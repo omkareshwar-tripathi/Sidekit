@@ -12,11 +12,6 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 ### Core (no OS dependencies — fully unit-testable)
 
-- [ ] **Brick 0b — Continuous integration (the safety net).** GitHub Actions workflow on `windows-latest` (real x64): restore, build the whole solution, run `dotnet test` on every push/PR. This is what catches Windows-only breakage you can't see on the Mac. (Gate the slow Whisper integration test to a separate/optional job.)
-  - Skill: dotnet-best-practices, run-tests
-  - Verify: push a branch → the Actions run goes green; intentionally break a Windows-only build line → CI goes red (then revert).
-  - **Watch (from Brick 0 review):** `TreatWarningsAsErrors=true` is solution-wide (`Directory.Build.props`). The first time real WinForms code lands (Brick 9/10), generated designer/`ApplicationConfiguration` partials could surface a warning-as-error that only shows on Windows. This CI run is where it'll first appear — if red on a generated-code warning, scope `TreatWarningsAsErrors` off generated files rather than disabling it.
-
 - [ ] **Brick 1 — Settings model + JSON store (`ISettingsStore`).** POCO settings (hotkey, modelSize, fillerRemoval, overlay, autostart, debugLogging) with defaults; load/save `%APPDATA%\SpeakType\settings.json`; tolerate missing/partial file.
   - Skill: dotnet-best-practices, dotnet-xunit, run-tests
   - Verify (unit): round-trip serialize/deserialize; missing file → defaults; partial file → defaults fill gaps; invalid hotkey rejected.
@@ -86,6 +81,15 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 ## Done
 
 _(Newest first.)_
+
+### Brick 0b — Continuous integration (2026-06-02)
+- **What:** GitHub Actions CI (`.github/workflows/ci.yml`) on `windows-latest` (real x64): checkout → setup .NET 8 → restore → build the full solution → test, on every push/PR to `main`. Has a `concurrency` group to cancel superseded runs.
+- **Files:** `.github/workflows/ci.yml`.
+- **Verified:** pushed to `main`; the run went **green in ~1m24s** (run 26778664115). The **Build step passing is the first real proof the `net8.0-windows` App compiles on Windows x64** — it retroactively validates Brick 0's deferred App build. Test step ran the smoke test green.
+- **Notes / follow-ups:**
+  - Test step filters `Category!=Integration` so the on-device Whisper test (Brick 7) is already excluded from the fast job; Brick 7 adds its own optional integration job.
+  - **Dated follow-up — by 2026-06-16:** GitHub deprecates Node 20 actions; `actions/checkout@v4` and `actions/setup-dotnet@v4` will be forced to Node 24 (may break). Bump to the Node-24 major versions before then (verify the tags exist first).
+  - The Brick 0 "warnings-as-errors on WinForms generated code" watch-point now lives with this CI run — it'll surface here first when Brick 9/10 lands real WinForms code.
 
 ### Brick 0 — Project scaffold (cross-platform split) (2026-06-02)
 - **What:** Three-project .NET 8 solution. `SpeakType.Core` (`net8.0`, holds `AppInfo.Name`), `SpeakType.App` (`net8.0-windows` WinForms, `AssemblyName=SpeakType`, minimal `Main` — no UI yet), `SpeakType.Tests` (xUnit, refs Core) with one smoke test. Root `Directory.Build.props` (shared `Nullable`/`ImplicitUsings`/`LangVersion`/`TreatWarningsAsErrors`) + `SpeakType.sln`. Self-contained single-file `win-x64` publish profile on the App.
