@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel an in-progress run when a newer commit is pushed to the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & test (windows x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore SpeakType.sln
+
+      # Builds the whole solution, including SpeakType.App (net8.0-windows),
+      # which cannot be built on macOS — this is the real Windows-build check.
+      - name: Build
+        run: dotnet build SpeakType.sln -c Release --no-restore
+
+      # Excludes the slow on-device Whisper test (Category=Integration), which
+      # arrives in Brick 7. It gets its own optional job then.
+      - name: Test
+        run: dotnet test SpeakType.sln -c Release --no-build --filter "Category!=Integration"
