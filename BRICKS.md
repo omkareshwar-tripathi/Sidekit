@@ -12,17 +12,10 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 ### Core (no OS dependencies — fully unit-testable)
 
-- [ ] **Brick 0 — Project scaffold (cross-platform split).** Create the solution with three projects so the logic is developable on macOS and the app builds on Windows:
-  - `SpeakType.Core` → **`net8.0`** (no Windows bits): pure logic + the port interfaces. Builds/tests on Mac **and** Windows.
-  - `SpeakType.App` → **`net8.0-windows`**, WinForms, x64: the Win32/NAudio/Whisper adapters + UI. **Builds on Windows only.** References `Core`. Add the self-contained single-file publish profile here.
-  - `SpeakType.Tests` → **`net8.0`** (xUnit), references `Core` only. Runs on Mac and Windows.
-  - Two-machine flow: develop+test `Core`/`Tests` on the Mac; build+run `App` on the Windows Intel laptop; Git is the bridge. Get one trivial passing test green.
-  - Skill: dotnet-best-practices, dotnet-xunit, run-tests
-  - Verify: on **Mac** `dotnet test` (Core+Tests) passes and `dotnet build SpeakType.App` *fails as expected* (Windows-only TFM); on **Windows** `dotnet build` (all) + `dotnet test` pass, `dotnet run --project SpeakType.App` shows an empty tray icon, and the publish command produces a runnable `.exe`.
-
 - [ ] **Brick 0b — Continuous integration (the safety net).** GitHub Actions workflow on `windows-latest` (real x64): restore, build the whole solution, run `dotnet test` on every push/PR. This is what catches Windows-only breakage you can't see on the Mac. (Gate the slow Whisper integration test to a separate/optional job.)
   - Skill: dotnet-best-practices, run-tests
   - Verify: push a branch → the Actions run goes green; intentionally break a Windows-only build line → CI goes red (then revert).
+  - **Watch (from Brick 0 review):** `TreatWarningsAsErrors=true` is solution-wide (`Directory.Build.props`). The first time real WinForms code lands (Brick 9/10), generated designer/`ApplicationConfiguration` partials could surface a warning-as-error that only shows on Windows. This CI run is where it'll first appear — if red on a generated-code warning, scope `TreatWarningsAsErrors` off generated files rather than disabling it.
 
 - [ ] **Brick 1 — Settings model + JSON store (`ISettingsStore`).** POCO settings (hotkey, modelSize, fillerRemoval, overlay, autostart, debugLogging) with defaults; load/save `%APPDATA%\SpeakType\settings.json`; tolerate missing/partial file.
   - Skill: dotnet-best-practices, dotnet-xunit, run-tests
@@ -92,7 +85,18 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 ## Done
 
-_(Newest first. Nothing completed yet.)_
+_(Newest first.)_
+
+### Brick 0 — Project scaffold (cross-platform split) (2026-06-02)
+- **What:** Three-project .NET 8 solution. `SpeakType.Core` (`net8.0`, holds `AppInfo.Name`), `SpeakType.App` (`net8.0-windows` WinForms, `AssemblyName=SpeakType`, minimal `Main` — no UI yet), `SpeakType.Tests` (xUnit, refs Core) with one smoke test. Root `Directory.Build.props` (shared `Nullable`/`ImplicitUsings`/`LangVersion`/`TreatWarningsAsErrors`) + `SpeakType.sln`. Self-contained single-file `win-x64` publish profile on the App.
+- **Files:** `SpeakType.sln`, `Directory.Build.props`, `SpeakType.Core/{SpeakType.Core.csproj,AppInfo.cs}`, `SpeakType.App/{SpeakType.App.csproj,Program.cs,Properties/PublishProfiles/win-x64.pubxml}`, `SpeakType.Tests/{SpeakType.Tests.csproj,AppInfoTests.cs,GlobalUsings.cs}`.
+- **Verified (on Mac):** `dotnet build SpeakType.Core` → 0 errors; `dotnet test SpeakType.Tests/SpeakType.Tests.csproj` → 1/1 passing; `dotnet build SpeakType.App` → fails **only** with the expected `MSB4019` (Windows-Desktop SDK absent on macOS), proving the split. **App build/run on Windows is NOT yet verified** — deferred to Brick 0b CI / the Windows laptop. (No tray UI exists yet — that's Brick 9; the earlier "empty tray icon" verify wording was wrong for a scaffold and is corrected here.)
+- **Notes / decisions:**
+  - **Mac test command targets the Tests project, not the solution** (`dotnet test SpeakType.Tests/SpeakType.Tests.csproj`). `dotnet build/test SpeakType.sln` fails on Mac because it pulls in the Windows-only App. Use the project-scoped command locally; CI/Windows builds the whole `.sln`.
+  - **x64 is achieved via the `win-x64` publish RID, not an MSBuild `Platform`.** Brick-0 review flagged that a `<Platforms>x64</Platforms>` on the App forced a fragile hand-edited `Any CPU→x64` remap in the `.sln`. Removed it; App now builds `Any CPU` (uniform `.sln`) and ships x64 via `RuntimeIdentifier=win-x64` in the pubxml. Simpler and still spec-compliant.
+  - Simplify pass removed duplicated `ImplicitUsings`/`Nullable` from the test csproj and a redundant `using Xunit;` (uses the template's `global using`).
+  - **Follow-up (Brick 15 packaging):** when NAudio/Whisper native libs arrive, the single-file publish will need `<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>`.
+  - The hand-authored `.sln` App entry (GUID `C7A2E1F4-…`) could not be CLI-validated on macOS; it's now standard `Any CPU` mappings, but Brick 0b CI is the first real proof the full solution builds on Windows.
 
 <!-- Template for each entry:
 
