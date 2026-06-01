@@ -12,10 +12,6 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 ### Core (no OS dependencies — fully unit-testable)
 
-- [ ] **Brick 1 — Settings model + JSON store (`ISettingsStore`).** POCO settings (hotkey, modelSize, fillerRemoval, overlay, autostart, debugLogging) with defaults; load/save `%APPDATA%\SpeakType\settings.json`; tolerate missing/partial file.
-  - Skill: dotnet-best-practices, dotnet-xunit, run-tests
-  - Verify (unit): round-trip serialize/deserialize; missing file → defaults; partial file → defaults fill gaps; invalid hotkey rejected.
-
 - [ ] **Brick 2 — Cleanup pipeline (pure).** Composable stages: filler removal (safe set + comma-bounded phrases; NOT like/actually/etc.), fixups (spacing/commas/`I`), formatting (trim + trailing space), hallucination filter (empty / `[BLANK_AUDIO]` / short-clip `you`/`Thank you.`). Filler stage toggleable.
   - Skill: dotnet-best-practices, dotnet-xunit, run-tests
   - Verify (unit, table-driven `[Theory]`): the corpus from spec Feature 4 (e.g. `"Um, I think, you know, we should ship it."` → `"I think we should ship it. "`; `"I mean it."` kept; `"i like pizza"` → `"I like pizza "`; toggle OFF retains fillers; hallucinations → empty).
@@ -81,6 +77,16 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 ## Done
 
 _(Newest first.)_
+
+### Brick 1 — Settings model + JSON store (2026-06-02)
+- **What:** `AppSettings` POCO (hotkey, modelSize, fillerRemoval, overlay, autostart, debugLogging) with spec defaults (RightCtrl / base.en / on / on / on / off), an `ISettingsStore` port, and `JsonSettingsStore` (System.Text.Json, camelCase keys) reading/writing `%APPDATA%\SpeakType\settings.json` (path is constructor-injected for testability; `DefaultFilePath` static for the real location). Robust load: missing file, partial file, corrupt JSON, and blank/explicit-null string fields all fall back to defaults via `AppSettings.Normalize()`.
+- **Files:** `SpeakType.Core/Settings/{AppSettings.cs, ISettingsStore.cs, JsonSettingsStore.cs}`, `SpeakType.Tests/Settings/JsonSettingsStoreTests.cs`.
+- **Verified (on Mac):** `dotnet test SpeakType.Tests/...` → **10/10 pass** — round-trip (non-default values through disk), missing→defaults, partial→defaults, corrupt→defaults, literal-`null`→defaults, blank/explicit-null hotkey & modelSize→defaults, Save-creates-dir, camelCase keys (all six, no PascalCase leak). No manual M# (pure logic). CI on Windows covers it too.
+- **Notes / decisions:**
+  - **Normalization lives on the model (`AppSettings.Normalize()`), not in the store** — review flagged that putting it in `JsonSettingsStore.Load()` duplicated the default and coupled the port to field semantics (any future store impl would have to re-implement it). Single-source defaults via `DefaultHotkey`/`DefaultModelSize` consts.
+  - **Boundary:** "invalid hotkey rejected" here means **blank/null → default only**. Full hotkey-grammar validation (which keys/combos are legal) is **Brick 4** (the hotkey listener). Don't duplicate it here.
+  - Code review caught a real latent NRE: an explicit JSON `null` on a non-nullable string (e.g. `{ "modelSize": null }`) would survive deserialization as null; `Normalize()` now coerces it, with tests.
+  - **Possible later hardening (not done, §2):** `Save()` is a non-atomic `File.WriteAllText`; a crash mid-write yields a corrupt file (which `Load()` already degrades to defaults). A temp-file+rename swap would make it atomic — revisit if corruption is ever observed, since settings are rewritten on every change (apply-on-change).
 
 ### Brick 0b — Continuous integration (2026-06-02)
 - **What:** GitHub Actions CI (`.github/workflows/ci.yml`) on `windows-latest` (real x64): checkout → setup .NET 8 → restore → build the full solution → test, on every push/PR to `main`. Has a `concurrency` group to cancel superseded runs.
