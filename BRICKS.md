@@ -12,10 +12,6 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 ### App shell, UI & polish
 
-- [ ] **Brick 13 — Logging + performance timing.** Rolling log at `%APPDATA%\SpeakType\logs`; metadata + timings only by default; transcript text only when Debug logging on; log release→paste latency each run.
-  - Skill: dotnet-best-practices, dotnet-xunit, run-tests
-  - Verify: unit — log line formatting; transcript absent by default, present when debug on. Manual — latency line appears, observe vs <2 s goal.
-
 ### Integration & ship
 
 - [ ] **Brick 14 — End-to-end wiring.** Compose the real adapters into the orchestrator behind composition root; full dictation works in a real app.
@@ -23,6 +19,7 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
   - **Own the threading model.** The orchestrator is synchronous in v1; the real auto-stop timer fires `OnAutoStop` on a thread-pool thread, so its `State` guard + `_pressTimestamp` are **not thread-safe** today. A release racing the 60 s fire could double-run the cycle. Marshal hotkey + timer callbacks onto one thread (or lock) here, and offload the capture→transcribe→paste work off the UI thread.
   - **`WhisperTranscriber.Transcribe` must run OFF the UI thread (Brick 7 review).** It bridges Whisper's async stream synchronously (`ToBlockingEnumerable`). Verified it will NOT deadlock (Whisper.net uses `ConfigureAwait(false)` + a thread-pool worker), but calling it inline on the WinForms UI thread **freezes the window** for the whole transcription. Wrap the cycle in `Task.Run`. Also: `WhisperTranscriber.Dispose()` throws if a transcription is still in flight — only dispose when idle (or switch to `DisposeAsync`), which the single-cycle + off-UI-thread design already ensures.
   - **Reference `Whisper.net.Runtime` from the App (Brick 7).** The `SpeakType.Whisper` adapter references only managed `Whisper.net`; the deployable app must add `Whisper.net.Runtime` (native libs) so Whisper actually runs — a packaging concern shared with Brick 15.
+  - **Logging wiring (from Brick 13).** Construct `FileLogSink(FileLogSink.DefaultLogPath)` → wrap in `AppLogger`, passing `() => settings.DebugLogging` (a live `Func<bool>`, NOT a captured bool, so the Debug-logging toggle applies immediately). Call `Recording`/`Transcribed`/`Latency`/`Transcript`/`Error` from the dictation cycle; measure release→paste latency with the monotonic Stopwatch `IClock` (avoids the negative-latency case). The sink is best-effort (never throws) and process-locks, so it's safe to call from the timer/UI/background threads.
   - **Autostart wiring (deferred from Brick 12).** Brick 12 wired only the tray "Start with Windows" toggle → `WinAutostart`. Funnel that AND `SettingsForm.AutostartChanged` through one `ApplyAutostart(bool)` path that also keeps both surfaces (tray checkmark + Settings checkbox) and `AppSettings.Autostart` in sync. **Gate the hotkey on model readiness** (Brick 12 makes the app exit if first-run setup is abandoned, but once running, the hotkey must stay inert until the model is actually loaded). Handle **corrupt-on-load re-download** (spec Feature 2): Brick 12's first-run gate is existence-only, so a truncated/stale cached model is re-downloaded only here, at load time.
   - Skill: dotnet-best-practices, run-tests
   - Verify: manual — **M1** end-to-end + **M8** (full happy path across Notepad/Slack/browser).
@@ -37,6 +34,8 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
   - Skill: dotnet-best-practices, run-tests
 - [ ] **Clipboard contention + paste error handling (revealed by Brick 8 review).** WinForms `Clipboard` throws transient `ExternalException` when another process holds the clipboard open; today that propagates out of `ClipboardPasteService.Paste` (and on Windows, up through the hotkey hook callback). Add best-effort retry/swallow in the `WinClipboard` adapter and decide the user-facing failure surface. Tightly coupled to Brick 9 (global exception handling) and Brick 14 (threading / marshalling the paste onto the STA thread) — fold in there rather than as a standalone brick if convenient.
   - Skill: dotnet-best-practices, run-tests
+- [ ] **Unify the `%APPDATA%/%LOCALAPPDATA%\SpeakType` path literal via `AppInfo.Name` (revealed by Brick 13 review).** `JsonSettingsStore.DefaultFilePath`, `ModelStore.DefaultModelsDirectory`, and `FileLogSink.DefaultLogPath` each hardcode the `"SpeakType"` string, though `AppInfo.Name` exists for exactly this (its doc-comment already says so). Three sites now — replace all three together (a one-off in `FileLogSink` would just make it the odd one out). Pure cleanup, Core-only, fully Mac-testable.
+  - Skill: dotnet-best-practices, run-tests
 - [ ] **Shared test temp-dir helper (revealed by Brick 6b review).** The temp-dir scaffolding (`_tempDir` field + ctor + `Dispose`) is now duplicated across `JsonSettingsStoreTests`, `ModelStoreTests`, and `HttpModelDownloaderTests` (rule-of-three met). Extract a tiny `TempDir`/`TempDirFixture` IDisposable helper and have the three classes use it (~12 lines saved each). Deferred from Brick 6b to keep that brick from editing already-shipped test files; do it as its own small test-only brick.
   - Skill: dotnet-xunit, run-tests
 
@@ -46,6 +45,17 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 ## Done
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
+
+### Brick 13 — Logging + performance timing (2026-06-02)
+- **What:** Local diagnostic logging (spec Logging & Privacy + Performance). `AppLogger` (Core) formats one line per dictation-cycle event — `recording 7.2s`, `transcribe 1.4s, 38 chars`, `latency 1.8s` (the release→paste perf line, logged each run), `error: …` — **always**; the **transcribed text** is logged **only when Debug logging is on** (privacy default = off), with the flag read **live** (a `Func<bool>`) so the Settings toggle applies immediately. `FileLogSink` (Core) writes to `%APPDATA%\SpeakType\logs\speaktype.log`, size-rolling to one `.1` backup, thread-safe, timestamp-prefixed. Not wired into the orchestrator yet (Brick 14).
+- **Files:** `SpeakType.Core/Logging/{ILogSink.cs, AppLogger.cs, FileLogSink.cs}` (new); tests `SpeakType.Tests/Logging/{AppLoggerTests.cs, FileLogSinkTests.cs}` (new).
+- **Verified:** Fully cross-platform → `dotnet test SpeakType.Tests/...` **143/143 pass** (16 new: each metadata line's format, transcript absent-by-default / present-when-debug / live-flag, file+dir creation, append, timestamp prefix, rolling-preserves-old-content-in-backup, non-positive-maxBytes guard, best-effort I/O-failure swallow, newline collapse). Windows x64 **CI also green** (run 26829056095). **Manual: the latency line is observed end-to-end in M8 (Brick 14).**
+- **Notes / decisions:**
+  - **Best-effort sink (code-review must-fix):** `FileLogSink.Write` wraps its file I/O in a swallow — a logger must never take down the thing it observes (disk full, permissions, AV lock, a dir deleted mid-run). The `ILogSink` contract now states Write never throws and emits one physical line.
+  - **Newline sanitization (code-review must-fix):** dictated transcripts legitimately contain newlines; written raw they'd split into multiple un-timestamped physical lines and could **forge a log line** (injection). `Write` collapses embedded newlines (`ReplaceLineEndings(" ")`) so each event is exactly one line.
+  - **Non-positive `maxBytes` guard (code-review must-fix):** `maxBytes <= 0` would roll on every write, silently destroying history; the ctor now rejects it (mirrors the existing `ThrowIfNullOrEmpty(filePath)`).
+  - **Three-way split** (`ILogSink` port / `AppLogger` formatting brain / `FileLogSink` adapter) keeps formatting + the privacy gate pure and unit-testable; timestamp/rolling/locking live in the adapter. File I/O lives in Core because the project already puts cross-platform file I/O there (`ModelStore`, `JsonSettingsStore`) — so the whole brick is Mac-testable.
+  - **Single `.1` backup** is the spec's minimum "rolling" interpretation (bounds disk ~2×maxBytes); N-generation rolling is a deferrable design decision, not done autonomously. The `"SpeakType"` path literal is now a 3-site duplication vs `AppInfo.Name` → backlog cleanup.
 
 ### Brick 12 — First-run + autostart (2026-06-02)
 - **What:** First-launch setup + Start-with-Windows (spec Feature 2 first-run + Feature 6 autostart). On first run (no `base.en` model on disk) a **Welcome window** shows the one-line how-to ("Hold Right Ctrl, speak, release.") and downloads `base.en` with a progress bar (Retry on failure); on success the app registers autostart and shows a **"Ready!"** tray balloon. If setup doesn't complete (download abandoned / window closed) the app **exits cleanly** rather than running with no usable model. **Autostart** is the per-user `HKCU\…\Run` key (default ON, applied once first-run setup succeeds), toggled from the tray "Start with Windows" item; the menu checkmark is reconciled to the real registry state at startup.
@@ -67,16 +77,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
   - **Orphaned `ModelSize` reconciled (code review must-fix):** `AppSettings.Normalize()` only null-checks, so a stored model name not in the catalog would leave the `DropDownList` **blank** and the setting unreconciled. The form now falls back to `DefaultModelSize` and updates the in-memory setting, so the dropdown is never empty.
   - **Shared-instance + Save-per-edit** is what makes filler/overlay/debug apply live for free. **Brick 14 owns failure/rollback** — the form persists-then-notifies and can't itself undo a setting if a side-effect (e.g. a model download) fails.
   - **No Save button** per spec; closing the window hides it so the single instance is reshown.
-
-### Brick 10 — Recording overlay (2026-06-02)
-- **What:** The on-screen status overlay (spec Feature 6). `RecordingOverlay` (App) is a borderless, always-on-top, **no-activate, click-through** `Form` that **never steals focus** (so the paste target keeps its caret), shown near the **bottom-center of the active monitor**. `ShowStatus(OverlayStatus)` displays the right text per state and `FadeOut()` fades it away on completion. The exact display strings — **🎙 Listening…**, **⚙ Transcribing…**, **No speech detected**, **Copied — paste manually** — live in Core (`OverlayText.For`, unit-tested), mirroring the `TrayState` precedent.
-- **Files:** `SpeakType.Core/Overlay/OverlayStatus.cs` (new); tests `SpeakType.Tests/Overlay/OverlayTextTests.cs` (new); `SpeakType.App/Overlay/RecordingOverlay.cs` (new, Windows-only). Drive + `AppSettings.Overlay` gating deferred to Brick 14.
-- **Verified:** Core on Mac → `dotnet test SpeakType.Tests/...` **127/127 pass** (4 new theory cases: the status→text mapping). App is **Windows-only — cannot build on Mac**; Windows x64 **CI is the compile gate** (green: run 26825692605, after a `fix` for a `Timer` ambiguity — see below). **Manual M5 (appears bottom-center, correct text, fades, never steals focus) deferred to the laptop.**
-- **Notes / decisions:**
-  - **Alpha via `SetLayeredWindowAttributes`, not `Form.Opacity` (code review must-fix):** the original set `WS_EX_LAYERED` in `CreateParams` *and* used `Form.Opacity`, a known trap that can leave the window invisible (Opacity manages the layered style itself). The overlay now drives a layered+transparent window's uniform alpha directly (LWA_ALPHA) — the reliable click-through-fading-overlay recipe.
-  - **`Timer` ambiguity broke the Windows build (CI caught it):** WinForms `Timer` collided with `System.Threading.Timer` (in the implicit usings) → CS0104; fixed by fully-qualifying `System.Windows.Forms.Timer`. (The Mac unit suite can't compile App, so CI is the gate — it did its job.)
-  - **Font leak fixed (code review):** the label's explicitly-created `Font` was never disposed; it's now a field disposed with the form (and the redundant `_label.Dispose()` was dropped — the Controls collection disposes it).
-  - **"Active monitor" = the cursor's screen** — a reasonable v1 heuristic; resolving the foreground window's screen is a later refinement.
 
 <!-- Template for each entry:
 
