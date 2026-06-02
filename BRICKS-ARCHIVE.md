@@ -4,6 +4,13 @@ Append-only archive of completed bricks, moved out of `BRICKS.md` to keep the ac
 
 ---
 
+### Brick 17 — Unify per-user path literals via AppInfo.Name (2026-06-03)
+- **What:** Pure cleanup (revealed by the Brick 13 review): the three per-user default paths each hardcoded the `"SpeakType"` folder string, although `AppInfo.Name` exists for exactly that (its doc-comment already cites these paths). Replaced the literal with `AppInfo.Name` at all three sites so renaming the app moves settings/models/logs together instead of leaving stragglers. No behavior change (`AppInfo.Name == "SpeakType"`).
+- **Files:** `SpeakType.Core/Settings/JsonSettingsStore.cs` (`DefaultFilePath`), `SpeakType.Core/Models/ModelStore.cs` (`DefaultModelsDirectory`), `SpeakType.Core/Logging/FileLogSink.cs` (`DefaultLogPath`); tests `SpeakType.Tests/DefaultPathsTests.cs` (new, +3).
+- **Verified:** Fully cross-platform → `dotnet test SpeakType.Tests/...` **179/179 pass** (3 new characterization tests assert each default ends with `Path.Combine(AppInfo.Name, …)` — green both before and after the swap, locking in the behavior the refactor preserves).
+- **Notes / decisions:**
+  - **Scope:** `AppInfo` resolves with no `using` from the `SpeakType.Core.*` sub-namespaces (enclosing-namespace lookup). The two remaining `"SpeakType…"` strings in the App layer are **UI copy** ("SpeakType Settings" title, the "already running" balloon), not the path folder — intentionally left (display text can diverge from the folder name). Backlog item retired.
+
 ### Brick 15 — Packaging (self-contained single-file win-x64) (2026-06-03)
 - **What:** Finalized v1 packaging (spec Feature 26): the documented publish command now produces **one self-contained, single-file `win-x64` `.exe`** that runs on a clean machine with no .NET install. The fix that makes it a *true* single file is `IncludeNativeLibrariesForSelfExtract` in the App csproj — without it, single-file publish drops the native whisper.cpp libraries (`Whisper.net.Runtime`) *beside* the exe; with it they're embedded and self-extracted at launch. Added a README (the repo had none) documenting build/test/run, the publish command + output path, and the expected unsigned-app SmartScreen warning. Added a CI **publish smoke step** that runs the spec publish command and asserts the exe is produced, so a broken packaging config fails the build instead of only surfacing on the clean-machine test.
 - **Files:** `SpeakType.App/SpeakType.App.csproj` (`IncludeNativeLibrariesForSelfExtract`); `.github/workflows/ci.yml` (publish + exe-exists steps); `README.md` (new). No source/test changes.

@@ -14,9 +14,6 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2026-06-03-ui-modern-light-restyle-design.md`; plan: `docs/superpowers/plans/2026-06-03-ui-modern-light-restyle.md`. All Windows-only → verify = CI compile-green + a laptop screenshot vs mockup B (no Core changes; 179 tests stay green)._
 
-- [ ] **Brick UI-3 — Restyle SettingsForm.** Apply `UiTheme`, swap the 4 checkboxes → `ToggleSwitch` (`MakeCheck`→`MakeToggle`, keep the `_loading` guard + all event wiring), flatten the hotkey field + model dropdown. First visible change.
-  - Skill: dotnet-best-practices, run-tests
-  - Verify: CI compile-green; laptop screenshot vs mockup B; re-check M6 (settings still apply live).
 - [ ] **Brick UI-4 — Restyle WelcomeForm.** Apply `UiTheme` (Semibold heading, muted status), make Retry a primary accent button; keep the system progress bar.
   - Skill: dotnet-best-practices, run-tests
   - Verify: CI compile-green; laptop screenshot; re-check M2 (download + Retry still work).
@@ -46,6 +43,14 @@ _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 
+### Brick UI-3 — Restyle SettingsForm (2026-06-03)
+- **What:** First *visible* brick of the modern-light restyle. The Settings window now wears `UiTheme`: light background + Segoe UI via `StyleWindow`, the hotkey `TextBox` and model `ComboBox` flattened via `StyleField`, and the four square checkboxes (Remove filler words / Show recording overlay / Start with Windows / Debug logging) replaced by the new `ToggleSwitch`. The old `MakeCheck` helper became `MakeToggle` (same signature). **All behaviour is unchanged** — the `_loading` guard, the four apply-and-save handlers, the `AutostartChanged` event, hotkey commit/rebind and model-switch wiring are preserved verbatim.
+- **Files:** `SpeakType.App/Settings/SettingsForm.cs` (usings, `StyleWindow`/`StyleField`, layout `BackColor`, `MakeCheck`→`MakeToggle` + 4 call sites). No Core/test changes.
+- **Verified:** Windows-only → **Windows x64 CI green** (run 26844849720, build + publish) = compile-green. Core suite untouched → **179/179**. `/code-review` → **no correctness bugs** (6 candidates all REFUTED): object-initializer ordering + `_loading` both prevent any spurious save on construction; `FlatStyle.Flat` doesn't change the `DropDownList` selection; `internal` `ToggleSwitch`/`UiTheme` are accessible from the `public` form (same assembly); the fixed-size toggle in an AutoSize cell won't clip. `/simplify` → 2 soft findings, neither applied (see notes). **Visual + M6 (settings still apply live) = laptop screenshot vs mockup B — first screenshot of the restyle, do this pass.**
+- **Notes / decisions:**
+  - **`/simplify` deferred, not skipped blindly:** (a) the layout's explicit `BackColor = UiTheme.Background` is technically redundant with `StyleWindow`'s ambient inheritance — **kept** as plan-specified (explicit beats relying on WinForms ambient-color quirks; zero cost). (b) the layout still hardcodes `Padding(12)` instead of `UiTheme.WindowPadding` (20px) and the rows don't use `RowGap` — that's a **visual spacing** change, deferred to the screenshot loop rather than blind-guessing pixels on a Mac that can't render WinForms. **If the first screenshot looks cramped vs mockup B, the fix is `Padding(12)`→`UiTheme.WindowPadding` (and widen `AddRow` margins toward `RowGap`).**
+  - **Toggle rows are ~18px tall vs the old checkbox rows** — slightly shorter; expected from the restyle, validate in the screenshot.
+
 ### Brick UI-2 — ToggleSwitch control (2026-06-03)
 - **What:** Second foundation brick of the modern-light restyle. Added `ToggleSwitch` — a small owner-drawn on/off switch (pill track + knob, painted via `UiTheme` colours: accent when on, grey `ToggleOff` when off, white knob) that replaces the square WinForms `CheckBox` in Settings. Exposes only the slice the forms use — `Checked` (bool) + `CheckedChanged` — and toggles on mouse click or Space/Enter. No animation (instant flip, per spec). **Not wired into any form yet** — that's UI-3.
 - **Files:** `SpeakType.App/Controls/ToggleSwitch.cs` (new). No Core/test changes.
@@ -62,13 +67,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
   - **`public` members inside an `internal static` class** → effective accessibility is internal (harmless; left as written in the plan).
   - **Tray-state colours (SteelBlue/Red/Orange/DarkRed) and the dark RecordingOverlay are intentionally NOT in UiTheme** — they're status-indicator / dark-HUD concerns, separate from the light chrome palette.
   - **Fonts are `static readonly`, held for process lifetime** (small fixed set, app is a singleton) — not disposed by design.
-
-### Brick 17 — Unify per-user path literals via AppInfo.Name (2026-06-03)
-- **What:** Pure cleanup (revealed by the Brick 13 review): the three per-user default paths each hardcoded the `"SpeakType"` folder string, although `AppInfo.Name` exists for exactly that (its doc-comment already cites these paths). Replaced the literal with `AppInfo.Name` at all three sites so renaming the app moves settings/models/logs together instead of leaving stragglers. No behavior change (`AppInfo.Name == "SpeakType"`).
-- **Files:** `SpeakType.Core/Settings/JsonSettingsStore.cs` (`DefaultFilePath`), `SpeakType.Core/Models/ModelStore.cs` (`DefaultModelsDirectory`), `SpeakType.Core/Logging/FileLogSink.cs` (`DefaultLogPath`); tests `SpeakType.Tests/DefaultPathsTests.cs` (new, +3).
-- **Verified:** Fully cross-platform → `dotnet test SpeakType.Tests/...` **179/179 pass** (3 new characterization tests assert each default ends with `Path.Combine(AppInfo.Name, …)` — green both before and after the swap, locking in the behavior the refactor preserves).
-- **Notes / decisions:**
-  - **Scope:** `AppInfo` resolves with no `using` from the `SpeakType.Core.*` sub-namespaces (enclosing-namespace lookup). The two remaining `"SpeakType…"` strings in the App layer are **UI copy** ("SpeakType Settings" title, the "already running" balloon), not the path folder — intentionally left (display text can diverge from the folder name). Backlog item retired.
 
 <!-- Template for each entry:
 
