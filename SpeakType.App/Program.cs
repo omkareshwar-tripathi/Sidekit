@@ -1,12 +1,22 @@
 using System.Drawing;
 using System.Net.Http;
 using System.Windows.Forms;
+using SpeakType.App.Audio;
+using SpeakType.App.Input;
+using SpeakType.App.Paste;
 using SpeakType.App.Startup;
+using SpeakType.App.Threading;
 using SpeakType.App.Tray;
 using SpeakType.Core;
+using SpeakType.Core.Cleanup;
+using SpeakType.Core.Input;
 using SpeakType.Core.Models;
 using SpeakType.Core.Orchestration;
+using SpeakType.Core.Paste;
 using SpeakType.Core.Settings;
+using SpeakType.Core.Time;
+using SpeakType.Core.Transcription;
+using SpeakType.Whisper;
 
 namespace SpeakType.App;
 
@@ -84,10 +94,70 @@ internal static class Program
         // Reflect the real Run-key state in the menu (the user may have toggled it off on a prior run).
         tray.SetStartWithWindowsChecked(autostart.IsEnabled());
 
-        // This brick builds only the tray + lifecycle shell. Wiring the tray's state and
-        // Pause to the real DictationOrchestrator is Brick 14 (the composition root).
+        // Build the dictation pipeline now that a usable model is present. The hotkey hook is installed
+        // LAST — after the model loads — so it stays inert until SpeakType is actually ready (spec Feature 2).
+        var settingsStore = new JsonSettingsStore(JsonSettingsStore.DefaultFilePath);
+        var settings = settingsStore.Load();
+
+        var transcriber = LoadTranscriber(modelStore, modelName, tray);
+        if (transcriber is null)
+        {
+            return; // corrupt-on-load re-download was abandoned; tray already disposed
+        }
+
+        using var uiMarshaller = new UiMarshaller();
+        using var capture = new NAudioCapture();
+        using var autoStopTimer = new SystemAutoStopTimer();
+        using var hotkey = new Win32HotkeyListener(Hotkey.Resolve(settings.Hotkey, AppSettings.DefaultHotkey));
+
+        // Paste runs inside the background cycle, but WinForms Clipboard needs the STA UI thread, so it
+        // is marshalled there. The cycle itself runs off the UI thread so transcription never freezes it.
+        var pasteService = new ClipboardPasteService(new MarshallingClipboard(new WinClipboard(), uiMarshaller));
+        var dispatcher = new BackgroundCycleDispatcher(ex => uiMarshaller.Post(() => RecoverFromUiException(tray, ex)));
+
+        // The orchestrator subscribes to the hotkey in its constructor; the hotkey listener keeps it
+        // alive for the session, so the instance itself isn't held here.
+        _ = new DictationOrchestrator(
+            hotkey, capture, transcriber, pasteService, new TranscriptCleaner(), settings,
+            new SystemClock(), autoStopTimer, dispatcher);
+
         Application.Run();
         tray.Dispose();
+
+        // Dispose the model last. Guard against the rare quit-during-transcription: WhisperTranscriber
+        // throws if disposed mid-run, and the process is exiting anyway.
+        try
+        {
+            (transcriber as IDisposable)?.Dispose();
+        }
+        catch
+        {
+            // Ignore — a cycle was still in flight at quit; the OS reclaims native resources on exit.
+        }
+    }
+
+    // Loads the Whisper model into a transcriber. Implements spec Feature 2 "corrupt-on-load": the
+    // first-run gate only checks the file exists, so a truncated/stale cached model is detected here
+    // (Whisper fails to load it) and re-downloaded via the Welcome flow. Returns null if that
+    // re-download is abandoned (in which case the tray has been disposed and the app should exit).
+    private static ITranscriber? LoadTranscriber(ModelStore modelStore, string modelName, TrayIcon tray)
+    {
+        var modelPath = modelStore.GetInstalledModelPath(modelName)!; // guaranteed present by the first-run gate
+        try
+        {
+            return new WhisperTranscriber(modelPath);
+        }
+        catch (Exception)
+        {
+            using var redownload = new WelcomeForm(modelStore, modelName);
+            if (redownload.ShowDialog() != DialogResult.OK)
+            {
+                tray.Dispose();
+                return null;
+            }
+
+            return new WhisperTranscriber(modelStore.GetInstalledModelPath(modelName)!);
+        }
     }
 
     // Surface a recoverable UI-thread failure as a balloon and return to Idle rather than crash.

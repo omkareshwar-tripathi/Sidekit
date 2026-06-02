@@ -10,8 +10,12 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.2.1" />
+    <!-- Native whisper.cpp libraries so Whisper actually runs in the deployed app; the managed
+         Whisper.net comes transitively via the SpeakType.Whisper project reference. -->
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SpeakType.Core\SpeakType.Core.csproj" />
+    <ProjectReference Include="..\SpeakType.Whisper\SpeakType.Whisper.csproj" />
   </ItemGroup>
 </Project>
