@@ -31,6 +31,8 @@ coverage/
 # SpeakType runtime artifacts (never commit these)
 # Whisper model files are large and downloaded at runtime
 *.bin
-models/
+# Only a repo-root models/ dir (stray local downloads); the runtime store lives in
+# %LOCALAPPDATA%. Anchored so it does not clobber source folders like Core/Models/.
+/models/
 # Local logs
 logs/
