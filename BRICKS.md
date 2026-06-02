@@ -12,10 +12,6 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 ### App shell, UI & polish
 
-- [ ] **Brick 11 — Settings window.** WinForms form: hotkey rebind, model dropdown, Remove-filler toggle, overlay toggle, Start-with-Windows toggle, Debug-logging toggle. Apply-on-change → `ISettingsStore`; hotkey rebind re-registers hook; model change triggers store download/switch.
-  - Skill: dotnet-best-practices, run-tests
-  - Verify: manual — **M6**.
-
 - [ ] **Brick 12 — First-run + autostart.** Welcome window (how-to + `base.en` download progress; hotkey inert until ready → "Ready!" balloon); `HKCU\…\Run` autostart (default ON), toggled from tray/Settings.
   - Skill: dotnet-best-practices, run-tests
   - Verify: manual — **M2** (first-run), **M6** (autostart registry key add/remove).
@@ -54,6 +50,16 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 
+### Brick 11 — Settings window (2026-06-02)
+- **What:** The settings UI (spec Feature 7). `SettingsForm` (App) is a thin fixed dialog over the shared, live `AppSettings` with **no Save button** — every edit mutates that instance, persists via `ISettingsStore.Save`, and applies live. Controls: a **Hotkey** textbox (validated with `Hotkey.TryParse`), a **Model size** dropdown (the catalog ordered by size: tiny.en/base.en/small.en), and toggles for **Remove filler words**, **Show recording overlay**, **Start with Windows**, and **Debug logging**. Side-effects the form can't do itself are raised as events for the Brick 14 composition root: `HotkeyRebound` (re-register the global hook), `ModelChangeRequested` (download/switch the model), `AutostartChanged` (write/remove the HKCU Run key — Brick 12). Filler/overlay/debug need no event — they mutate the same `AppSettings` the orchestrator/logger already read.
+- **Files:** `SpeakType.App/Settings/SettingsForm.cs` (new, Windows-only). No new Core code → no new unit tests (spec §8: adapters are manual-tested; settings round-trip/defaults/invalid-hotkey are already unit-tested in earlier bricks).
+- **Verified:** Core suite unchanged → `dotnet test SpeakType.Tests/...` **127/127**. App is **Windows-only — cannot build on Mac**; Windows x64 **CI is the compile gate** (green: run 26826439447). **Manual M6 (change each setting → immediate effect; survives restart) deferred to the laptop.**
+- **Notes / decisions:**
+  - **Hotkey via `Leave` + a changed-guard + commit-on-close (code review must-fix):** the first cut used `Validating`+`e.Cancel`, which under the form's default `AutoValidate.EnableAllowFocusChange` doesn't trap focus — so a newly-typed valid hotkey could be **lost on close**, and merely re-focusing the box **re-saved + re-registered the hook**. Now it applies on `Leave` only when the text actually changed, and `OnFormClosing` commits a pending valid value before hiding (and discards an invalid one).
+  - **Orphaned `ModelSize` reconciled (code review must-fix):** `AppSettings.Normalize()` only null-checks, so a stored model name not in the catalog would leave the `DropDownList` **blank** and the setting unreconciled. The form now falls back to `DefaultModelSize` and updates the in-memory setting, so the dropdown is never empty.
+  - **Shared-instance + Save-per-edit** is what makes filler/overlay/debug apply live for free. **Brick 14 owns failure/rollback** — the form persists-then-notifies and can't itself undo a setting if a side-effect (e.g. a model download) fails.
+  - **No Save button** per spec; closing the window hides it so the single instance is reshown.
+
 ### Brick 10 — Recording overlay (2026-06-02)
 - **What:** The on-screen status overlay (spec Feature 6). `RecordingOverlay` (App) is a borderless, always-on-top, **no-activate, click-through** `Form` that **never steals focus** (so the paste target keeps its caret), shown near the **bottom-center of the active monitor**. `ShowStatus(OverlayStatus)` displays the right text per state and `FadeOut()` fades it away on completion. The exact display strings — **🎙 Listening…**, **⚙ Transcribing…**, **No speech detected**, **Copied — paste manually** — live in Core (`OverlayText.For`, unit-tested), mirroring the `TrayState` precedent.
 - **Files:** `SpeakType.Core/Overlay/OverlayStatus.cs` (new); tests `SpeakType.Tests/Overlay/OverlayTextTests.cs` (new); `SpeakType.App/Overlay/RecordingOverlay.cs` (new, Windows-only). Drive + `AppSettings.Overlay` gating deferred to Brick 14.
@@ -74,17 +80,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
   - **Second-instance balloon needs a pump (code review):** a balloon won't render without a running message loop, so the "already running" path runs a brief `Application.Run()` that exits on a timer instead of `Thread.Sleep`.
   - **Icons generated in code, not shipped as assets** — keeps the brick self-contained and avoids committing binaries; colors Idle=SteelBlue, Recording=Red, Busy=Orange, Error=DarkRed.
   - **`TrayState.Error`** has no `RecordingState` source by design — it's a spec-listed tray state set explicitly by Brick 14's adapter-failure handling (e.g. "No microphone found") via `SetState`, so it's staged, not dead.
-
-### Brick 8 — Clipboard-safe paste (2026-06-02)
-- **What:** "Works everywhere" paste (spec Feature 5). Behind the ports-and-adapters seam: a new `IClipboard` port (Core) with text-only save/restore primitives, a best-effort editable-target check, and a `SendPaste` that reports whether the keystrokes were actually injected. `ClipboardPasteService` (Core) runs the sequence **save current clipboard text → set our text → check for a focused editable target → Ctrl+V → wait ~150 ms (so the target can read the clipboard) → restore the original**. If no editable target is confirmed **or** the OS blocks the paste injection, it skips the restore and **leaves our text on the clipboard** (`PasteOutcome.LeftOnClipboard` → overlay "Copied — paste manually"), so the user's words are never silently lost. The Windows adapter `WinClipboard` (App) wraps WinForms `Clipboard` + `SendInput` Ctrl+V + `GetGUIThreadInfo` caret detection. Not wired into the app yet (Brick 14).
-- **Files:** `SpeakType.Core/Paste/{IClipboard.cs, ClipboardPasteService.cs}` (new); `SpeakType.App/Paste/WinClipboard.cs` (new, Windows-only); tests `SpeakType.Tests/Paste/ClipboardPasteServiceTests.cs` (new).
-- **Verified:** Core on Mac → `dotnet test SpeakType.Tests/...` **119/119 pass** (7 new: full-sequence ordering, restore-after-delay ordering, null-original → `Clear`, no-target leave-on-clipboard, **blocked-paste leave-on-clipboard**, null-text and null-clipboard guards). App adapter is **Windows-only — cannot build on Mac**; Windows x64 **CI is the compile gate** (green: run 26823975915). **Manual M4 deferred to the laptop** (paste into Slack, clipboard restored, click-desktop → "Copied — paste manually").
-- **Notes / decisions:**
-  - **Save-then-set, in both branches** — our cleaned text is put on the clipboard *before* the target check, so even the leave-on-clipboard path preserves the words. The injected `Action<TimeSpan>` delay keeps the 150 ms restore-wait policy in Core while making the ordering unit-testable without real sleeping.
-  - **SendPaste returns success (code review must-fix):** the original ignored `SendInput`'s return, so a paste blocked by UIPI (non-elevated app → elevated foreground window) would still restore the old clipboard and report success, silently losing the dictation. Now a blocked injection returns `LeftOnClipboard` and keeps our text. Core-tested.
-  - **CS0649 build-break averted (code review must-fix):** the Win32 interop structs (`MOUSEINPUT`/`RECT`/unused `GUITHREADINFO` members) have fields populated only by the marshaller, which trips CS0649 under `TreatWarningsAsErrors` — fixed with a scoped `#pragma warning disable CS0649` (the existing hotkey adapter sidestepped this by reading raw bytes). This would have failed CI; caught before push.
-  - **`GetGUIThreadInfo(0, …)`** uses the foreground thread directly, dropping the `GetForegroundWindow`+`GetWindowThreadProcessId` dance (simpler, avoids a rare focus-on-another-thread false negative).
-  - **Follow-ups revealed (see Backlog):** the caret-only target check returns false for **Electron/Chromium** apps (Slack, VS Code, Chrome, Discord) → they hit leave-on-clipboard, which **M4 expects to paste** — needs UI Automation. Also clipboard `ExternalException` contention + the STA-thread requirement are owned by Bricks 9/14 (error handling + threading), noted on `WinClipboard`.
 
 <!-- Template for each entry:
 
