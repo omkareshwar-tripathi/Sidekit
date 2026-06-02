@@ -182,6 +182,29 @@ public sealed record Hotkey(HotkeyModifiers Modifiers, string TriggerKey)
         return false;
     }
 
+    /// <summary>
+    /// Resolves a persisted hotkey string to a valid <see cref="Hotkey"/>. Returns the parsed
+    /// <paramref name="persisted"/> value when it is valid; otherwise falls back to
+    /// <paramref name="fallback"/> (the app's compile-time default, which must itself be valid).
+    /// Used at the seam where a stored setting becomes a real binding — AppSettings.Normalize()
+    /// only null-guards, so a hand-edited bad value (e.g. "E") would otherwise reach the hook.
+    /// </summary>
+    public static Hotkey Resolve(string? persisted, string fallback)
+    {
+        if (TryParse(persisted, out var parsed, out _))
+        {
+            return parsed!;
+        }
+
+        if (TryParse(fallback, out var parsedFallback, out _))
+        {
+            return parsedFallback!;
+        }
+
+        throw new ArgumentException(
+            $"The fallback hotkey '{fallback}' is not a valid hotkey.", nameof(fallback));
+    }
+
     /// <summary>Canonical round-trippable form, e.g. "Ctrl+Shift+F1" or "RightCtrl".</summary>
     public override string ToString()
     {
