@@ -7,4 +7,7 @@ namespace SpeakType.Core;
 public static class AppInfo
 {
     public const string Name = "SpeakType";
+
+    /// <summary>Name of the single-instance mutex (spec Feature 6 lifecycle).</summary>
+    public const string SingleInstanceMutexName = "SpeakType.Single";
 }
