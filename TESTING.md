@@ -58,7 +58,8 @@ Default hotkey below is **Right Ctrl**. Reset to a clean user profile where a te
 - [ ] Copy the text **ORIGINAL** to the clipboard. Dictate into Slack → dictated text pastes correctly.
 - [ ] Immediately press **Ctrl+V** in another field → **ORIGINAL** is still there (clipboard restored).
 - [ ] _(Known tradeoff)_ Copy an **image**, then dictate → image is **lost** (text-only restore — expected in v1).
-- [ ] Click the desktop (no editable field) and dictate → overlay **"Copied — paste manually"**; pressing Ctrl+V in a real field afterward yields the dictated text (not lost).
+- [ ] Dictate into a **modern** app where the old caret check used to fail (browser address bar, VS Code, Slack, Win11 Notepad) → text types directly into the field (no longer just left on the clipboard).
+- [ ] Click the desktop (no editable field) and dictate → text is typed nowhere but **remains on the clipboard** (pressing Ctrl+V in a real field afterward yields it). If the foreground window blocks injection (e.g. an elevated app), overlay shows **"Copied — paste manually"**.
 
 ### M5 — Tray icon & overlay _(Bricks 9, 10)_
 - [ ] Tray icon reflects state: Idle → Recording → Busy during a dictation, back to Idle.

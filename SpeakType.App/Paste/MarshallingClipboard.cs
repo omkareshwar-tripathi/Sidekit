@@ -29,7 +29,5 @@ internal sealed class MarshallingClipboard : IClipboard
 
     public void Clear() => _ui.Invoke(() => _inner.Clear());
 
-    public bool HasEditableTarget() => _ui.Invoke(() => _inner.HasEditableTarget());
-
     public bool SendPaste() => _ui.Invoke(() => _inner.SendPaste());
 }

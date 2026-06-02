@@ -6,10 +6,10 @@ namespace SpeakType.App.Paste;
 
 /// <summary>
 /// Windows <see cref="IClipboard"/> adapter. Text save/restore uses WinForms
-/// <see cref="Clipboard"/>; Ctrl+V is injected via <c>SendInput</c>; the editable-target
-/// check reads the foreground GUI thread's caret. The caret check is best-effort — apps
-/// without a Win32 caret (Electron, games) report no target and fall back to
-/// leave-on-clipboard, which is the intended spec behavior.
+/// <see cref="Clipboard"/>; Ctrl+V is injected via <c>SendInput</c>. The paste is always
+/// attempted (no pre-check for an editable target); a return of <c>false</c> from
+/// <see cref="SendPaste"/> means the OS blocked the keystroke, and the caller leaves the
+/// text on the clipboard for a manual paste.
 /// <para>
 /// The WinForms <see cref="Clipboard"/> calls require an STA thread; Brick 14's
 /// composition root must marshal <see cref="GetText"/>/<see cref="SetText"/>/<see cref="Clear"/>
@@ -50,19 +50,6 @@ public sealed partial class WinClipboard : IClipboard
         // Returns the number of events injected; 0 (or short) means the OS blocked input
         // (e.g. an elevated foreground window) — report failure so we don't restore over our text.
         return SendInput((uint)inputs.Length, inputs, InputSize) == (uint)inputs.Length;
-    }
-
-    public bool HasEditableTarget()
-    {
-        // idThread 0 = the foreground thread; a caret in its focused control is the
-        // lightweight "this is editable" signal.
-        var info = new GUITHREADINFO { cbSize = (uint)Marshal.SizeOf<GUITHREADINFO>() };
-        if (!GetGUIThreadInfo(0, ref info))
-        {
-            return false;
-        }
-
-        return info.hwndCaret != IntPtr.Zero;
     }
 
     private static INPUT KeyInput(ushort vk, uint flags) => new()
@@ -117,32 +104,8 @@ public sealed partial class WinClipboard : IClipboard
         public nuint dwExtraInfo;
     }
 
-    private struct RECT
-    {
-        public int left;
-        public int top;
-        public int right;
-        public int bottom;
-    }
-
-    private struct GUITHREADINFO
-    {
-        public uint cbSize;
-        public uint flags;
-        public nint hwndActive;
-        public nint hwndFocus;
-        public nint hwndCapture;
-        public nint hwndMenuOwner;
-        public nint hwndMoveSize;
-        public nint hwndCaret;
-        public RECT rcCaret;
-    }
 #pragma warning restore CS0649
 
     [LibraryImport("user32.dll", SetLastError = true)]
     private static partial uint SendInput(uint nInputs, [In] INPUT[] pInputs, int cbSize);
-
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
 }

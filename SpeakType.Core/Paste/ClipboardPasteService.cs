@@ -2,10 +2,14 @@ namespace SpeakType.Core.Paste;
 
 /// <summary>
 /// Clipboard-safe paste (spec Feature 5). The sequence: save the current clipboard text,
-/// set our text (so the user's words are never silently lost), then check for a focused
-/// editable target. If one is confirmed it simulates Ctrl+V, waits briefly so the target
-/// app can read the clipboard, then restores the original text. If no target is confirmed
-/// it leaves our text on the clipboard for a manual paste and restores nothing.
+/// set our text (so the user's words are never silently lost), then simulate Ctrl+V into
+/// whatever app is focused. If the keystroke is injected it waits briefly so the target app
+/// can read the clipboard, then restores the original text. If the OS blocks the keystroke
+/// (e.g. an elevated foreground window) it leaves our text on the clipboard for a manual
+/// paste and restores nothing. We always attempt the paste rather than pre-checking for an
+/// editable target: focus detection is unreliable across modern apps (browsers, Electron,
+/// WinUI), so a confirm-first check produced far more false "no target" misses than the
+/// harmless stray Ctrl+V it avoided.
 /// </summary>
 public sealed class ClipboardPasteService : IPasteService
 {
@@ -29,11 +33,6 @@ public sealed class ClipboardPasteService : IPasteService
 
         var original = _clipboard.GetText(); // save first
         _clipboard.SetText(text);            // set our text (kept on clipboard in both branches)
-
-        if (!_clipboard.HasEditableTarget())
-        {
-            return PasteOutcome.LeftOnClipboard; // no confirmed target → leave it for manual paste
-        }
 
         if (!_clipboard.SendPaste())
         {

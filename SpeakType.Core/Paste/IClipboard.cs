@@ -16,9 +16,6 @@ public interface IClipboard
     /// <summary>Empty the clipboard (used to restore when the original held no text).</summary>
     void Clear();
 
-    /// <summary>Best-effort: <c>true</c> only when a focused editable target is confirmed.</summary>
-    bool HasEditableTarget();
-
     /// <summary>
     /// Simulate Ctrl+V into the focused application. Returns <c>true</c> if the paste
     /// keystrokes were injected; <c>false</c> if the OS blocked them (e.g. an elevated
