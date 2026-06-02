@@ -14,10 +14,6 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2026-06-03-ui-modern-light-restyle-design.md`; plan: `docs/superpowers/plans/2026-06-03-ui-modern-light-restyle.md`. All Windows-only → verify = CI compile-green + a laptop screenshot vs mockup B (no Core changes; 179 tests stay green)._
 
-- [ ] **Brick UI-5 — Flat tray menu.** Give the tray `ContextMenuStrip` a `ToolStripProfessionalRenderer(new FlatMenuColorTable())` + light font/colors (flat white menu, accent hover) in place of the gray gradient.
-  - Skill: dotnet-best-practices, run-tests
-  - Verify: CI compile-green; laptop screenshot; menu actions still work.
-
 ### Integration & ship
 
 ### Backlog (optional — needs a user decision, not in the v1 critical path)
@@ -40,6 +36,13 @@ _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 
+### Brick UI-5 — Flat tray menu (2026-06-03)
+- **What:** Final brick of the modern-light restyle. The tray right-click `ContextMenuStrip` now uses a `ToolStripProfessionalRenderer` backed by `FlatMenuColorTable` plus light font/colours (`UiTheme.Body`/`TextPrimary`/`Surface`, `RoundedEdges = false`) — a flat white menu with accent hover and a thin grey separator, replacing the legacy gray-gradient chrome. Menu items, the separator, checkmarks (Pause / Start with Windows) and **all Click wiring are unchanged**.
+- **Files:** `SpeakType.App/Tray/TrayIcon.cs` (using + 4 lines in `BuildMenu`). No Core/test changes.
+- **Verified:** Windows-only → **Windows x64 CI green** (run 26845342026, build + publish) = compile-green. Core suite untouched → **179/179**. Combined `/code-review` + `/simplify` → **clean**: `RoundedEdges` is a valid property; subclassing only the colour table leaves checkmark rendering intact; the renderer + `FlatMenuColorTable` aren't `IDisposable` and hold no unmanaged handles → no leak, nothing to dispose; behaviour-preserving. **Visual + menu actions = laptop screenshot (right-click the tray icon).**
+- **Notes / decisions:**
+  - **Tray *icon* glyphs unchanged** — the four state circles (SteelBlue/Red/Orange/DarkRed via `MakeIcon`) still convey Idle/Recording/Busy/Error; only the *menu* chrome changed. (A logo for the icon itself is the separate Brick UI-6.)
+
 ### Brick UI-4 — Restyle WelcomeForm (2026-06-03)
 - **What:** Restyled the model-download / first-run Welcome window (also reused for a mid-session model switch) to the modern-light look: light background + Segoe UI via `StyleWindow`, a **Segoe UI Semibold heading**, **muted (TextSecondary) status text**, and the **Retry button as a primary accent button** via `StyleButton`. The system `ProgressBar` is left as-is (already accent-coloured on Win11). **Behaviour unchanged** — the async download, the `_downloading` re-entrancy guard, Retry, and cancel-on-close are untouched.
 - **Files:** `SpeakType.App/Startup/WelcomeForm.cs` (using + `StyleWindow` + heading font + status colour + `StyleButton(_retry)`). No Core/test changes.
@@ -54,14 +57,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 - **Notes / decisions:**
   - **`/simplify` deferred, not skipped blindly:** (a) the layout's explicit `BackColor = UiTheme.Background` is technically redundant with `StyleWindow`'s ambient inheritance — **kept** as plan-specified (explicit beats relying on WinForms ambient-color quirks; zero cost). (b) the layout still hardcodes `Padding(12)` instead of `UiTheme.WindowPadding` (20px) and the rows don't use `RowGap` — that's a **visual spacing** change, deferred to the screenshot loop rather than blind-guessing pixels on a Mac that can't render WinForms. **If the first screenshot looks cramped vs mockup B, the fix is `Padding(12)`→`UiTheme.WindowPadding` (and widen `AddRow` margins toward `RowGap`).**
   - **Toggle rows are ~18px tall vs the old checkbox rows** — slightly shorter; expected from the restyle, validate in the screenshot.
-
-### Brick UI-2 — ToggleSwitch control (2026-06-03)
-- **What:** Second foundation brick of the modern-light restyle. Added `ToggleSwitch` — a small owner-drawn on/off switch (pill track + knob, painted via `UiTheme` colours: accent when on, grey `ToggleOff` when off, white knob) that replaces the square WinForms `CheckBox` in Settings. Exposes only the slice the forms use — `Checked` (bool) + `CheckedChanged` — and toggles on mouse click or Space/Enter. No animation (instant flip, per spec). **Not wired into any form yet** — that's UI-3.
-- **Files:** `SpeakType.App/Controls/ToggleSwitch.cs` (new). No Core/test changes.
-- **Verified:** Windows-only → **Windows x64 CI green** (run 26844485594, build + publish) = compile-green. Core suite untouched → **179/179**. `/simplify` → applied one nit (knob fill routed through `UiTheme.OnAccent` instead of a hardcoded `Color.White`, so a future dark-mode swap catches it; `OnAccent` *is* white → zero behaviour change). `/code-review` → found + **fixed one real correctness bug**: the focus ring was painted `if (Focused)` but nothing repainted on focus change, so the keyboard focus indicator never appeared/cleared on Tab — added `OnGotFocus`/`OnLostFocus` overrides that `Invalidate()`. **Visual + manual toggle behaviour: laptop screenshot/keyboard test comes with UI-3 (when it's first placed in a window).**
-- **Notes / decisions:**
-  - **Cosmetic knob-centering asymmetry deferred to the screenshot loop:** the off-state knob inset is 2px and the on-state is 1px (from the plan's exact pixels). Review flagged the slight asymmetry; rather than blind-guess pixel values on a Mac that can't render WinForms, this is left for the agreed laptop screenshot pass to tune against mockup B.
-  - **Programmatic-set contract:** setting `Checked` raises `CheckedChanged`, but setting to the current value early-returns (no spurious fire); callers (SettingsForm in UI-3) set `Checked` before attaching the handler and gate with `_loading`, mirroring the old checkbox wiring.
 
 <!-- Template for each entry:
 

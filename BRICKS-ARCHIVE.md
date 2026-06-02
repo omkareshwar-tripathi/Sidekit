@@ -4,6 +4,14 @@ Append-only archive of completed bricks, moved out of `BRICKS.md` to keep the ac
 
 ---
 
+### Brick UI-2 — ToggleSwitch control (2026-06-03)
+- **What:** Second foundation brick of the modern-light restyle. Added `ToggleSwitch` — a small owner-drawn on/off switch (pill track + knob, painted via `UiTheme` colours: accent when on, grey `ToggleOff` when off, white knob) that replaces the square WinForms `CheckBox` in Settings. Exposes only the slice the forms use — `Checked` (bool) + `CheckedChanged` — and toggles on mouse click or Space/Enter. No animation (instant flip, per spec). **Not wired into any form yet** — that's UI-3.
+- **Files:** `SpeakType.App/Controls/ToggleSwitch.cs` (new). No Core/test changes.
+- **Verified:** Windows-only → **Windows x64 CI green** (run 26844485594, build + publish) = compile-green. Core suite untouched → **179/179**. `/simplify` → applied one nit (knob fill routed through `UiTheme.OnAccent` instead of a hardcoded `Color.White`, so a future dark-mode swap catches it; `OnAccent` *is* white → zero behaviour change). `/code-review` → found + **fixed one real correctness bug**: the focus ring was painted `if (Focused)` but nothing repainted on focus change, so the keyboard focus indicator never appeared/cleared on Tab — added `OnGotFocus`/`OnLostFocus` overrides that `Invalidate()`. **Visual + manual toggle behaviour: laptop screenshot/keyboard test comes with UI-3 (when it's first placed in a window).**
+- **Notes / decisions:**
+  - **Cosmetic knob-centering asymmetry deferred to the screenshot loop:** the off-state knob inset is 2px and the on-state is 1px (from the plan's exact pixels). Review flagged the slight asymmetry; rather than blind-guess pixel values on a Mac that can't render WinForms, this is left for the agreed laptop screenshot pass to tune against mockup B.
+  - **Programmatic-set contract:** setting `Checked` raises `CheckedChanged`, but setting to the current value early-returns (no spurious fire); callers (SettingsForm in UI-3) set `Checked` before attaching the handler and gate with `_loading`, mirroring the old checkbox wiring.
+
 ### Brick UI-1 — UiTheme tokens + style helpers (2026-06-03)
 - **What:** First foundation brick of the modern-light UI restyle. Added a central theme — `UiTheme` (Win11 "Fluent light" palette: bg `#F3F3F3`, white surface, accent `#0067C0`, secondary text `#616161`, etc.; Segoe UI body + Segoe UI Semibold heading fonts; 20px window padding / 12px row gap) plus three styling helpers (`StyleWindow`/`StyleField`/`StyleButton`) and a `FlatMenuColorTable` (flat white context-menu colours). Single source of truth so the look changes in one place (and dark mode is a future one-place swap). **No visible change yet** — nothing consumes it until UI-3/UI-4/UI-5.
 - **Files:** `SpeakType.App/Theme/UiTheme.cs` (new). No Core/test changes.
