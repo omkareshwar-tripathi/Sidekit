@@ -17,6 +17,7 @@ public sealed partial class TrayIcon : IDisposable
     private readonly NotifyIcon _notifyIcon;
     private readonly ContextMenuStrip _menu;
     private readonly Dictionary<TrayState, Icon> _icons;
+    private ToolStripMenuItem _startupItem = null!; // assigned in BuildMenu (called from the ctor)
     private bool _disposed;
 
     public TrayIcon()
@@ -60,6 +61,10 @@ public sealed partial class TrayIcon : IDisposable
     public void ShowBalloon(string title, string text) =>
         _notifyIcon.ShowBalloonTip(3000, title, text, ToolTipIcon.Info);
 
+    /// <summary>Reflects the actual autostart state in the menu checkmark. Sets the property
+    /// directly (no <c>Click</c>), so it does not raise <see cref="StartWithWindowsToggled"/>.</summary>
+    public void SetStartWithWindowsChecked(bool isChecked) => _startupItem.Checked = isChecked;
+
     public void Dispose()
     {
         if (_disposed)
@@ -91,6 +96,7 @@ public sealed partial class TrayIcon : IDisposable
 
         var startup = new ToolStripMenuItem("Start with Windows") { CheckOnClick = true, Checked = true };
         startup.Click += (_, _) => StartWithWindowsToggled?.Invoke(this, startup.Checked);
+        _startupItem = startup;
 
         var about = new ToolStripMenuItem("About");
         about.Click += (_, _) => MessageBox.Show(AppInfo.Name, $"About {AppInfo.Name}");
