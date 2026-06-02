@@ -1,5 +1,6 @@
 using SpeakType.Core.Audio;
 using SpeakType.Core.Cleanup;
+using SpeakType.Core.Logging;
 using SpeakType.Core.Orchestration;
 using SpeakType.Core.Paste;
 using SpeakType.Core.Settings;
@@ -315,5 +316,156 @@ public sealed class DictationOrchestratorTests
         Assert.Equal(new[] { DictationOutcome.Pasted }, outcomes);
         Assert.Equal(1, paste.CallCount);
         Assert.Equal(RecordingState.Idle, sut.State);
+    }
+
+    [Fact]
+    public void State_changed_reports_full_lifecycle_on_a_normal_cycle()
+    {
+        var states = new List<RecordingState>();
+        _sut.StateChanged += (_, s) => states.Add(s);
+        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
+        _transcriber.Result = "Hello.";
+
+        _hotkey.Press();
+        _hotkey.Release();
+
+        Assert.Equal(
+            new[]
+            {
+                RecordingState.Recording, RecordingState.Transcribing,
+                RecordingState.Pasting, RecordingState.Idle,
+            },
+            states);
+    }
+
+    [Fact]
+    public void State_changed_skips_pasting_when_no_speech()
+    {
+        var states = new List<RecordingState>();
+        _sut.StateChanged += (_, s) => states.Add(s);
+        _audio.Result = new CapturedAudio(new[] { 0.0f }, HasSpeech: false);
+
+        _hotkey.Press();
+        _hotkey.Release();
+
+        Assert.Equal(
+            new[] { RecordingState.Recording, RecordingState.Transcribing, RecordingState.Idle },
+            states);
+    }
+
+    [Fact]
+    public void State_changed_on_a_tap_is_recording_then_idle_only()
+    {
+        var states = new List<RecordingState>();
+        _sut.StateChanged += (_, s) => states.Add(s);
+        _clock.Elapsed = TimeSpan.FromMilliseconds(100);
+
+        _hotkey.Press();
+        _hotkey.Release();
+
+        Assert.Equal(new[] { RecordingState.Recording, RecordingState.Idle }, states);
+    }
+
+    [Fact]
+    public void State_changed_reports_full_lifecycle_on_auto_stop()
+    {
+        var states = new List<RecordingState>();
+        _sut.StateChanged += (_, s) => states.Add(s);
+        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
+        _transcriber.Result = "Hello.";
+
+        _hotkey.Press();
+        _timer.Fire();
+
+        Assert.Equal(
+            new[]
+            {
+                RecordingState.Recording, RecordingState.Transcribing,
+                RecordingState.Pasting, RecordingState.Idle,
+            },
+            states);
+    }
+
+    [Fact]
+    public void Logs_recording_transcribe_transcript_and_latency_on_a_normal_cycle()
+    {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber { Result = "Um, hello." };
+        var sink = new FakeLogSink();
+        var logger = new AppLogger(sink, () => true);
+        _ = new DictationOrchestrator(
+            hotkey, audio, transcriber, new FakePasteService(), new TranscriptCleaner(), new AppSettings(),
+            new FakeClock(), new FakeAutoStopTimer(), dispatcher: null, logger: logger);
+
+        hotkey.Press();
+        hotkey.Release();
+
+        Assert.Equal(
+            new[]
+            {
+                "recording 1.0s", "transcribe 1.0s, 7 chars", "transcript: Hello. ", "latency 1.0s",
+            },
+            sink.Lines);
+    }
+
+    [Fact]
+    public void Transcript_is_omitted_when_debug_logging_is_disabled()
+    {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber { Result = "Um, hello." };
+        var sink = new FakeLogSink();
+        var logger = new AppLogger(sink, () => false);
+        _ = new DictationOrchestrator(
+            hotkey, audio, transcriber, new FakePasteService(), new TranscriptCleaner(), new AppSettings(),
+            new FakeClock(), new FakeAutoStopTimer(), dispatcher: null, logger: logger);
+
+        hotkey.Press();
+        hotkey.Release();
+
+        Assert.DoesNotContain(sink.Lines, line => line.StartsWith("transcript:", StringComparison.Ordinal));
+        Assert.Contains("recording 1.0s", sink.Lines);
+        Assert.Contains("transcribe 1.0s, 7 chars", sink.Lines);
+        Assert.Contains("latency 1.0s", sink.Lines);
+    }
+
+    [Fact]
+    public void Logs_error_when_an_adapter_throws()
+    {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber
+        {
+            ThrowOnCall = new InvalidOperationException("boom"),
+        };
+        var sink = new FakeLogSink();
+        var logger = new AppLogger(sink, () => true);
+        _ = new DictationOrchestrator(
+            hotkey, audio, transcriber, new FakePasteService(), new TranscriptCleaner(), new AppSettings(),
+            new FakeClock(), new FakeAutoStopTimer(), dispatcher: null, logger: logger);
+
+        hotkey.Press();
+        Assert.Throws<InvalidOperationException>(() => hotkey.Release());
+
+        Assert.Contains("recording 1.0s", sink.Lines);
+        Assert.Contains("error: boom", sink.Lines);
+    }
+
+    [Fact]
+    public void Silent_audio_logs_only_recording()
+    {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.0f }, HasSpeech: false) };
+        var sink = new FakeLogSink();
+        var logger = new AppLogger(sink, () => true);
+        _ = new DictationOrchestrator(
+            hotkey, audio, new FakeTranscriber(), new FakePasteService(), new TranscriptCleaner(),
+            new AppSettings(), new FakeClock(), new FakeAutoStopTimer(), dispatcher: null, logger: logger);
+
+        hotkey.Press();
+        hotkey.Release();
+
+        Assert.Equal(new[] { "recording 1.0s" }, sink.Lines);
     }
 }

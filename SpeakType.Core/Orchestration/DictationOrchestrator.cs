@@ -1,6 +1,7 @@
 using SpeakType.Core.Audio;
 using SpeakType.Core.Cleanup;
 using SpeakType.Core.Input;
+using SpeakType.Core.Logging;
 using SpeakType.Core.Paste;
 using SpeakType.Core.Settings;
 using SpeakType.Core.Time;
@@ -37,10 +38,13 @@ public sealed class DictationOrchestrator
     private readonly IClock _clock;
     private readonly IAutoStopTimer _autoStopTimer;
     private readonly ICycleDispatcher _dispatcher;
+    private readonly AppLogger? _logger;
     private readonly object _gate = new();
 
     private RecordingState _state = RecordingState.Idle;
     private long _pressTimestamp;
+    private TimeSpan _recordingDuration;
+    private long _releaseTimestamp;
 
     public DictationOrchestrator(
         IHotkeyListener hotkey,
@@ -51,7 +55,8 @@ public sealed class DictationOrchestrator
         AppSettings settings,
         IClock clock,
         IAutoStopTimer autoStopTimer,
-        ICycleDispatcher? dispatcher = null)
+        ICycleDispatcher? dispatcher = null,
+        AppLogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(hotkey);
         ArgumentNullException.ThrowIfNull(audioCapture);
@@ -70,6 +75,7 @@ public sealed class DictationOrchestrator
         _clock = clock;
         _autoStopTimer = autoStopTimer;
         _dispatcher = dispatcher ?? new SynchronousCycleDispatcher();
+        _logger = logger;
 
         hotkey.Pressed += OnPressed;
         hotkey.Released += OnReleased;
@@ -84,6 +90,16 @@ public sealed class DictationOrchestrator
 
     /// <summary>Raised once at the end of every dictation cycle that produced an outcome.</summary>
     public event EventHandler<DictationOutcome>? Completed;
+
+    /// <summary>Raised after each UI-meaningful lifecycle transition: <see cref="RecordingState.Recording"/>
+    /// on press, <see cref="RecordingState.Transcribing"/> when a cycle actually begins processing,
+    /// <see cref="RecordingState.Pasting"/> while text is pasted, and <see cref="RecordingState.Idle"/>
+    /// when the cycle finishes or an accidental tap is discarded. The transient Transcribing state an
+    /// accidental tap passes through (claim then discard) is NOT surfaced. Raised outside the lock (like
+    /// <see cref="Completed"/>), so a handler may be slow or marshal to another thread.</summary>
+    public event EventHandler<RecordingState>? StateChanged;
+
+    private void RaiseStateChanged(RecordingState state) => StateChanged?.Invoke(this, state);
 
     // Atomically transition Recording -> Transcribing. Returns true to the single caller that wins
     // the claim; a racing release/auto-stop sees a non-Recording state and gets false. This is what
@@ -130,6 +146,18 @@ public sealed class DictationOrchestrator
                 throw;
             }
         }
+
+        RaiseStateChanged(RecordingState.Recording);
+    }
+
+    // Commit to running a cycle: stamp the release time (for latency), announce Transcribing, and hand
+    // the cycle to the dispatcher. The fields read by RunCycle on the (possibly background) cycle thread
+    // are written here first; the dispatcher's Task.Run establishes the happens-before for that read.
+    private void StartCycle()
+    {
+        _releaseTimestamp = _clock.GetTimestamp();
+        RaiseStateChanged(RecordingState.Transcribing);
+        _dispatcher.Run(RunCycle);
     }
 
     private void OnReleased(object? sender, EventArgs e)
@@ -143,13 +171,15 @@ public sealed class DictationOrchestrator
 
         // Reading _pressTimestamp unlocked is safe here: the claim above acquired the lock, so this
         // thread has already synchronized with OnPressed's write of it.
-        if (_clock.GetElapsedTime(_pressTimestamp) < MinHold)
+        var hold = _clock.GetElapsedTime(_pressTimestamp);
+        if (hold < MinHold)
         {
             DiscardRecording(); // accidental tap
             return;
         }
 
-        _dispatcher.Run(RunCycle);
+        _recordingDuration = hold;
+        StartCycle();
     }
 
     private void OnAutoStop()
@@ -158,7 +188,8 @@ public sealed class DictationOrchestrator
         // raced the timer can't also run the cycle.
         if (TryClaimForProcessing())
         {
-            _dispatcher.Run(RunCycle);
+            _recordingDuration = _clock.GetElapsedTime(_pressTimestamp);
+            StartCycle();
         }
     }
 
@@ -177,6 +208,9 @@ public sealed class DictationOrchestrator
                 _state = RecordingState.Idle; // never leave the machine wedged if Stop() throws
             }
         }
+
+        // Outside the finally so a throwing StateChanged handler can't mask a Stop() failure.
+        RaiseStateChanged(RecordingState.Idle);
     }
 
     // The capture → transcribe → clean → paste cycle. Both hotkey release and the 60 s auto-stop
@@ -185,10 +219,17 @@ public sealed class DictationOrchestrator
     // dispatcher; by default it runs synchronously.
     private void RunCycle()
     {
+        _logger?.Recording(_recordingDuration);
+
         DictationOutcome outcome;
         try
         {
             outcome = ProcessRecording();
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(ex.Message);
+            throw;
         }
         finally
         {
@@ -202,8 +243,11 @@ public sealed class DictationOrchestrator
             }
         }
 
-        // Raised only after State is back to Idle, so a handler may legally start
-        // a fresh cycle, and after the cycle's work has fully completed.
+        // Raised on the success path only (a rethrow skips this) and outside the finally, so a
+        // throwing StateChanged handler can't mask the adapter exception. On the error path the
+        // dispatcher's onError owns the UI reset. Both fire after State is Idle, so a handler may
+        // legally start a fresh cycle, and after the cycle's work has fully completed.
+        RaiseStateChanged(RecordingState.Idle);
         Completed?.Invoke(this, outcome);
     }
 
@@ -215,19 +259,27 @@ public sealed class DictationOrchestrator
             return DictationOutcome.NoSpeech;
         }
 
+        var t0 = _clock.GetTimestamp();
         var raw = _transcriber.Transcribe(audio.Samples);
+        var transcribeDuration = _clock.GetElapsedTime(t0);
         var cleaned = _cleaner.Clean(raw, _settings.FillerRemoval);
+        _logger?.Transcribed(transcribeDuration, cleaned.Length);
         if (cleaned.Length == 0)
         {
             return DictationOutcome.NoSpeech;
         }
+
+        _logger?.Transcript(cleaned);
 
         lock (_gate)
         {
             _state = RecordingState.Pasting;
         }
 
+        RaiseStateChanged(RecordingState.Pasting);
+
         var outcome = _pasteService.Paste(cleaned);
+        _logger?.Latency(_clock.GetElapsedTime(_releaseTimestamp));
         return outcome == PasteOutcome.LeftOnClipboard
             ? DictationOutcome.LeftOnClipboard
             : DictationOutcome.Pasted;

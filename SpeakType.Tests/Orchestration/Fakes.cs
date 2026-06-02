@@ -1,5 +1,6 @@
 using SpeakType.Core.Audio;
 using SpeakType.Core.Input;
+using SpeakType.Core.Logging;
 using SpeakType.Core.Orchestration;
 using SpeakType.Core.Paste;
 using SpeakType.Core.Time;
@@ -150,4 +151,12 @@ internal sealed class DeferredDispatcher : ICycleDispatcher
         _pending = null;
         work?.Invoke();
     }
+}
+
+/// <summary>Captures the formatted log lines so a test can assert what AppLogger emitted.</summary>
+internal sealed class FakeLogSink : ILogSink
+{
+    public List<string> Lines { get; } = new();
+
+    public void Write(string message) => Lines.Add(message);
 }
