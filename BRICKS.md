@@ -14,9 +14,6 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2026-06-03-ui-modern-light-restyle-design.md`; plan: `docs/superpowers/plans/2026-06-03-ui-modern-light-restyle.md`. All Windows-only → verify = CI compile-green + a laptop screenshot vs mockup B (no Core changes; 179 tests stay green)._
 
-- [ ] **Brick UI-4 — Restyle WelcomeForm.** Apply `UiTheme` (Semibold heading, muted status), make Retry a primary accent button; keep the system progress bar.
-  - Skill: dotnet-best-practices, run-tests
-  - Verify: CI compile-green; laptop screenshot; re-check M2 (download + Retry still work).
 - [ ] **Brick UI-5 — Flat tray menu.** Give the tray `ContextMenuStrip` a `ToolStripProfessionalRenderer(new FlatMenuColorTable())` + light font/colors (flat white menu, accent hover) in place of the gray gradient.
   - Skill: dotnet-best-practices, run-tests
   - Verify: CI compile-green; laptop screenshot; menu actions still work.
@@ -43,6 +40,13 @@ _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 
+### Brick UI-4 — Restyle WelcomeForm (2026-06-03)
+- **What:** Restyled the model-download / first-run Welcome window (also reused for a mid-session model switch) to the modern-light look: light background + Segoe UI via `StyleWindow`, a **Segoe UI Semibold heading**, **muted (TextSecondary) status text**, and the **Retry button as a primary accent button** via `StyleButton`. The system `ProgressBar` is left as-is (already accent-coloured on Win11). **Behaviour unchanged** — the async download, the `_downloading` re-entrancy guard, Retry, and cancel-on-close are untouched.
+- **Files:** `SpeakType.App/Startup/WelcomeForm.cs` (using + `StyleWindow` + heading font + status colour + `StyleButton(_retry)`). No Core/test changes.
+- **Verified:** Windows-only → **Windows x64 CI green** (run 26845091836, build + publish) = compile-green. Core suite untouched → **179/179**. Combined `/code-review` + `/simplify` → **clean** (purely additive theme calls; `internal UiTheme` accessible from the `public` form, same assembly; styling a hidden button before the Click handler is order-independent and fine; AutoSize layout absorbs the larger heading font; no removed behaviour). **Visual + M2 (download + Retry still work) = laptop screenshot — trigger first-run or a model switch.**
+- **Notes / decisions:**
+  - **ProgressBar intentionally unstyled:** Win11 already renders the continuous bar in the system accent; there's no `UiTheme` helper for it and a behaviour-preserving restyle shouldn't owner-draw it. If it looks off vs mockup B in the screenshot, revisit then.
+
 ### Brick UI-3 — Restyle SettingsForm (2026-06-03)
 - **What:** First *visible* brick of the modern-light restyle. The Settings window now wears `UiTheme`: light background + Segoe UI via `StyleWindow`, the hotkey `TextBox` and model `ComboBox` flattened via `StyleField`, and the four square checkboxes (Remove filler words / Show recording overlay / Start with Windows / Debug logging) replaced by the new `ToggleSwitch`. The old `MakeCheck` helper became `MakeToggle` (same signature). **All behaviour is unchanged** — the `_loading` guard, the four apply-and-save handlers, the `AutostartChanged` event, hotkey commit/rebind and model-switch wiring are preserved verbatim.
 - **Files:** `SpeakType.App/Settings/SettingsForm.cs` (usings, `StyleWindow`/`StyleField`, layout `BackColor`, `MakeCheck`→`MakeToggle` + 4 call sites). No Core/test changes.
@@ -58,15 +62,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 - **Notes / decisions:**
   - **Cosmetic knob-centering asymmetry deferred to the screenshot loop:** the off-state knob inset is 2px and the on-state is 1px (from the plan's exact pixels). Review flagged the slight asymmetry; rather than blind-guess pixel values on a Mac that can't render WinForms, this is left for the agreed laptop screenshot pass to tune against mockup B.
   - **Programmatic-set contract:** setting `Checked` raises `CheckedChanged`, but setting to the current value early-returns (no spurious fire); callers (SettingsForm in UI-3) set `Checked` before attaching the handler and gate with `_loading`, mirroring the old checkbox wiring.
-
-### Brick UI-1 — UiTheme tokens + style helpers (2026-06-03)
-- **What:** First foundation brick of the modern-light UI restyle. Added a central theme — `UiTheme` (Win11 "Fluent light" palette: bg `#F3F3F3`, white surface, accent `#0067C0`, secondary text `#616161`, etc.; Segoe UI body + Segoe UI Semibold heading fonts; 20px window padding / 12px row gap) plus three styling helpers (`StyleWindow`/`StyleField`/`StyleButton`) and a `FlatMenuColorTable` (flat white context-menu colours). Single source of truth so the look changes in one place (and dark mode is a future one-place swap). **No visible change yet** — nothing consumes it until UI-3/UI-4/UI-5.
-- **Files:** `SpeakType.App/Theme/UiTheme.cs` (new). No Core/test changes.
-- **Verified:** Windows-only (WinForms, `net8.0-windows`) → **Windows x64 CI green** (run 26844090822, incl. build + publish steps) = compile-green, the only automated proof for UI. Core suite untouched → still **179/179**. `/simplify` clean (no reuse/simplification/efficiency/altitude findings — confirmed no pre-existing theme/palette helper existed). `/code-review` clean (`[]`; brand-new unreferenced file, nothing removed/no callers). **Visual: no UI surface yet — first screenshot comes with UI-3.**
-- **Notes / decisions:**
-  - **`public` members inside an `internal static` class** → effective accessibility is internal (harmless; left as written in the plan).
-  - **Tray-state colours (SteelBlue/Red/Orange/DarkRed) and the dark RecordingOverlay are intentionally NOT in UiTheme** — they're status-indicator / dark-HUD concerns, separate from the light chrome palette.
-  - **Fonts are `static readonly`, held for process lifetime** (small fixed set, app is a singleton) — not disposed by design.
 
 <!-- Template for each entry:
 

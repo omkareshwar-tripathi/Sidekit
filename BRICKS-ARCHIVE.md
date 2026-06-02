@@ -4,6 +4,15 @@ Append-only archive of completed bricks, moved out of `BRICKS.md` to keep the ac
 
 ---
 
+### Brick UI-1 — UiTheme tokens + style helpers (2026-06-03)
+- **What:** First foundation brick of the modern-light UI restyle. Added a central theme — `UiTheme` (Win11 "Fluent light" palette: bg `#F3F3F3`, white surface, accent `#0067C0`, secondary text `#616161`, etc.; Segoe UI body + Segoe UI Semibold heading fonts; 20px window padding / 12px row gap) plus three styling helpers (`StyleWindow`/`StyleField`/`StyleButton`) and a `FlatMenuColorTable` (flat white context-menu colours). Single source of truth so the look changes in one place (and dark mode is a future one-place swap). **No visible change yet** — nothing consumes it until UI-3/UI-4/UI-5.
+- **Files:** `SpeakType.App/Theme/UiTheme.cs` (new). No Core/test changes.
+- **Verified:** Windows-only (WinForms, `net8.0-windows`) → **Windows x64 CI green** (run 26844090822, incl. build + publish steps) = compile-green, the only automated proof for UI. Core suite untouched → still **179/179**. `/simplify` clean (no reuse/simplification/efficiency/altitude findings — confirmed no pre-existing theme/palette helper existed). `/code-review` clean (`[]`; brand-new unreferenced file, nothing removed/no callers). **Visual: no UI surface yet — first screenshot comes with UI-3.**
+- **Notes / decisions:**
+  - **`public` members inside an `internal static` class** → effective accessibility is internal (harmless; left as written in the plan).
+  - **Tray-state colours (SteelBlue/Red/Orange/DarkRed) and the dark RecordingOverlay are intentionally NOT in UiTheme** — they're status-indicator / dark-HUD concerns, separate from the light chrome palette.
+  - **Fonts are `static readonly`, held for process lifetime** (small fixed set, app is a singleton) — not disposed by design.
+
 ### Brick 17 — Unify per-user path literals via AppInfo.Name (2026-06-03)
 - **What:** Pure cleanup (revealed by the Brick 13 review): the three per-user default paths each hardcoded the `"SpeakType"` folder string, although `AppInfo.Name` exists for exactly that (its doc-comment already cites these paths). Replaced the literal with `AppInfo.Name` at all three sites so renaming the app moves settings/models/logs together instead of leaving stragglers. No behavior change (`AppInfo.Name == "SpeakType"`).
 - **Files:** `SpeakType.Core/Settings/JsonSettingsStore.cs` (`DefaultFilePath`), `SpeakType.Core/Models/ModelStore.cs` (`DefaultModelsDirectory`), `SpeakType.Core/Logging/FileLogSink.cs` (`DefaultLogPath`); tests `SpeakType.Tests/DefaultPathsTests.cs` (new, +3).
