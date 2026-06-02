@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Windows.Forms;
 using SpeakType.App.Audio;
 using SpeakType.App.Input;
+using SpeakType.App.Overlay;
 using SpeakType.App.Paste;
 using SpeakType.App.Startup;
 using SpeakType.App.Threading;
@@ -10,8 +11,10 @@ using SpeakType.App.Tray;
 using SpeakType.Core;
 using SpeakType.Core.Cleanup;
 using SpeakType.Core.Input;
+using SpeakType.Core.Logging;
 using SpeakType.Core.Models;
 using SpeakType.Core.Orchestration;
+using SpeakType.Core.Overlay;
 using SpeakType.Core.Paste;
 using SpeakType.Core.Settings;
 using SpeakType.Core.Time;
@@ -106,6 +109,7 @@ internal static class Program
         }
 
         using var uiMarshaller = new UiMarshaller();
+        using var overlay = new RecordingOverlay();
         using var capture = new NAudioCapture();
         using var autoStopTimer = new SystemAutoStopTimer();
         using var hotkey = new Win32HotkeyListener(Hotkey.Resolve(settings.Hotkey, AppSettings.DefaultHotkey));
@@ -113,13 +117,74 @@ internal static class Program
         // Paste runs inside the background cycle, but WinForms Clipboard needs the STA UI thread, so it
         // is marshalled there. The cycle itself runs off the UI thread so transcription never freezes it.
         var pasteService = new ClipboardPasteService(new MarshallingClipboard(new WinClipboard(), uiMarshaller));
-        var dispatcher = new BackgroundCycleDispatcher(ex => uiMarshaller.Post(() => RecoverFromUiException(tray, ex)));
 
-        // The orchestrator subscribes to the hotkey in its constructor; the hotkey listener keeps it
-        // alive for the session, so the instance itself isn't held here.
-        _ = new DictationOrchestrator(
+        // On a background-cycle failure: recover the tray to Idle and clear any overlay the cycle left
+        // up — it threw before StateChanged(Idle)/Completed could fire, so nothing else fades it.
+        var dispatcher = new BackgroundCycleDispatcher(ex => uiMarshaller.Post(() =>
+        {
+            RecoverFromUiException(tray, ex);
+            overlay.FadeOut();
+        }));
+
+        // Diagnostic log (spec Logging & Privacy): metadata always; the transcript only when Debug
+        // logging is on — read live via the Func so the Settings toggle applies without a restart.
+        var logger = new AppLogger(new FileLogSink(FileLogSink.DefaultLogPath), () => settings.DebugLogging);
+
+        var orchestrator = new DictationOrchestrator(
             hotkey, capture, transcriber, pasteService, new TranscriptCleaner(), settings,
-            new SystemClock(), autoStopTimer, dispatcher);
+            new SystemClock(), autoStopTimer, dispatcher, logger);
+
+        // Drive the tray colour + overlay from the cycle. The events can fire on the background cycle
+        // thread, so every UI touch is marshalled to the UI thread. Invariant: SHOWING the overlay is
+        // gated on settings.Overlay, but CLEARING it (FadeOut) is unconditional — so toggling Overlay
+        // off mid-cycle (Brick 14e) can never leave a stale overlay stuck on screen.
+        orchestrator.StateChanged += (_, state) => uiMarshaller.Post(() =>
+        {
+            tray.SetState(TrayStatus.From(state));
+
+            if (state == RecordingState.Idle)
+            {
+                overlay.FadeOut();
+                return;
+            }
+
+            if (!settings.Overlay)
+            {
+                return;
+            }
+
+            switch (state)
+            {
+                case RecordingState.Recording:
+                    overlay.ShowStatus(OverlayStatus.Listening);
+                    break;
+                case RecordingState.Transcribing:
+                    overlay.ShowStatus(OverlayStatus.Transcribing);
+                    break;
+
+                // Pasting keeps the "Transcribing…" overlay up; the tray already reads Busy via SetState.
+            }
+        });
+
+        orchestrator.Completed += (_, outcome) => uiMarshaller.Post(() =>
+        {
+            // Flash the outcome text (only if the overlay is enabled), then always fade so nothing is
+            // left on screen. A clean paste shows no text — it just clears the lingering "Transcribing…".
+            if (settings.Overlay)
+            {
+                switch (outcome)
+                {
+                    case DictationOutcome.NoSpeech:
+                        overlay.ShowStatus(OverlayStatus.NoSpeech);
+                        break;
+                    case DictationOutcome.LeftOnClipboard:
+                        overlay.ShowStatus(OverlayStatus.CopiedManually);
+                        break;
+                }
+            }
+
+            overlay.FadeOut();
+        });
 
         Application.Run();
         tray.Dispose();
