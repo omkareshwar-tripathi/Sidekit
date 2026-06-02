@@ -23,6 +23,20 @@ internal sealed class UiMarshaller : IDisposable
     public T Invoke<T>(Func<T> func) =>
         _control.InvokeRequired ? (T)_control.Invoke(func) : func();
 
+    /// <summary>Run a void <paramref name="action"/> on the UI thread (blocks the caller). Needed for the
+    /// void clipboard ops (SetText/Clear) — a void lambda can't bind to the <see cref="Invoke{T}"/> overload.</summary>
+    public void Invoke(Action action)
+    {
+        if (_control.InvokeRequired)
+        {
+            _control.Invoke(action);
+        }
+        else
+        {
+            action();
+        }
+    }
+
     /// <summary>Queue <paramref name="action"/> to run on the UI thread without blocking the caller.
     /// A no-op once the UI thread has shut down (the app is quitting mid-cycle), so a background
     /// cycle's error report can't throw on a thread-pool thread during teardown.</summary>
