@@ -48,3 +48,12 @@ jobs:
           $exe = "SpeakType.App/bin/Release/net8.0-windows/win-x64/publish/SpeakType.exe"
           if (-not (Test-Path $exe)) { Write-Error "Publish did not produce $exe"; exit 1 }
           Write-Host ("Published {0:N1} MB single-file exe" -f ((Get-Item $exe).Length / 1MB))
+
+      # Make the built exe downloadable: each run's "Artifacts" section gets SpeakType.exe, so the
+      # app can be installed by downloading it from a green run — no .NET SDK / build needed.
+      - name: Upload SpeakType.exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeakType-win-x64
+          path: SpeakType.App/bin/Release/net8.0-windows/win-x64/publish/SpeakType.exe
+          if-no-files-found: error
