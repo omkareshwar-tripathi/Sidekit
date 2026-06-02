@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using SpeakType.App.Theme;
 using SpeakType.Core;
 using SpeakType.Core.Orchestration;
 
@@ -87,6 +88,10 @@ public sealed partial class TrayIcon : IDisposable
     private ContextMenuStrip BuildMenu()
     {
         var menu = new ContextMenuStrip();
+        menu.Renderer = new ToolStripProfessionalRenderer(new FlatMenuColorTable()) { RoundedEdges = false };
+        menu.Font = UiTheme.Body;
+        menu.ForeColor = UiTheme.TextPrimary;
+        menu.BackColor = UiTheme.Surface;
 
         var settings = new ToolStripMenuItem("Settings…");
         settings.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
