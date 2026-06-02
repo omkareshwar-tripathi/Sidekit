@@ -5,6 +5,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>SpeakType.App</RootNamespace>
     <AssemblyName>SpeakType</AssemblyName>
+    <!-- Required by [LibraryImport] source-generated P/Invoke (SYSLIB1062). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SpeakType.Core\SpeakType.Core.csproj" />
