@@ -23,7 +23,7 @@ public sealed partial class RecordingOverlay : Form
 
     private readonly Label _label;
     private readonly Font _font;
-    private readonly Timer _fadeTimer;
+    private readonly System.Windows.Forms.Timer _fadeTimer; // disambiguate from System.Threading.Timer
     private int _fadeAlpha;
 
     public RecordingOverlay()
@@ -44,7 +44,7 @@ public sealed partial class RecordingOverlay : Form
         };
         Controls.Add(_label);
 
-        _fadeTimer = new Timer { Interval = 30 };
+        _fadeTimer = new System.Windows.Forms.Timer { Interval = 30 };
         _fadeTimer.Tick += FadeTick;
     }
 
