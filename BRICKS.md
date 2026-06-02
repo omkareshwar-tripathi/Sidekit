@@ -10,12 +10,6 @@ Plan derived from `SpeakType-v1-spec.md` (the complete, decision-resolved spec).
 
 _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick that grows past ~150 LOC / 5 source files.)_
 
-### Adapters (real OS integration — thin, manual-verified)
-
-- [ ] **Brick 8 — Clipboard-safe paste (`IClipboard`/`IPasteService`).** Save (text only) → set our text → `SendInput` Ctrl+V → ~150 ms delay → restore. Best-effort editable-target detection; if unsure, skip restore and leave our text on the clipboard.
-  - Skill: dotnet-best-practices, dotnet-xunit, run-tests
-  - Verify: unit — save/restore and leave-on-clipboard branch (fake clipboard); restore-after-delay ordering. Manual — **M4**.
-
 ### App shell, UI & polish
 
 - [ ] **Brick 9 — Tray app + lifecycle.** `NotifyIcon` with Idle/Recording/Busy/Error icons; menu (Settings…, Pause, Start with Windows, About, Quit); single-instance mutex `SpeakType.Single`; global exception handlers (log + balloon + recover to Idle). Wire Pause (session-only) and tray state to the orchestrator.
@@ -54,6 +48,10 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 ### Backlog (optional — needs a user decision, not in the v1 critical path)
 
+- [ ] **Editable-target detection via UI Automation (revealed by Brick 8 review).** The Brick 8 `WinClipboard.HasEditableTarget` uses a `GetGUIThreadInfo` caret check, which returns false for **Electron/Chromium** apps (Slack, VS Code, Chrome, Discord) — they expose no Win32 caret, so dictation into them falls back to "Copied — paste manually" instead of pasting. **M4 expects Slack to paste**, so this gap will show at manual verification. Upgrade the heuristic to UI Automation (`AutomationElement.FocusedElement` + `TextPattern`/`ValuePattern` / `IsKeyboardFocusable`), keeping the caret check as a fast-path and leave-on-clipboard as the final fallback. Windows-only; verify with M4 against an Electron app on the laptop.
+  - Skill: dotnet-best-practices, run-tests
+- [ ] **Clipboard contention + paste error handling (revealed by Brick 8 review).** WinForms `Clipboard` throws transient `ExternalException` when another process holds the clipboard open; today that propagates out of `ClipboardPasteService.Paste` (and on Windows, up through the hotkey hook callback). Add best-effort retry/swallow in the `WinClipboard` adapter and decide the user-facing failure surface. Tightly coupled to Brick 9 (global exception handling) and Brick 14 (threading / marshalling the paste onto the STA thread) — fold in there rather than as a standalone brick if convenient.
+  - Skill: dotnet-best-practices, run-tests
 - [ ] **Shared test temp-dir helper (revealed by Brick 6b review).** The temp-dir scaffolding (`_tempDir` field + ctor + `Dispose`) is now duplicated across `JsonSettingsStoreTests`, `ModelStoreTests`, and `HttpModelDownloaderTests` (rule-of-three met). Extract a tiny `TempDir`/`TempDirFixture` IDisposable helper and have the three classes use it (~12 lines saved each). Deferred from Brick 6b to keep that brick from editing already-shipped test files; do it as its own small test-only brick.
   - Skill: dotnet-xunit, run-tests
 
@@ -63,6 +61,17 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 ## Done
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
+
+### Brick 8 — Clipboard-safe paste (2026-06-02)
+- **What:** "Works everywhere" paste (spec Feature 5). Behind the ports-and-adapters seam: a new `IClipboard` port (Core) with text-only save/restore primitives, a best-effort editable-target check, and a `SendPaste` that reports whether the keystrokes were actually injected. `ClipboardPasteService` (Core) runs the sequence **save current clipboard text → set our text → check for a focused editable target → Ctrl+V → wait ~150 ms (so the target can read the clipboard) → restore the original**. If no editable target is confirmed **or** the OS blocks the paste injection, it skips the restore and **leaves our text on the clipboard** (`PasteOutcome.LeftOnClipboard` → overlay "Copied — paste manually"), so the user's words are never silently lost. The Windows adapter `WinClipboard` (App) wraps WinForms `Clipboard` + `SendInput` Ctrl+V + `GetGUIThreadInfo` caret detection. Not wired into the app yet (Brick 14).
+- **Files:** `SpeakType.Core/Paste/{IClipboard.cs, ClipboardPasteService.cs}` (new); `SpeakType.App/Paste/WinClipboard.cs` (new, Windows-only); tests `SpeakType.Tests/Paste/ClipboardPasteServiceTests.cs` (new).
+- **Verified:** Core on Mac → `dotnet test SpeakType.Tests/...` **119/119 pass** (7 new: full-sequence ordering, restore-after-delay ordering, null-original → `Clear`, no-target leave-on-clipboard, **blocked-paste leave-on-clipboard**, null-text and null-clipboard guards). App adapter is **Windows-only — cannot build on Mac**; Windows x64 **CI is the compile gate** (green: run 26823975915). **Manual M4 deferred to the laptop** (paste into Slack, clipboard restored, click-desktop → "Copied — paste manually").
+- **Notes / decisions:**
+  - **Save-then-set, in both branches** — our cleaned text is put on the clipboard *before* the target check, so even the leave-on-clipboard path preserves the words. The injected `Action<TimeSpan>` delay keeps the 150 ms restore-wait policy in Core while making the ordering unit-testable without real sleeping.
+  - **SendPaste returns success (code review must-fix):** the original ignored `SendInput`'s return, so a paste blocked by UIPI (non-elevated app → elevated foreground window) would still restore the old clipboard and report success, silently losing the dictation. Now a blocked injection returns `LeftOnClipboard` and keeps our text. Core-tested.
+  - **CS0649 build-break averted (code review must-fix):** the Win32 interop structs (`MOUSEINPUT`/`RECT`/unused `GUITHREADINFO` members) have fields populated only by the marshaller, which trips CS0649 under `TreatWarningsAsErrors` — fixed with a scoped `#pragma warning disable CS0649` (the existing hotkey adapter sidestepped this by reading raw bytes). This would have failed CI; caught before push.
+  - **`GetGUIThreadInfo(0, …)`** uses the foreground thread directly, dropping the `GetForegroundWindow`+`GetWindowThreadProcessId` dance (simpler, avoids a rare focus-on-another-thread false negative).
+  - **Follow-ups revealed (see Backlog):** the caret-only target check returns false for **Electron/Chromium** apps (Slack, VS Code, Chrome, Discord) → they hit leave-on-clipboard, which **M4 expects to paste** — needs UI Automation. Also clipboard `ExternalException` contention + the STA-thread requirement are owned by Bricks 9/14 (error handling + threading), noted on `WinClipboard`.
 
 ### Brick 7 — On-device Whisper transcriber (2026-06-02)
 - **What:** The actual speech-to-text (spec Feature 2). New **cross-platform** `SpeakType.Whisper` project with `WhisperTranscriber : ITranscriber` over Whisper.NET: loads a ggml model once, then `Transcribe(float[] samples)` runs whisper.cpp with `language="en"` and `threads = max(1, cpu-1)` and returns the trimmed transcript (bridges Whisper's async stream via `ToBlockingEnumerable`). The adapter references only the **managed** `Whisper.net` so `Core` stays dependency-free and the engine runs on macOS/Windows/Linux. Whisper.NET was validated on this Mac (Metal-accelerated) before building — see the spike notes below.
@@ -82,16 +91,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
   - **Manual buffer-copy loop (not `Stream.CopyToAsync`)** — `CopyToAsync` gives no progress callback, and the UI needs a download progress signal, so the hand-rolled loop is required (review confirmed).
   - **Borrow, don't own, the `HttpClient`** — the recommended pattern (a long-lived client avoids socket exhaustion); the composition root owns it. Buffer size is the BCL default 80 KB.
   - **Progress is best-effort** (review): if a misbehaving server sends more/fewer bytes than `Content-Length`, the fraction can momentarily exceed 1.0 or stop short — cosmetic only, since `ModelStore.Verify` gates on exact size+SHA256. Unknown length → no progress reports (every catalog `ModelInfo` has a known size, so this only affects ad-hoc URLs).
-
-### Brick 6a — Model store logic + verification (2026-06-02)
-- **What:** The model-management core (spec Feature 2 plumbing): resolve the per-user models directory (`%LOCALAPPDATA%\SpeakType\models`), verify a model file by exact byte size **and** SHA256, download-with-retry, install atomically, and **keep the prior model untouched when a switch fails**. Behind ports: `IModelStore` (`ModelsDirectory`, `GetInstalledModelPath`, `EnsureAsync`) and `IModelDownloader` (one download attempt; the real `HttpClient` impl is Brick 6b). `ModelStore.EnsureAsync` short-circuits when a valid file is already present, else downloads to a `.download` temp, verifies, and `File.Move(overwrite)`s into place only on success (so a failed/partial download never clobbers a good model); it re-downloads a corrupt-on-disk or missing file and retries up to 3×. `ModelCatalog` holds the three ggml `.en` models (tiny/base/small) with their HuggingFace URLs + Git-LFS size/SHA256. **Cross-platform** (BCL `System.IO`/`System.Security.Cryptography` only — no NuGet, no Windows APIs).
-- **Files:** `SpeakType.Core/Models/{ModelCatalog.cs, IModelDownloader.cs, IModelStore.cs, ModelStore.cs}` (new); tests `SpeakType.Tests/Models/ModelStoreTests.cs` (new); `.gitignore` (narrowed the over-broad `models/` rule that was hiding the source `Models/` folders to a repo-root anchor `/models/`; runtime `*.bin` stay ignored).
-- **Verified (on Mac):** `dotnet test SpeakType.Tests/...` → **107/107 pass** (9 new: install-on-verify, truncated-download throws + cleans temp, **keep-old-on-failed-switch**, already-installed short-circuit (downloader not called), corrupt-on-disk re-download, retry-then-succeed, unknown-model throws, `GetInstalledModelPath` present/absent, and **case-insensitive name resolution**). Fully Mac-verified (the spec's unit deliverable); CI green on Windows too (run 26819768676). Real download + switch + failure is **manual M2 on the laptop** (needs Brick 6b + network).
-- **Notes / decisions:**
-  - **Brick 6 was split (6a + 6b)** by §2a sizing: the verify/retry/switch **logic** (here, fully Mac-tested with a fake downloader + temp dirs) vs the real `HttpClient` streaming downloader (6b). The `IModelDownloader` seam is exactly what makes the logic testable without a network.
-  - **Code review caught a real cross-platform bug (fixed):** `GetInstalledModelPath` used the raw argument while `EnsureAsync` used the canonical catalog name — so a non-canonical query like `"BASE.EN"` looked for `ggml-BASE.EN.bin` and returned null on a case-sensitive filesystem (Mac/Linux/CI run plain `net8.0`) even when `ggml-base.en.bin` was installed. Now both resolve through the catalog; regression test added. Also added the last download error as the final exception's `InnerException` for M2 diagnosability.
-  - **Catalog SHA256/size are the HuggingFace Git-LFS pointer values** (fetched live): tiny.en 77704715 / `921e4cf8…`, base.en 147964211 / `a03779c8…`, small.en 487614201 / `c6138d6d…`. The verify *logic* is unit-tested; the catalog *values* are confirmed at M2 against a real download.
-  - **`%LOCALAPPDATA%` path is cross-platform** via `Environment.GetFolderPath(LocalApplicationData)` (maps to the OS per-user data dir); `DefaultModelsDirectory` is exposed for the Brick 14 composition root, while the dir is constructor-injected for tests.
 
 <!-- Template for each entry:
 
