@@ -31,7 +31,8 @@ jobs:
       - name: Build
         run: dotnet build SpeakType.sln -c Release --no-restore
 
-      # Excludes the slow on-device Whisper test (Category=Integration), which
-      # arrives in Brick 7. It gets its own optional job then.
+      # Excludes the slow on-device Whisper integration test (Category=Integration,
+      # SpeakType.Whisper.Tests, added in Brick 7). It downloads a model + runs whisper,
+      # so it is run locally / in a future optional job, not in this fast push job.
       - name: Test
         run: dotnet test SpeakType.sln -c Release --no-build --filter "Category!=Integration"
