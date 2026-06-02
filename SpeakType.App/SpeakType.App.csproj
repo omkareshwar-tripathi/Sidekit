@@ -12,7 +12,14 @@
          them so the documented publish command produces ONE file. Only takes effect during a
          single-file publish, so it's inert for normal build/test. -->
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Brand logo (Brick UI-6): the .exe icon. The same file is embedded below so the windows
+         and tray can load it at runtime. -->
+    <ApplicationIcon>Assets\speaktype.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- LogicalName makes the runtime lookup name deterministic (AppIcon.Brand loads "speaktype.ico"). -->
+    <EmbeddedResource Include="Assets\speaktype.ico" LogicalName="speaktype.ico" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.2.1" />
     <!-- Native whisper.cpp libraries so Whisper actually runs in the deployed app; the managed

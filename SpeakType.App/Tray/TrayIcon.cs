@@ -1,6 +1,6 @@
 using System.Drawing;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using SpeakType.App.Branding;
 using SpeakType.App.Theme;
 using SpeakType.Core;
 using SpeakType.Core.Orchestration;
@@ -10,10 +10,11 @@ namespace SpeakType.App.Tray;
 /// <summary>
 /// The system-tray surface (spec Feature 6): a <see cref="NotifyIcon"/> whose icon and
 /// tooltip reflect the four <see cref="TrayState"/>s, plus a right-click menu. State icons
-/// are drawn programmatically (no .ico assets). The composition root (Brick 14) subscribes
+/// are drawn programmatically as the waveform logo glyph tinted per state (see
+/// <see cref="AppIcon.ForState"/>). The composition root (Brick 14) subscribes
 /// to the events to wire Settings/Pause/Start-with-Windows/Quit; About is handled in place.
 /// </summary>
-public sealed partial class TrayIcon : IDisposable
+public sealed class TrayIcon : IDisposable
 {
     private readonly NotifyIcon _notifyIcon;
     private readonly ContextMenuStrip _menu;
@@ -25,10 +26,10 @@ public sealed partial class TrayIcon : IDisposable
     {
         _icons = new Dictionary<TrayState, Icon>
         {
-            [TrayState.Idle] = MakeIcon(Color.SteelBlue),
-            [TrayState.Recording] = MakeIcon(Color.Red),
-            [TrayState.Busy] = MakeIcon(Color.Orange),
-            [TrayState.Error] = MakeIcon(Color.DarkRed),
+            [TrayState.Idle] = AppIcon.ForState(Color.SteelBlue),
+            [TrayState.Recording] = AppIcon.ForState(Color.Red),
+            [TrayState.Busy] = AppIcon.ForState(Color.Orange),
+            [TrayState.Error] = AppIcon.ForState(Color.DarkRed),
         };
 
         _menu = BuildMenu();
@@ -119,35 +120,4 @@ public sealed partial class TrayIcon : IDisposable
     }
 
     private static string Tooltip(TrayState state) => $"{AppInfo.Name} — {state}"; // ≤ 63 chars (Win32 limit)
-
-    // Draw a filled circle on a 16×16 bitmap and turn it into an Icon — avoids shipping
-    // binary .ico assets for the four states.
-    private static Icon MakeIcon(Color color)
-    {
-        using var bitmap = new Bitmap(16, 16);
-        using (var graphics = Graphics.FromImage(bitmap))
-        using (var brush = new SolidBrush(color))
-        {
-            graphics.Clear(Color.Transparent);
-            graphics.FillEllipse(brush, 1, 1, 14, 14);
-        }
-
-        // GetHicon returns an unmanaged HICON that Icon.FromHandle does NOT own (so disposing
-        // that Icon would not free it). Clone an Icon that owns its own copy, then destroy the
-        // original handle — keeping the Dispose() loop an honest, leak-free cleanup.
-        var hicon = bitmap.GetHicon();
-        try
-        {
-            using var unowned = Icon.FromHandle(hicon);
-            return (Icon)unowned.Clone();
-        }
-        finally
-        {
-            DestroyIcon(hicon);
-        }
-    }
-
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool DestroyIcon(nint handle);
 }

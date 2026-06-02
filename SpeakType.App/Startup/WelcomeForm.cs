@@ -1,4 +1,5 @@
 using System.Windows.Forms;
+using SpeakType.App.Branding;
 using SpeakType.App.Theme;
 using SpeakType.Core.Models;
 
@@ -38,6 +39,7 @@ public sealed class WelcomeForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        Icon = AppIcon.Brand;
         UiTheme.StyleWindow(this);
 
         var layout = new TableLayoutPanel
