@@ -10,13 +10,6 @@ Plan derived from `SpeakType-v1-spec.md` (the complete, decision-resolved spec).
 
 _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick that grows past ~150 LOC / 5 source files.)_
 
-### Core (no OS dependencies — fully unit-testable)
-
-- [ ] **Brick 3b — Orchestrator timing guards.** Add the two time-based hold guards to the Brick 3a orchestrator: **< 300 ms hold → discard** (no transcribe/paste) and **60 s auto-stop** (timer fires → run the same cycle as a release). Introduce `IClock` (for press→release elapsed) and an `ITimer`-style abstraction (for the 60 s auto-stop), both faked in tests. The cycle entry point already exists (`RunCycle()` extracted in 3a) — the auto-stop timer is a second caller of it, no re-cut needed.
-  - **Decision locked in 3a review:** the < 300 ms guard measures **wall-clock from press to release via the injected `IClock`**, NOT captured-sample count — keeps `CapturedAudio` a pure data carrier and duration logic in the orchestrator where the clock lives.
-  - Skill: dotnet-best-practices, dotnet-xunit, run-tests
-  - Verify (unit, fakes + fake clock): hold < 300 ms → discarded (no transcribe/paste, returns Idle, timer cancelled); advance fake clock/timer to 60 s while held → auto-stops and runs the cycle; a normal-length release still works (timer cancelled on release).
-
 ### Adapters (real OS integration — thin, manual-verified)
 
 - [ ] **Brick 4 — Hotkey adapter (`IHotkeyListener`).** `WH_KEYBOARD_LL` low-level hook; default Right Ctrl; suppress bound key while held; hotkey string parse/validate (allow safe keys + combos, reject bare letters/digits); live re-register on rebind.
@@ -64,6 +57,8 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 ### Integration & ship
 
 - [ ] **Brick 14 — End-to-end wiring.** Compose the real adapters into the orchestrator behind composition root; full dictation works in a real app.
+  - **Provide the real `IClock` (Stopwatch-backed) and `IAutoStopTimer` (`System.Threading.Timer`, one-shot via `Timeout.Infinite` period) adapters** (deferred from Brick 3b — no real impls exist yet).
+  - **Own the threading model.** The orchestrator is synchronous in v1; the real auto-stop timer fires `OnAutoStop` on a thread-pool thread, so its `State` guard + `_pressTimestamp` are **not thread-safe** today. A release racing the 60 s fire could double-run the cycle. Marshal hotkey + timer callbacks onto one thread (or lock) here, and offload the capture→transcribe→paste work off the UI thread.
   - Skill: dotnet-best-practices, run-tests
   - Verify: manual — **M1** end-to-end + **M8** (full happy path across Notepad/Slack/browser).
 
@@ -79,6 +74,16 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 ## Done
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
+
+### Brick 3b — Orchestrator timing guards (2026-06-02)
+- **What:** The two hold-duration guards on the Brick 3a orchestrator (spec Feature 1). A hold **< 300 ms** is an accidental tap → discarded (capture stopped to release the mic + keep Start/Stop balanced, no transcribe/paste, no `Completed`). A hold reaching **60 s** auto-stops: a one-shot timer started on press fires `OnAutoStop`, which runs the same `RunCycle()` as a release **while the key is still held** (the later real release is then ignored). Two new ports — `IClock` (Stopwatch-style `GetTimestamp`/`GetElapsedTime`, measures press→release wall-clock elapsed) and `IAutoStopTimer` (`Start(delay,onElapsed)`/`Cancel`) — injected into the orchestrator; thresholds are tunable `MinHold`/`MaxHold` consts.
+- **Files:** `SpeakType.Core/Time/IClock.cs`, `SpeakType.Core/Time/IAutoStopTimer.cs` (new); edited `SpeakType.Core/Orchestration/DictationOrchestrator.cs`; tests `SpeakType.Tests/Orchestration/{Fakes.cs, DictationOrchestratorTests.cs}`.
+- **Verified (on Mac):** `dotnet test SpeakType.Tests/...` → **52/52 pass**. New tests: <300 ms discard (no transcribe/paste, mic stopped, timer cancelled, no outcome); 60 s auto-stop runs the cycle while held + the late release is ignored; timer starts at 60 s and is cancelled on release; discard-then-next-cycle works; and **audio `Start()` throwing resets State to Idle so the next press works** (the must-fix below). Pure logic → no manual M#. CI on Windows covers it too.
+- **Notes / decisions:**
+  - **Code review caught a real latent bug (fixed):** `OnPressed` set `State=Recording` then called `_audioCapture.Start()`/`_autoStopTimer.Start()` with no protection — if the mic won't open (`Start()` throws), State stuck at `Recording` forever, wedging all future dictation (same failure class as the Brick 3a `RunCycle` fix, but on the press path this brick modified). Wrapped the press body in `try { … } catch { State = Idle; throw; }`. Regression test added.
+  - **Hand-rolled `IClock`/`IAutoStopTimer` instead of .NET 8 `TimeProvider` — deliberate** (simplify + review both raised it). `TimeProvider` (+`FakeTimeProvider`) would cover `IClock`'s role, but Core currently has **zero external NuGet deps** and every port is project-owned (`IHotkeyListener`/`IAudioCapture`/…); `FakeTimeProvider` needs an extra test package and `TimeProvider` bundles wall-clock/timer-creation members we don't use. Kept the convention; revisit if Core ever takes a `Microsoft.Extensions.*` dep anyway.
+  - **`MinHold`/`MaxHold` are private consts, not `AppSettings`** — no spec/user story exposes them; promoting to settings (JSON key + Normalize default + Settings UI) would be speculative configurability (§2). "Tunable in code" per spec line 57.
+  - **Threaded-timer races + real adapters deferred to Brick 14** (now noted on that brick): the real `IAutoStopTimer` fires on a thread-pool thread, so the `State` guard + `_pressTimestamp` aren't thread-safe yet — a release racing the 60 s fire could double-run the cycle. The orchestrator is **synchronous in v1 by design** (Brick 3a); the real Stopwatch/`System.Threading.Timer` adapters + threading model are Brick 14's job.
 
 ### Brick 3a — Dictation orchestrator: ports + core flow (2026-06-02)
 - **What:** The pure state machine that wires a dictation cycle, plus the ports it drives. `DictationOrchestrator` subscribes to hotkey press/release: press (Idle) → `Recording` + `audioCapture.Start()`; release → `Transcribing` → `Stop()` → if no speech skip → `Transcribe()` → `TranscriptCleaner.Clean(raw, settings.FillerRemoval)` → if empty skip → `Pasting` → `Paste()` → `Idle`, raising a single `Completed(DictationOutcome)` per cycle (`Pasted` / `LeftOnClipboard` / `NoSpeech`). Press while non-Idle is ignored (busy). **This brick is the non-timing logic only** — Brick 3b adds the `<300 ms`/`60 s` guards.
@@ -101,16 +106,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
   - **Simplify pass:** dropped `RegexOptions.Compiled` (net-negative JIT cost for a run-once-per-utterance path), tidied `[,]?`→`,?`, and split the hallucination list into named `Sentinels` (`[BLANK_AUDIO]`) vs `SilencePhrases` (`you`/`Thank you.`) so the membership rule is explicit, not accretive.
   - **Code review — confirmed real-world edge cases that are NOT code defects but spec-level tradeoffs (left as the spec dictates; flagged for the user, see follow-up below):** the always-filler list deletes real standalone tokens — `mm` (millimeter: "5 mm wide" → "5 wide"), `er` (ER), `ah` — because spec line 121 declares them "never real words"; and `\bi\b`→`I` (spec line 129) over-capitalizes `i.e.` / `for i` / `Section i`. These are the spec author's documented decisions; I did **not** silently override them mid-ship.
   - **Known niche defects (no spec answer; documented, not fixed):** two stacked *leading* always-fillers with a comma drop the re-capitalization (`"Um er, it works."` → `"it works. "`); a hyphen-joined cluster leaves debris (`"Mm-hmm."` → `"-hmm. "`). Rare Whisper outputs; fixing needs invented behavior or added pass complexity — deferred to the follow-up.
-
-### Brick 1 — Settings model + JSON store (2026-06-02)
-- **What:** `AppSettings` POCO (hotkey, modelSize, fillerRemoval, overlay, autostart, debugLogging) with spec defaults (RightCtrl / base.en / on / on / on / off), an `ISettingsStore` port, and `JsonSettingsStore` (System.Text.Json, camelCase keys) reading/writing `%APPDATA%\SpeakType\settings.json` (path is constructor-injected for testability; `DefaultFilePath` static for the real location). Robust load: missing file, partial file, corrupt JSON, and blank/explicit-null string fields all fall back to defaults via `AppSettings.Normalize()`.
-- **Files:** `SpeakType.Core/Settings/{AppSettings.cs, ISettingsStore.cs, JsonSettingsStore.cs}`, `SpeakType.Tests/Settings/JsonSettingsStoreTests.cs`.
-- **Verified (on Mac):** `dotnet test SpeakType.Tests/...` → **10/10 pass** — round-trip (non-default values through disk), missing→defaults, partial→defaults, corrupt→defaults, literal-`null`→defaults, blank/explicit-null hotkey & modelSize→defaults, Save-creates-dir, camelCase keys (all six, no PascalCase leak). No manual M# (pure logic). CI on Windows covers it too.
-- **Notes / decisions:**
-  - **Normalization lives on the model (`AppSettings.Normalize()`), not in the store** — review flagged that putting it in `JsonSettingsStore.Load()` duplicated the default and coupled the port to field semantics (any future store impl would have to re-implement it). Single-source defaults via `DefaultHotkey`/`DefaultModelSize` consts.
-  - **Boundary:** "invalid hotkey rejected" here means **blank/null → default only**. Full hotkey-grammar validation (which keys/combos are legal) is **Brick 4** (the hotkey listener). Don't duplicate it here.
-  - Code review caught a real latent NRE: an explicit JSON `null` on a non-nullable string (e.g. `{ "modelSize": null }`) would survive deserialization as null; `Normalize()` now coerces it, with tests.
-  - **Possible later hardening (not done, §2):** `Save()` is a non-atomic `File.WriteAllText`; a crash mid-write yields a corrupt file (which `Load()` already degrades to defaults). A temp-file+rename swap would make it atomic — revisit if corruption is ever observed, since settings are rewritten on every change (apply-on-change).
 
 <!-- Template for each entry:
 
