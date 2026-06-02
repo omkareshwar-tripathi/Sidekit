@@ -3,6 +3,7 @@ using SpeakType.Core.Cleanup;
 using SpeakType.Core.Orchestration;
 using SpeakType.Core.Paste;
 using SpeakType.Core.Settings;
+using SpeakType.Core.Time;
 
 namespace SpeakType.Tests.Orchestration;
 
@@ -12,6 +13,8 @@ public sealed class DictationOrchestratorTests
     private readonly FakeAudioCapture _audio = new();
     private readonly FakeTranscriber _transcriber = new();
     private readonly FakePasteService _paste = new();
+    private readonly FakeClock _clock = new();
+    private readonly FakeAutoStopTimer _timer = new();
     private readonly DictationOrchestrator _sut;
 
     private readonly List<DictationOutcome> _outcomes = new();
@@ -19,7 +22,8 @@ public sealed class DictationOrchestratorTests
     public DictationOrchestratorTests()
     {
         _sut = new DictationOrchestrator(
-            _hotkey, _audio, _transcriber, _paste, new TranscriptCleaner(), new AppSettings());
+            _hotkey, _audio, _transcriber, _paste, new TranscriptCleaner(), new AppSettings(),
+            _clock, _timer);
         _sut.Completed += (_, outcome) => _outcomes.Add(outcome);
     }
 
@@ -145,6 +149,100 @@ public sealed class DictationOrchestratorTests
 
         // A subsequent dictation succeeds normally.
         _transcriber.ThrowOnCall = null;
+        _transcriber.Result = "Hello again.";
+        _hotkey.Press();
+        _hotkey.Release();
+
+        Assert.Equal("Hello again. ", _paste.ReceivedText);
+        Assert.Equal(new[] { DictationOutcome.Pasted }, _outcomes);
+        Assert.Equal(RecordingState.Idle, _sut.State);
+    }
+
+    [Fact]
+    public void Hold_under_300ms_is_discarded()
+    {
+        _clock.Elapsed = TimeSpan.FromMilliseconds(100);
+        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
+        _transcriber.Result = "Hello.";
+
+        _hotkey.Press();
+        _hotkey.Release();
+
+        Assert.False(_transcriber.WasCalled);
+        Assert.Equal(0, _paste.CallCount);
+        Assert.Empty(_outcomes); // accidental tap produces no Completed outcome
+        Assert.Equal(RecordingState.Idle, _sut.State);
+        Assert.Equal(1, _audio.StopCount); // capture was stopped to release the mic
+        Assert.Equal(1, _timer.CancelCount);
+    }
+
+    [Fact]
+    public void Auto_stop_runs_the_cycle_while_still_held()
+    {
+        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
+        _transcriber.Result = "Hello.";
+
+        _hotkey.Press();
+        _timer.Fire(); // 60 s reached, still held
+
+        Assert.True(_transcriber.WasCalled);
+        Assert.Equal(1, _paste.CallCount);
+        Assert.Equal(new[] { DictationOutcome.Pasted }, _outcomes);
+        Assert.Equal(RecordingState.Idle, _sut.State);
+
+        _hotkey.Release(); // user finally lets go — ignored, cycle already ran
+
+        Assert.Single(_outcomes);
+        Assert.Equal(RecordingState.Idle, _sut.State);
+    }
+
+    [Fact]
+    public void Auto_stop_timer_starts_at_60s_and_is_cancelled_on_release()
+    {
+        _hotkey.Press();
+
+        Assert.True(_timer.IsRunning);
+        Assert.Equal(TimeSpan.FromSeconds(60), _timer.Delay);
+
+        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
+        _transcriber.Result = "Hello.";
+        _hotkey.Release();
+
+        Assert.Equal(1, _timer.CancelCount);
+        Assert.False(_timer.IsRunning);
+    }
+
+    [Fact]
+    public void Discard_resets_state_so_the_next_cycle_works()
+    {
+        _clock.Elapsed = TimeSpan.FromMilliseconds(50);
+        _hotkey.Press();
+        _hotkey.Release(); // discarded
+
+        _clock.Elapsed = TimeSpan.FromSeconds(1);
+        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
+        _transcriber.Result = "Hi.";
+        _hotkey.Press();
+        _hotkey.Release();
+
+        Assert.Equal(new[] { DictationOutcome.Pasted }, _outcomes);
+        Assert.Equal(RecordingState.Idle, _sut.State);
+    }
+
+    [Fact]
+    public void Audio_start_throwing_resets_state_so_the_next_press_works()
+    {
+        _audio.ThrowOnStart = new InvalidOperationException("mic in use");
+
+        Assert.Throws<InvalidOperationException>(() => _hotkey.Press());
+
+        // The throw on press must NOT wedge the machine in Recording.
+        Assert.Equal(RecordingState.Idle, _sut.State);
+        Assert.Empty(_outcomes);
+
+        // A subsequent press/release dictates normally.
+        _audio.ThrowOnStart = null;
+        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
         _transcriber.Result = "Hello again.";
         _hotkey.Press();
         _hotkey.Release();

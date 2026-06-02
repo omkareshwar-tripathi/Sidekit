@@ -1,6 +1,7 @@
 using SpeakType.Core.Audio;
 using SpeakType.Core.Input;
 using SpeakType.Core.Paste;
+using SpeakType.Core.Time;
 using SpeakType.Core.Transcription;
 
 namespace SpeakType.Tests.Orchestration;
@@ -18,11 +19,26 @@ internal sealed class FakeHotkeyListener : IHotkeyListener
 internal sealed class FakeAudioCapture : IAudioCapture
 {
     public int StartCount { get; private set; }
+    public int StopCount { get; private set; }
     public CapturedAudio Result { get; set; } = new(Array.Empty<float>(), HasSpeech: true);
 
-    public void Start() => StartCount++;
+    /// <summary>When set, <see cref="Start"/> throws it (simulates a mic that won't open).</summary>
+    public Exception? ThrowOnStart { get; set; }
 
-    public CapturedAudio Stop() => Result;
+    public void Start()
+    {
+        StartCount++;
+        if (ThrowOnStart is not null)
+        {
+            throw ThrowOnStart;
+        }
+    }
+
+    public CapturedAudio Stop()
+    {
+        StopCount++;
+        return Result;
+    }
 }
 
 internal sealed class FakeTranscriber : ITranscriber
@@ -58,5 +74,56 @@ internal sealed class FakePasteService : IPasteService
         CallCount++;
         ReceivedText = text;
         return Result;
+    }
+}
+
+/// <summary>
+/// Controllable clock. <see cref="Elapsed"/> is what the orchestrator sees for the
+/// press→release hold; it defaults to a normal hold (past the 300 ms guard) so existing
+/// flow tests are unaffected. Discard tests set it below the guard.
+/// </summary>
+internal sealed class FakeClock : IClock
+{
+    public TimeSpan Elapsed { get; set; } = TimeSpan.FromSeconds(1);
+
+    public long GetTimestamp() => 0;
+
+    public TimeSpan GetElapsedTime(long startingTimestamp) => Elapsed;
+}
+
+/// <summary>One-shot timer fake. Tests inspect Start/Cancel and fire it on demand.</summary>
+internal sealed class FakeAutoStopTimer : IAutoStopTimer
+{
+    public bool IsRunning { get; private set; }
+    public TimeSpan Delay { get; private set; }
+    public int CancelCount { get; private set; }
+
+    private Action? _onElapsed;
+
+    public void Start(TimeSpan delay, Action onElapsed)
+    {
+        IsRunning = true;
+        Delay = delay;
+        _onElapsed = onElapsed;
+    }
+
+    public void Cancel()
+    {
+        if (IsRunning)
+        {
+            CancelCount++;
+        }
+
+        IsRunning = false;
+        _onElapsed = null;
+    }
+
+    /// <summary>Simulate the timer elapsing.</summary>
+    public void Fire()
+    {
+        var callback = _onElapsed;
+        IsRunning = false;
+        _onElapsed = null;
+        callback?.Invoke();
     }
 }
