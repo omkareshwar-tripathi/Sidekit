@@ -12,6 +12,24 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 ### App shell, UI & polish
 
+_Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2026-06-03-ui-modern-light-restyle-design.md`; plan: `docs/superpowers/plans/2026-06-03-ui-modern-light-restyle.md`. All Windows-only → verify = CI compile-green + a laptop screenshot vs mockup B (no Core changes; 179 tests stay green)._
+
+- [ ] **Brick UI-1 — `UiTheme` tokens + helpers.** New `SpeakType.App/Theme/UiTheme.cs`: light palette (bg `#F3F3F3`, surface white, accent `#0067C0`, …), Segoe UI fonts, spacing, and `StyleWindow`/`StyleField`/`StyleButton` helpers + a `FlatMenuColorTable`. Foundation, no visible change yet.
+  - Skill: dotnet-best-practices, run-tests
+  - Verify: CI compile-green.
+- [ ] **Brick UI-2 — `ToggleSwitch` control.** New `SpeakType.App/Controls/ToggleSwitch.cs`: owner-drawn on/off switch mirroring `CheckBox` (`Checked` + `CheckedChanged`; click + Space/Enter toggle). Foundation.
+  - Skill: dotnet-best-practices, run-tests
+  - Verify: CI compile-green; manual toggle behavior on the laptop.
+- [ ] **Brick UI-3 — Restyle SettingsForm.** Apply `UiTheme`, swap the 4 checkboxes → `ToggleSwitch` (`MakeCheck`→`MakeToggle`, keep the `_loading` guard + all event wiring), flatten the hotkey field + model dropdown. First visible change.
+  - Skill: dotnet-best-practices, run-tests
+  - Verify: CI compile-green; laptop screenshot vs mockup B; re-check M6 (settings still apply live).
+- [ ] **Brick UI-4 — Restyle WelcomeForm.** Apply `UiTheme` (Semibold heading, muted status), make Retry a primary accent button; keep the system progress bar.
+  - Skill: dotnet-best-practices, run-tests
+  - Verify: CI compile-green; laptop screenshot; re-check M2 (download + Retry still work).
+- [ ] **Brick UI-5 — Flat tray menu.** Give the tray `ContextMenuStrip` a `ToolStripProfessionalRenderer(new FlatMenuColorTable())` + light font/colors (flat white menu, accent hover) in place of the gray gradient.
+  - Skill: dotnet-best-practices, run-tests
+  - Verify: CI compile-green; laptop screenshot; menu actions still work.
+
 ### Integration & ship
 
 ### Backlog (optional — needs a user decision, not in the v1 critical path)
