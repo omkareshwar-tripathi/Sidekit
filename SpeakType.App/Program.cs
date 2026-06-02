@@ -5,6 +5,7 @@ using SpeakType.App.Audio;
 using SpeakType.App.Input;
 using SpeakType.App.Overlay;
 using SpeakType.App.Paste;
+using SpeakType.App.Settings;
 using SpeakType.App.Startup;
 using SpeakType.App.Threading;
 using SpeakType.App.Tray;
@@ -60,7 +61,13 @@ internal static class Program
 
         // Start-with-Windows: the tray toggle writes/removes the per-user Run key.
         var autostart = new WinAutostart();
-        tray.StartWithWindowsToggled += (_, enabled) =>
+
+        var settingsStore = new JsonSettingsStore(JsonSettingsStore.DefaultFilePath);
+        var settings = settingsStore.Load();
+
+        // Single funnel for both autostart entry points (tray menu + Settings checkbox) so the Run key,
+        // the persisted AppSettings.Autostart, and the tray checkmark never diverge.
+        void ApplyAutostart(bool enabled)
         {
             if (enabled)
             {
@@ -70,7 +77,13 @@ internal static class Program
             {
                 autostart.Disable();
             }
-        };
+
+            settings.Autostart = enabled;
+            settingsStore.Save(settings);
+            tray.SetStartWithWindowsChecked(enabled);
+        }
+
+        tray.StartWithWindowsToggled += (_, enabled) => ApplyAutostart(enabled);
 
         // First-run: download the default model via the Welcome window before the app is usable.
         // The HttpClient lives until Run() returns (Application.Run blocks), covering the modal flow.
@@ -90,7 +103,7 @@ internal static class Program
             }
 
             // Setup succeeded: apply the spec default (autostart ON) and tell the user we're ready.
-            autostart.Enable();
+            ApplyAutostart(true);
             tray.ShowBalloon(AppInfo.Name, "Ready!");
         }
 
@@ -99,9 +112,6 @@ internal static class Program
 
         // Build the dictation pipeline now that a usable model is present. The hotkey hook is installed
         // LAST — after the model loads — so it stays inert until SpeakType is actually ready (spec Feature 2).
-        var settingsStore = new JsonSettingsStore(JsonSettingsStore.DefaultFilePath);
-        var settings = settingsStore.Load();
-
         var transcriber = LoadTranscriber(modelStore, modelName, tray);
         if (transcriber is null)
         {
@@ -133,6 +143,39 @@ internal static class Program
         var orchestrator = new DictationOrchestrator(
             hotkey, capture, transcriber, pasteService, new TranscriptCleaner(), settings,
             new SystemClock(), autoStopTimer, dispatcher, logger);
+
+        // Settings window — single instance; Show/Activate on each request, it hides itself on close.
+        using var settingsForm = new SettingsForm(settings, settingsStore);
+        settingsForm.HotkeyRebound += (_, rebound) =>
+        {
+            hotkey.Rebind(rebound);
+            orchestrator.Cancel(); // a rebind mid-hold won't fire Released — drop any active capture
+        };
+        settingsForm.AutostartChanged += (_, enabled) => ApplyAutostart(enabled);
+        // settingsForm.ModelChangeRequested is wired in the model-switch brick (14h).
+        tray.SettingsRequested += (_, _) =>
+        {
+            if (!settingsForm.Visible)
+            {
+                settingsForm.Show();
+            }
+
+            settingsForm.Activate();
+        };
+
+        // Pause is session-only (spec Feature 6): stop/resume the hook; pausing mid-hold drops the capture.
+        tray.PauseToggled += (_, paused) =>
+        {
+            if (paused)
+            {
+                hotkey.Pause();
+                orchestrator.Cancel();
+            }
+            else
+            {
+                hotkey.Resume();
+            }
+        };
 
         // Drive the tray colour + overlay from the cycle. The events can fire on the background cycle
         // thread, so every UI touch is marshalled to the UI thread. Invariant: SHOWING the overlay is

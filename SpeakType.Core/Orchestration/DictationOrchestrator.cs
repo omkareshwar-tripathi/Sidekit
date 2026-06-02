@@ -193,6 +193,47 @@ public sealed class DictationOrchestrator
         }
     }
 
+    /// <summary>
+    /// Cancels an in-progress recording and returns to <see cref="RecordingState.Idle"/>, discarding
+    /// the captured audio (no transcribe, no paste, no <see cref="Completed"/>). Intended for when a
+    /// pause or hotkey-rebind happens mid-hold — the hook won't fire <see cref="OnReleased"/> for that
+    /// press, so the consumer calls this to avoid a stuck Recording state. A no-op unless currently
+    /// Recording (the same atomic claim used by release/auto-stop), so it never interrupts a running
+    /// cycle. Raises <see cref="StateChanged"/>(Idle) on the success path, outside the lock.
+    /// </summary>
+    public void Cancel()
+    {
+        // Claim the cycle the same way release/auto-stop do, but to a transient non-Idle state we
+        // never surface. Keeping _state non-Idle while we Stop() the capture blocks a concurrent
+        // OnPressed (a fresh press on the still-live hook right after a rebind) from calling Start()
+        // and overlapping our Stop() — NAudioCapture requires Start/Stop never overlap. Reset to Idle
+        // in the finally (so a throwing Stop() can't wedge the machine), and surface only Idle.
+        lock (_gate)
+        {
+            if (_state != RecordingState.Recording)
+            {
+                return;
+            }
+
+            _state = RecordingState.Transcribing;
+        }
+
+        _autoStopTimer.Cancel();
+        try
+        {
+            _audioCapture.Stop(); // discard the audio
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _state = RecordingState.Idle;
+            }
+        }
+
+        RaiseStateChanged(RecordingState.Idle);
+    }
+
     private void DiscardRecording()
     {
         // Accidental tap (< 300 ms): stop capture to keep Start/Stop balanced and release the

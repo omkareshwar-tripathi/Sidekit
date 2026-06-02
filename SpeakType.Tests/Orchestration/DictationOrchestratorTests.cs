@@ -387,6 +387,101 @@ public sealed class DictationOrchestratorTests
     }
 
     [Fact]
+    public void Cancel_while_recording_returns_to_idle_and_discards()
+    {
+        var states = new List<RecordingState>();
+        _sut.StateChanged += (_, s) => states.Add(s);
+
+        _hotkey.Press();
+        _sut.Cancel();
+
+        Assert.Equal(RecordingState.Idle, _sut.State);
+        Assert.Equal(1, _audio.StopCount); // capture stopped to release the mic
+        Assert.Equal(new[] { RecordingState.Recording, RecordingState.Idle }, states);
+        Assert.Empty(_outcomes); // no Completed on a cancel
+        Assert.False(_transcriber.WasCalled);
+    }
+
+    [Fact]
+    public void Cancel_keeps_the_cycle_claimed_while_stopping_capture()
+    {
+        // Regression: Cancel must keep _state non-Idle across Stop(), so a concurrent press on the
+        // still-live hook (after a rebind) can't pass OnPressed's Idle guard and Start() a capture
+        // that overlaps this Stop() — NAudioCapture requires Start/Stop never overlap.
+        var stateDuringStop = RecordingState.Idle;
+        _audio.OnStop = () => stateDuringStop = _sut.State;
+
+        _hotkey.Press();
+        _sut.Cancel();
+
+        Assert.NotEqual(RecordingState.Idle, stateDuringStop); // claimed during Stop → a racing Start() is blocked
+        Assert.Equal(RecordingState.Idle, _sut.State);         // and reset to Idle afterward
+    }
+
+    [Fact]
+    public void Cancel_when_idle_is_a_noop()
+    {
+        var states = new List<RecordingState>();
+        _sut.StateChanged += (_, s) => states.Add(s);
+
+        _sut.Cancel();
+
+        Assert.Empty(states);
+        Assert.Equal(0, _audio.StopCount);
+        Assert.Equal(RecordingState.Idle, _sut.State);
+    }
+
+    [Fact]
+    public void Cancel_during_active_cycle_is_ignored()
+    {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber { Result = "Hello." };
+        var paste = new FakePasteService();
+        var clock = new FakeClock();
+        var timer = new FakeAutoStopTimer();
+        var dispatcher = new DeferredDispatcher();
+        var outcomes = new List<DictationOutcome>();
+        var sut = new DictationOrchestrator(
+            hotkey, audio, transcriber, paste, new TranscriptCleaner(), new AppSettings(),
+            clock, timer, dispatcher);
+        sut.Completed += (_, o) => outcomes.Add(o);
+
+        hotkey.Press();
+        hotkey.Release(); // claims Transcribing, cycle queued but not run
+
+        Assert.Equal(RecordingState.Transcribing, sut.State);
+
+        sut.Cancel(); // a cycle is in flight — must be ignored
+
+        Assert.Equal(RecordingState.Transcribing, sut.State);
+        Assert.Equal(0, audio.StopCount); // not double-stopped (cycle's Stop runs when it runs)
+
+        dispatcher.RunPending();
+
+        Assert.Equal(new[] { DictationOutcome.Pasted }, outcomes);
+        Assert.Equal(RecordingState.Idle, sut.State);
+    }
+
+    [Fact]
+    public void Cancel_then_new_cycle_still_works()
+    {
+        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
+        _transcriber.Result = "Hello.";
+
+        _hotkey.Press();
+        _sut.Cancel();
+
+        // The cancel must not wedge the state machine: a fresh cycle dictates normally.
+        _hotkey.Press();
+        _hotkey.Release();
+
+        Assert.Equal("Hello. ", _paste.ReceivedText);
+        Assert.Equal(new[] { DictationOutcome.Pasted }, _outcomes);
+        Assert.Equal(RecordingState.Idle, _sut.State);
+    }
+
+    [Fact]
     public void Logs_recording_transcribe_transcript_and_latency_on_a_normal_cycle()
     {
         var hotkey = new FakeHotkeyListener();

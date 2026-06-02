@@ -27,6 +27,9 @@ internal sealed class FakeAudioCapture : IAudioCapture
     /// <summary>When set, <see cref="Start"/> throws it (simulates a mic that won't open).</summary>
     public Exception? ThrowOnStart { get; set; }
 
+    /// <summary>When set, invoked inside <see cref="Stop"/> so a test can observe state mid-stop.</summary>
+    public Action? OnStop { get; set; }
+
     public void Start()
     {
         StartCount++;
@@ -39,6 +42,7 @@ internal sealed class FakeAudioCapture : IAudioCapture
     public CapturedAudio Stop()
     {
         StopCount++;
+        OnStop?.Invoke();
         return Result;
     }
 }
