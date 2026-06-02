@@ -21,6 +21,7 @@ public sealed class SettingsForm : Form
     private readonly ISettingsStore _store;
     private readonly ErrorProvider _errorProvider = new();
     private readonly TextBox _hotkeyBox = new();
+    private readonly ComboBox _modelBox = new();
     private bool _loading = true;
 
     public SettingsForm(AppSettings settings, ISettingsStore store)
@@ -109,29 +110,24 @@ public sealed class SettingsForm : Form
     {
         // Reconcile a stored model name that isn't in the catalog (Normalize only null-checks it)
         // to the default, so the dropdown is never blank and the in-memory setting is consistent.
-        var selectedName = ModelCatalog.All.ContainsKey(_settings.ModelSize)
-            ? _settings.ModelSize
-            : AppSettings.DefaultModelSize;
+        var selectedName = ModelCatalog.Resolve(_settings.ModelSize);
         _settings.ModelSize = selectedName;
 
-        var box = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            DisplayMember = nameof(ModelInfo.Name),
-        };
+        _modelBox.DropDownStyle = ComboBoxStyle.DropDownList;
+        _modelBox.DisplayMember = nameof(ModelInfo.Name);
 
         foreach (var model in ModelCatalog.All.Values.OrderBy(m => m.SizeBytes))
         {
-            box.Items.Add(model);
+            _modelBox.Items.Add(model);
             if (string.Equals(model.Name, selectedName, StringComparison.OrdinalIgnoreCase))
             {
-                box.SelectedIndex = box.Items.Count - 1;
+                _modelBox.SelectedIndex = _modelBox.Items.Count - 1;
             }
         }
 
-        box.SelectedIndexChanged += (_, _) =>
+        _modelBox.SelectedIndexChanged += (_, _) =>
         {
-            if (_loading || box.SelectedItem is not ModelInfo model)
+            if (_loading || _modelBox.SelectedItem is not ModelInfo model)
             {
                 return;
             }
@@ -141,7 +137,33 @@ public sealed class SettingsForm : Form
             ModelChangeRequested?.Invoke(this, model.Name);
         };
 
-        return box;
+        return _modelBox;
+    }
+
+    /// <summary>
+    /// Reselects the model dropdown to <paramref name="modelName"/> without raising
+    /// <see cref="ModelChangeRequested"/>. The composition root calls this when a requested model
+    /// switch fails or is cancelled, so the dropdown stays in sync with the still-active model.
+    /// </summary>
+    public void RevertModelSelection(string modelName)
+    {
+        _loading = true; // suppress the SelectedIndexChanged handler for this programmatic change
+        try
+        {
+            for (var i = 0; i < _modelBox.Items.Count; i++)
+            {
+                if (_modelBox.Items[i] is ModelInfo model &&
+                    string.Equals(model.Name, modelName, StringComparison.OrdinalIgnoreCase))
+                {
+                    _modelBox.SelectedIndex = i;
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     // Validates and applies the hotkey box on focus-loss / window-close. No-ops when unchanged

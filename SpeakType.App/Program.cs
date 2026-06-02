@@ -89,7 +89,10 @@ internal static class Program
         // The HttpClient lives until Run() returns (Application.Run blocks), covering the modal flow.
         using var httpClient = new HttpClient();
         var modelStore = new ModelStore(new HttpModelDownloader(httpClient), ModelStore.DefaultModelsDirectory);
-        var modelName = AppSettings.DefaultModelSize;
+
+        // Honor the persisted model (fall back to the default if it isn't a known catalog entry), so a
+        // model chosen in Settings survives a restart instead of always reverting to the default.
+        var modelName = ModelCatalog.Resolve(settings.ModelSize);
         if (modelStore.GetInstalledModelPath(modelName) is null)
         {
             using var welcome = new WelcomeForm(modelStore, modelName);
@@ -118,6 +121,11 @@ internal static class Program
             return; // corrupt-on-load re-download was abandoned; tray already disposed
         }
 
+        // Wrap in a swappable so the Settings model dropdown can hot-swap the model at runtime
+        // (spec Feature 4). activeModel tracks what's actually loaded, for the roll-back on a failed switch.
+        var swappable = new SwappableTranscriber(transcriber);
+        var activeModel = modelName;
+
         using var uiMarshaller = new UiMarshaller();
         using var overlay = new RecordingOverlay();
         using var capture = new NAudioCapture();
@@ -141,7 +149,7 @@ internal static class Program
         var logger = new AppLogger(new FileLogSink(FileLogSink.DefaultLogPath), () => settings.DebugLogging);
 
         var orchestrator = new DictationOrchestrator(
-            hotkey, capture, transcriber, pasteService, new TranscriptCleaner(), settings,
+            hotkey, capture, swappable, pasteService, new TranscriptCleaner(), settings,
             new SystemClock(), autoStopTimer, dispatcher, logger);
 
         // Settings window — single instance; Show/Activate on each request, it hides itself on close.
@@ -152,7 +160,44 @@ internal static class Program
             orchestrator.Cancel(); // a rebind mid-hold won't fire Released — drop any active capture
         };
         settingsForm.AutostartChanged += (_, enabled) => ApplyAutostart(enabled);
-        // settingsForm.ModelChangeRequested is wired in the model-switch brick (14h).
+        settingsForm.ModelChangeRequested += (_, requested) =>
+        {
+            if (string.Equals(requested, activeModel, StringComparison.OrdinalIgnoreCase))
+            {
+                return; // already the live model
+            }
+
+            // Download + verify the new model behind a progress UI; the old model stays live throughout
+            // (we only swap after a verified download). A modal keeps the message loop pumping, so a
+            // background dictation cycle on the old model still works while this window is open.
+            var switched = false;
+            using (var download = new WelcomeForm(modelStore, requested, "Switch model", $"Switching to the {requested} model."))
+            {
+                if (download.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        // Swap on the UI thread (SwappableTranscriber's contract); it disposes the old model.
+                        swappable.Swap(new WhisperTranscriber(modelStore.GetInstalledModelPath(requested)!));
+                        activeModel = requested;
+                        switched = true;
+                    }
+                    catch
+                    {
+                        // The verified file still failed to load — keep the old model and roll back below.
+                    }
+                }
+            }
+
+            if (!switched)
+            {
+                // Download failed/cancelled (or load threw): keep the live model and undo both the
+                // persisted choice and the dropdown selection so they match what's actually running.
+                settings.ModelSize = activeModel;
+                settingsStore.Save(settings);
+                settingsForm.RevertModelSelection(activeModel);
+            }
+        };
         tray.SettingsRequested += (_, _) =>
         {
             if (!settingsForm.Visible)
@@ -236,7 +281,7 @@ internal static class Program
         // throws if disposed mid-run, and the process is exiting anyway.
         try
         {
-            (transcriber as IDisposable)?.Dispose();
+            swappable.Dispose(); // disposes whichever model is currently active
         }
         catch
         {

@@ -1,3 +1,5 @@
+using SpeakType.Core.Settings;
+
 namespace SpeakType.Core.Models;
 
 /// <summary>
@@ -15,6 +17,14 @@ public static class ModelCatalog
 {
     private static string UrlFor(string name) =>
         $"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{name}.bin";
+
+    /// <summary>
+    /// Returns <paramref name="modelName"/> when it names a known model, otherwise the default
+    /// (<see cref="AppSettings.DefaultModelSize"/>). Coerces a persisted/typed model name to a real
+    /// catalog entry before it is downloaded or loaded, so a stale or unknown name never reaches the store.
+    /// </summary>
+    public static string Resolve(string? modelName) =>
+        modelName is not null && All.ContainsKey(modelName) ? modelName : AppSettings.DefaultModelSize;
 
     /// <summary>All known models, keyed by name (case-insensitive).</summary>
     public static IReadOnlyDictionary<string, ModelInfo> All { get; } =

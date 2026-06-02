@@ -4,10 +4,10 @@ using SpeakType.Core.Models;
 namespace SpeakType.App.Startup;
 
 /// <summary>
-/// The first-run Welcome window (spec Feature 2 "first run"): shows the one-line how-to and
-/// downloads the default speech model with a progress bar, offering Retry on failure. The
-/// composition root shows this modally on first run, then a "Ready!" tray balloon on success;
-/// gating the hotkey on model readiness is Brick 14.
+/// A modal model-download window with a progress bar and Retry-on-failure. Used for the first-run
+/// Welcome flow (spec Feature 2) with its default how-to heading, and reused for a mid-session model
+/// switch (spec Feature 4) with a switch-specific title/heading passed by the composition root.
+/// Returns <see cref="DialogResult.OK"/> once the model is downloaded and verified.
 /// </summary>
 public sealed class WelcomeForm : Form
 {
@@ -19,14 +19,18 @@ public sealed class WelcomeForm : Form
     private readonly CancellationTokenSource _cts = new();
     private bool _downloading;
 
-    public WelcomeForm(IModelStore modelStore, string modelName)
+    public WelcomeForm(
+        IModelStore modelStore,
+        string modelName,
+        string windowTitle = "Welcome to SpeakType",
+        string headingText = "Hold Right Ctrl, speak, release.")
     {
         ArgumentNullException.ThrowIfNull(modelStore);
         ArgumentNullException.ThrowIfNull(modelName);
         _modelStore = modelStore;
         _modelName = modelName;
 
-        Text = "Welcome to SpeakType";
+        Text = windowTitle;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -43,7 +47,7 @@ public sealed class WelcomeForm : Form
             Padding = new Padding(16),
         };
 
-        var heading = new Label { Text = "Hold Right Ctrl, speak, release.", AutoSize = true, Margin = new Padding(3, 3, 3, 12) };
+        var heading = new Label { Text = headingText, AutoSize = true, Margin = new Padding(3, 3, 3, 12) };
         _status = new Label { Text = "Downloading speech model…", AutoSize = true, Margin = new Padding(3, 3, 3, 6) };
         _bar = new ProgressBar { Style = ProgressBarStyle.Continuous, Minimum = 0, Maximum = 100, Width = 280 };
         _retry = new Button { Text = "Retry", AutoSize = true, Visible = false, Margin = new Padding(3, 12, 3, 3) };
