@@ -4,6 +4,18 @@ Append-only archive of completed bricks, moved out of `BRICKS.md` to keep the ac
 
 ---
 
+### Brick 2 — Cleanup pipeline (pure) (2026-06-02)
+- **What:** `TranscriptCleaner.Clean(string? raw, bool removeFillers = true)` — turns a raw Whisper transcript into paste-ready text. Ordered stages in one class: (1) filler removal (toggleable) — always-words `um/uh/er/ah/hmm/mm` stripped even bare, phrase markers `you know/I mean/sort of/kind of` stripped only when comma-bounded or at a sentence boundary (so real uses survive); (2) always-on fixups — collapse comma/space debris, capitalize standalone `i`→`I`; (3) trim + single trailing space (no forced terminal punctuation); (4) hallucination/empty filter → returns `""` for empty, `[BLANK_AUDIO]`, and whole-output `you`/`Thank you.`.
+- **Files:** `SpeakType.Core/Cleanup/TranscriptCleaner.cs`, `SpeakType.Tests/Cleanup/TranscriptCleanerTests.cs`.
+- **Verified (on Mac):** `dotnet test SpeakType.Tests/...` → **38/38 pass**. Corpus covers the spec Feature-4 cases (filler ON, filler OFF still runs fixups, hallucinations→empty) plus a `Clean_guards_each_filler_pass` theory added during review to exercise the previously-untested passes: `sort of`/`kind of` *removal*, multi-sentence fillers after a period, filler-before-terminator, leading-filler-before-digit, stacked bare fillers. Pure logic → no manual M#. CI on Windows covers it too.
+- **Notes / decisions:**
+  - **No `ICleanupStage` interface / per-stage files in v1.** The spec's "composable, individually addressable stages" is forward-looking (for the Phase-2 LLM rewrite stage). v1 implements stages as ordered private methods in one class (`RemoveFillers` / `Fixups` + the filter) — a future stage slots in as another method off `Clean`. Avoids speculative abstraction (§2) and the 5-file ceiling.
+  - **Simplify pass:** dropped `RegexOptions.Compiled` (net-negative JIT cost for a run-once-per-utterance path), tidied `[,]?`→`,?`, and split the hallucination list into named `Sentinels` (`[BLANK_AUDIO]`) vs `SilencePhrases` (`you`/`Thank you.`) so the membership rule is explicit, not accretive.
+  - **Code review — confirmed real-world edge cases that are NOT code defects but spec-level tradeoffs (left as the spec dictates; flagged for the user, see follow-up below):** the always-filler list deletes real standalone tokens — `mm` (millimeter: "5 mm wide" → "5 wide"), `er` (ER), `ah` — because spec line 121 declares them "never real words"; and `\bi\b`→`I` (spec line 129) over-capitalizes `i.e.` / `for i` / `Section i`. These are the spec author's documented decisions; I did **not** silently override them mid-ship.
+  - **Known niche defects (no spec answer; documented, not fixed):** two stacked *leading* always-fillers with a comma drop the re-capitalization (`"Um er, it works."` → `"it works. "`); a hyphen-joined cluster leaves debris (`"Mm-hmm."` → `"-hmm. "`). Rare Whisper outputs; fixing needs invented behavior or added pass complexity — deferred to the follow-up.
+
+---
+
 ### Brick 1 — Settings model + JSON store (2026-06-02)
 - **What:** `AppSettings` POCO (hotkey, modelSize, fillerRemoval, overlay, autostart, debugLogging) with spec defaults (RightCtrl / base.en / on / on / on / off), an `ISettingsStore` port, and `JsonSettingsStore` (System.Text.Json, camelCase keys) reading/writing `%APPDATA%\SpeakType\settings.json` (path is constructor-injected for testability; `DefaultFilePath` static for the real location). Robust load: missing file, partial file, corrupt JSON, and blank/explicit-null string fields all fall back to defaults via `AppSettings.Normalize()`.
 - **Files:** `SpeakType.Core/Settings/{AppSettings.cs, ISettingsStore.cs, JsonSettingsStore.cs}`, `SpeakType.Tests/Settings/JsonSettingsStoreTests.cs`.
