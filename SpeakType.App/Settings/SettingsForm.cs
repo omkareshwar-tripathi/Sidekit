@@ -1,4 +1,6 @@
 using System.Windows.Forms;
+using SpeakType.App.Controls;
+using SpeakType.App.Theme;
 using SpeakType.Core.Input;
 using SpeakType.Core.Models;
 using SpeakType.Core.Settings;
@@ -38,6 +40,7 @@ public sealed class SettingsForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        UiTheme.StyleWindow(this);
 
         var layout = new TableLayoutPanel
         {
@@ -46,24 +49,26 @@ public sealed class SettingsForm : Form
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             ColumnCount = 2,
             Padding = new Padding(12),
+            BackColor = UiTheme.Background,
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
         _hotkeyBox.Text = _settings.Hotkey;
+        UiTheme.StyleField(_hotkeyBox);
         _hotkeyBox.Leave += (_, _) => CommitHotkey();
         AddRow(layout, "Hotkey", _hotkeyBox);
 
         AddRow(layout, "Model size", BuildModelBox());
 
-        AddRow(layout, "Remove filler words", MakeCheck(_settings.FillerRemoval, v => _settings.FillerRemoval = v));
-        AddRow(layout, "Show recording overlay", MakeCheck(_settings.Overlay, v => _settings.Overlay = v));
-        AddRow(layout, "Start with Windows", MakeCheck(_settings.Autostart, v =>
+        AddRow(layout, "Remove filler words", MakeToggle(_settings.FillerRemoval, v => _settings.FillerRemoval = v));
+        AddRow(layout, "Show recording overlay", MakeToggle(_settings.Overlay, v => _settings.Overlay = v));
+        AddRow(layout, "Start with Windows", MakeToggle(_settings.Autostart, v =>
         {
             _settings.Autostart = v;
             AutostartChanged?.Invoke(this, v);
         }));
-        AddRow(layout, "Debug logging", MakeCheck(_settings.DebugLogging, v => _settings.DebugLogging = v));
+        AddRow(layout, "Debug logging", MakeToggle(_settings.DebugLogging, v => _settings.DebugLogging = v));
 
         Controls.Add(layout);
         _loading = false;
@@ -115,6 +120,7 @@ public sealed class SettingsForm : Form
 
         _modelBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _modelBox.DisplayMember = nameof(ModelInfo.Name);
+        UiTheme.StyleField(_modelBox);
 
         foreach (var model in ModelCatalog.All.Values.OrderBy(m => m.SizeBytes))
         {
@@ -191,20 +197,22 @@ public sealed class SettingsForm : Form
         }
     }
 
-    private CheckBox MakeCheck(bool value, Action<bool> apply)
+    private ToggleSwitch MakeToggle(bool value, Action<bool> apply)
     {
-        var check = new CheckBox { AutoSize = true, Checked = value };
-        check.CheckedChanged += (_, _) =>
+        // Checked is set in the initializer BEFORE the handler is attached, so the initial
+        // value never triggers a save. The _loading guard then matches the old checkbox behavior.
+        var toggle = new ToggleSwitch { Checked = value };
+        toggle.CheckedChanged += (_, _) =>
         {
             if (_loading)
             {
                 return;
             }
 
-            apply(check.Checked);
+            apply(toggle.Checked);
             _store.Save(_settings);
         };
-        return check;
+        return toggle;
     }
 
     // Adds a label + control pair as the next row of the layout.
