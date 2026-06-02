@@ -1,5 +1,6 @@
 using SpeakType.Core.Audio;
 using SpeakType.Core.Input;
+using SpeakType.Core.Orchestration;
 using SpeakType.Core.Paste;
 using SpeakType.Core.Time;
 using SpeakType.Core.Transcription;
@@ -125,5 +126,28 @@ internal sealed class FakeAutoStopTimer : IAutoStopTimer
         IsRunning = false;
         _onElapsed = null;
         callback?.Invoke();
+    }
+}
+
+/// <summary>Captures the cycle action instead of running it, so a test can run it on demand
+/// and interleave a second trigger in between (to exercise the atomic claim deterministically).</summary>
+internal sealed class DeferredDispatcher : ICycleDispatcher
+{
+    private Action? _pending;
+
+    public int DispatchCount { get; private set; }
+
+    public void Run(Action cycle)
+    {
+        DispatchCount++;
+        _pending = cycle;
+    }
+
+    /// <summary>Run the most recently captured cycle, if any.</summary>
+    public void RunPending()
+    {
+        var work = _pending;
+        _pending = null;
+        work?.Invoke();
     }
 }

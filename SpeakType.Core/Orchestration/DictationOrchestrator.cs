@@ -19,6 +19,9 @@ public enum DictationOutcome { Pasted, LeftOnClipboard, NoSpeech }
 /// Concurrent hotkey events are ignored while a cycle is in flight (the
 /// <see cref="State"/> guard), so each cycle runs to completion. Hold-duration
 /// guards discard accidental taps and auto-stop a hold that reaches 60 s.
+/// All <see cref="State"/> access is serialized by an internal lock, so the hotkey
+/// thread, the thread-pool auto-stop callback, and the background cycle dispatcher
+/// can drive it concurrently without racing.
 /// </summary>
 public sealed class DictationOrchestrator
 {
@@ -33,7 +36,10 @@ public sealed class DictationOrchestrator
     private readonly AppSettings _settings;
     private readonly IClock _clock;
     private readonly IAutoStopTimer _autoStopTimer;
+    private readonly ICycleDispatcher _dispatcher;
+    private readonly object _gate = new();
 
+    private RecordingState _state = RecordingState.Idle;
     private long _pressTimestamp;
 
     public DictationOrchestrator(
@@ -44,7 +50,8 @@ public sealed class DictationOrchestrator
         TranscriptCleaner cleaner,
         AppSettings settings,
         IClock clock,
-        IAutoStopTimer autoStopTimer)
+        IAutoStopTimer autoStopTimer,
+        ICycleDispatcher? dispatcher = null)
     {
         ArgumentNullException.ThrowIfNull(hotkey);
         ArgumentNullException.ThrowIfNull(audioCapture);
@@ -62,66 +69,96 @@ public sealed class DictationOrchestrator
         _settings = settings;
         _clock = clock;
         _autoStopTimer = autoStopTimer;
+        _dispatcher = dispatcher ?? new SynchronousCycleDispatcher();
 
         hotkey.Pressed += OnPressed;
         hotkey.Released += OnReleased;
     }
 
-    public RecordingState State { get; private set; } = RecordingState.Idle;
+    /// <summary>The current pipeline state. Read under the lock so a caller on another thread
+    /// (e.g. the UI reading it while the background cycle runs) observes the latest write.</summary>
+    public RecordingState State
+    {
+        get { lock (_gate) { return _state; } }
+    }
 
     /// <summary>Raised once at the end of every dictation cycle that produced an outcome.</summary>
     public event EventHandler<DictationOutcome>? Completed;
 
+    // Atomically transition Recording -> Transcribing. Returns true to the single caller that wins
+    // the claim; a racing release/auto-stop sees a non-Recording state and gets false. This is what
+    // stops a key-release and the 60 s auto-stop from both running the cycle.
+    private bool TryClaimForProcessing()
+    {
+        lock (_gate)
+        {
+            if (_state != RecordingState.Recording)
+            {
+                return false;
+            }
+
+            _state = RecordingState.Transcribing;
+            return true;
+        }
+    }
+
     private void OnPressed(object? sender, EventArgs e)
     {
-        if (State != RecordingState.Idle)
+        // Establishing a recording — stamping the press time, opening the mic, arming the auto-stop
+        // timer — all happens under the lock, and State becomes Recording only once they succeed. So a
+        // release/auto-stop on another thread never sees Recording before the capture exists, and never
+        // runs a cycle against an un-started capture.
+        lock (_gate)
         {
-            return; // Busy with a cycle — ignore.
-        }
+            if (_state != RecordingState.Idle)
+            {
+                return; // Busy with a cycle — ignore.
+            }
 
-        State = RecordingState.Recording;
-        try
-        {
-            _pressTimestamp = _clock.GetTimestamp();
-            _audioCapture.Start();
-            _autoStopTimer.Start(MaxHold, OnAutoStop);
-        }
-        catch
-        {
-            // A port threw before recording could begin (e.g. mic in use): reset to
-            // Idle so the press-guard doesn't wedge all future dictation. Mirrors the
-            // RunCycle finally; user-facing error reporting stays deferred to Brick 9.
-            State = RecordingState.Idle;
-            throw;
+            try
+            {
+                _pressTimestamp = _clock.GetTimestamp();
+                _audioCapture.Start();
+                _autoStopTimer.Start(MaxHold, OnAutoStop);
+                _state = RecordingState.Recording;
+            }
+            catch
+            {
+                // A port threw before recording could begin (e.g. mic in use): stay Idle so the
+                // press-guard doesn't wedge all future dictation. User-facing error reporting is Brick 9.
+                _state = RecordingState.Idle;
+                throw;
+            }
         }
     }
 
     private void OnReleased(object? sender, EventArgs e)
     {
-        if (State != RecordingState.Recording)
-        {
-            return;
-        }
-
         _autoStopTimer.Cancel();
 
+        if (!TryClaimForProcessing())
+        {
+            return; // not recording, or the auto-stop already claimed this cycle
+        }
+
+        // Reading _pressTimestamp unlocked is safe here: the claim above acquired the lock, so this
+        // thread has already synchronized with OnPressed's write of it.
         if (_clock.GetElapsedTime(_pressTimestamp) < MinHold)
         {
             DiscardRecording(); // accidental tap
             return;
         }
 
-        RunCycle();
+        _dispatcher.Run(RunCycle);
     }
 
     private void OnAutoStop()
     {
-        // Timer fired: 60 s reached while still held. Held this long is always past MinHold,
-        // so no discard check — just run the cycle. Guarded against a release that raced the
-        // timer (a real timer's callback may already be running when Cancel() is called).
-        if (State == RecordingState.Recording)
+        // Timer fired: 60 s reached while still held. Guarded by the atomic claim so a release that
+        // raced the timer can't also run the cycle.
+        if (TryClaimForProcessing())
         {
-            RunCycle();
+            _dispatcher.Run(RunCycle);
         }
     }
 
@@ -135,14 +172,17 @@ public sealed class DictationOrchestrator
         }
         finally
         {
-            State = RecordingState.Idle; // never leave the machine wedged if Stop() throws
+            lock (_gate)
+            {
+                _state = RecordingState.Idle; // never leave the machine wedged if Stop() throws
+            }
         }
     }
 
-    // The capture → transcribe → clean → paste cycle. Hotkey release triggers it
-    // today; Brick 3b's 60 s auto-stop timer will be a second caller, so the
-    // trigger is kept separate from the work. In production the composition root
-    // (Brick 14) offloads this to a background thread; the logic here is synchronous.
+    // The capture → transcribe → clean → paste cycle. Both hotkey release and the 60 s auto-stop
+    // are callers, each after winning the atomic claim, so the trigger is kept separate from the
+    // work. In production the composition root offloads this to a background thread via the injected
+    // dispatcher; by default it runs synchronously.
     private void RunCycle()
     {
         DictationOutcome outcome;
@@ -156,7 +196,10 @@ public sealed class DictationOrchestrator
             // throws, the press-guard would otherwise block all future dictation.
             // User-facing error reporting/recovery is Brick 9; this is just the
             // local state-machine invariant.
-            State = RecordingState.Idle;
+            lock (_gate)
+            {
+                _state = RecordingState.Idle;
+            }
         }
 
         // Raised only after State is back to Idle, so a handler may legally start
@@ -166,8 +209,6 @@ public sealed class DictationOrchestrator
 
     private DictationOutcome ProcessRecording()
     {
-        State = RecordingState.Transcribing;
-
         var audio = _audioCapture.Stop();
         if (!audio.HasSpeech)
         {
@@ -181,7 +222,11 @@ public sealed class DictationOrchestrator
             return DictationOutcome.NoSpeech;
         }
 
-        State = RecordingState.Pasting;
+        lock (_gate)
+        {
+            _state = RecordingState.Pasting;
+        }
+
         var outcome = _pasteService.Paste(cleaned);
         return outcome == PasteOutcome.LeftOnClipboard
             ? DictationOutcome.LeftOnClipboard

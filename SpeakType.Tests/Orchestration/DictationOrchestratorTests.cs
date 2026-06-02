@@ -251,4 +251,69 @@ public sealed class DictationOrchestratorTests
         Assert.Equal(new[] { DictationOutcome.Pasted }, _outcomes);
         Assert.Equal(RecordingState.Idle, _sut.State);
     }
+
+    [Fact]
+    public void Cycle_is_run_through_the_injected_dispatcher()
+    {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber { Result = "Hello." };
+        var paste = new FakePasteService();
+        var clock = new FakeClock();
+        var timer = new FakeAutoStopTimer();
+        var dispatcher = new DeferredDispatcher();
+        var outcomes = new List<DictationOutcome>();
+        var sut = new DictationOrchestrator(
+            hotkey, audio, transcriber, paste, new TranscriptCleaner(), new AppSettings(),
+            clock, timer, dispatcher);
+        sut.Completed += (_, o) => outcomes.Add(o);
+
+        hotkey.Press();
+        hotkey.Release();
+
+        // The cycle was handed to the dispatcher, not run inline.
+        Assert.Equal(1, dispatcher.DispatchCount);
+        Assert.Empty(outcomes);
+        Assert.Equal(RecordingState.Transcribing, sut.State); // claimed, not yet finished
+        Assert.Equal(0, paste.CallCount);
+
+        dispatcher.RunPending();
+
+        Assert.Equal(new[] { DictationOutcome.Pasted }, outcomes);
+        Assert.Equal(1, paste.CallCount);
+        Assert.Equal(RecordingState.Idle, sut.State);
+    }
+
+    [Fact]
+    public void Auto_stop_claim_blocks_a_following_release_from_running_a_second_cycle()
+    {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber { Result = "Hello." };
+        var paste = new FakePasteService();
+        var clock = new FakeClock();
+        var timer = new FakeAutoStopTimer();
+        var dispatcher = new DeferredDispatcher();
+        var outcomes = new List<DictationOutcome>();
+        var sut = new DictationOrchestrator(
+            hotkey, audio, transcriber, paste, new TranscriptCleaner(), new AppSettings(),
+            clock, timer, dispatcher);
+        sut.Completed += (_, o) => outcomes.Add(o);
+
+        hotkey.Press();
+        timer.Fire(); // auto-stop claims the cycle and defers it
+
+        Assert.Equal(1, dispatcher.DispatchCount);
+        Assert.Equal(RecordingState.Transcribing, sut.State);
+
+        hotkey.Release(); // claim already taken — must not dispatch a second cycle
+
+        Assert.Equal(1, dispatcher.DispatchCount);
+
+        dispatcher.RunPending();
+
+        Assert.Equal(new[] { DictationOutcome.Pasted }, outcomes);
+        Assert.Equal(1, paste.CallCount);
+        Assert.Equal(RecordingState.Idle, sut.State);
+    }
 }
