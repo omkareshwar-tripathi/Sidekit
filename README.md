@@ -7,6 +7,16 @@ Push-to-talk voice typing for Windows, **fully on-device**. Hold the hotkey (def
 - Windows 10/11, **x64**.
 - An internet connection on **first run only**, to download the speech model.
 
+## Install (download, no build)
+
+Every green CI run attaches the finished, self-contained `SpeakType.exe` as a downloadable artifact — no .NET SDK or build needed:
+
+1. Open the repo's **Actions** tab → click the latest green **CI** run on `main`.
+2. Under **Artifacts**, download **`SpeakType-win-x64`** (a `.zip`).
+3. Unzip it, then double-click **`SpeakType.exe`** (see the SmartScreen note below on first launch).
+
+Artifacts are kept for 90 days. To build it yourself instead, see *Build a release* below.
+
 ## Run from source
 
 ```

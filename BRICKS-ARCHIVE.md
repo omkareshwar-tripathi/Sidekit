@@ -4,6 +4,13 @@ Append-only archive of completed bricks, moved out of `BRICKS.md` to keep the ac
 
 ---
 
+### Brick UI-4 — Restyle WelcomeForm (2026-06-03)
+- **What:** Restyled the model-download / first-run Welcome window (also reused for a mid-session model switch) to the modern-light look: light background + Segoe UI via `StyleWindow`, a **Segoe UI Semibold heading**, **muted (TextSecondary) status text**, and the **Retry button as a primary accent button** via `StyleButton`. The system `ProgressBar` is left as-is (already accent-coloured on Win11). **Behaviour unchanged** — the async download, the `_downloading` re-entrancy guard, Retry, and cancel-on-close are untouched.
+- **Files:** `SpeakType.App/Startup/WelcomeForm.cs` (using + `StyleWindow` + heading font + status colour + `StyleButton(_retry)`). No Core/test changes.
+- **Verified:** Windows-only → **Windows x64 CI green** (run 26845091836, build + publish) = compile-green. Core suite untouched → **179/179**. Combined `/code-review` + `/simplify` → **clean** (purely additive theme calls; `internal UiTheme` accessible from the `public` form, same assembly; styling a hidden button before the Click handler is order-independent and fine; AutoSize layout absorbs the larger heading font; no removed behaviour). **Visual + M2 (download + Retry still work) = laptop screenshot — trigger first-run or a model switch.**
+- **Notes / decisions:**
+  - **ProgressBar intentionally unstyled:** Win11 already renders the continuous bar in the system accent; there's no `UiTheme` helper for it and a behaviour-preserving restyle shouldn't owner-draw it. If it looks off vs mockup B in the screenshot, revisit then.
+
 ### Brick UI-3 — Restyle SettingsForm (2026-06-03)
 - **What:** First *visible* brick of the modern-light restyle. The Settings window now wears `UiTheme`: light background + Segoe UI via `StyleWindow`, the hotkey `TextBox` and model `ComboBox` flattened via `StyleField`, and the four square checkboxes (Remove filler words / Show recording overlay / Start with Windows / Debug logging) replaced by the new `ToggleSwitch`. The old `MakeCheck` helper became `MakeToggle` (same signature). **All behaviour is unchanged** — the `_loading` guard, the four apply-and-save handlers, the `AutostartChanged` event, hotkey commit/rebind and model-switch wiring are preserved verbatim.
 - **Files:** `SpeakType.App/Settings/SettingsForm.cs` (usings, `StyleWindow`/`StyleField`, layout `BackColor`, `MakeCheck`→`MakeToggle` + 4 call sites). No Core/test changes.
