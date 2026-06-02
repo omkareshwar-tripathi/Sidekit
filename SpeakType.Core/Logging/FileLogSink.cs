@@ -27,7 +27,7 @@ public sealed class FileLogSink : ILogSink
 
     public static string DefaultLogPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "SpeakType",
+        AppInfo.Name,
         "logs",
         "speaktype.log");
 

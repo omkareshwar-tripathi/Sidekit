@@ -32,7 +32,7 @@ public sealed class ModelStore : IModelStore
     /// <summary>The default per-user models directory for the composition root.</summary>
     public static string DefaultModelsDirectory => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "SpeakType",
+        AppInfo.Name,
         "models");
 
     public string ModelsDirectory => _modelsDirectory;

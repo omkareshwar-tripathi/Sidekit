@@ -25,7 +25,7 @@ public sealed class JsonSettingsStore : ISettingsStore
 
     public static string DefaultFilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "SpeakType",
+        AppInfo.Name,
         "settings.json");
 
     public AppSettings Load()
