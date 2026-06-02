@@ -14,9 +14,6 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2026-06-03-ui-modern-light-restyle-design.md`; plan: `docs/superpowers/plans/2026-06-03-ui-modern-light-restyle.md`. All Windows-only → verify = CI compile-green + a laptop screenshot vs mockup B (no Core changes; 179 tests stay green)._
 
-- [ ] **Brick UI-2 — `ToggleSwitch` control.** New `SpeakType.App/Controls/ToggleSwitch.cs`: owner-drawn on/off switch mirroring `CheckBox` (`Checked` + `CheckedChanged`; click + Space/Enter toggle). Foundation.
-  - Skill: dotnet-best-practices, run-tests
-  - Verify: CI compile-green; manual toggle behavior on the laptop.
 - [ ] **Brick UI-3 — Restyle SettingsForm.** Apply `UiTheme`, swap the 4 checkboxes → `ToggleSwitch` (`MakeCheck`→`MakeToggle`, keep the `_loading` guard + all event wiring), flatten the hotkey field + model dropdown. First visible change.
   - Skill: dotnet-best-practices, run-tests
   - Verify: CI compile-green; laptop screenshot vs mockup B; re-check M6 (settings still apply live).
@@ -49,6 +46,14 @@ _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 
+### Brick UI-2 — ToggleSwitch control (2026-06-03)
+- **What:** Second foundation brick of the modern-light restyle. Added `ToggleSwitch` — a small owner-drawn on/off switch (pill track + knob, painted via `UiTheme` colours: accent when on, grey `ToggleOff` when off, white knob) that replaces the square WinForms `CheckBox` in Settings. Exposes only the slice the forms use — `Checked` (bool) + `CheckedChanged` — and toggles on mouse click or Space/Enter. No animation (instant flip, per spec). **Not wired into any form yet** — that's UI-3.
+- **Files:** `SpeakType.App/Controls/ToggleSwitch.cs` (new). No Core/test changes.
+- **Verified:** Windows-only → **Windows x64 CI green** (run 26844485594, build + publish) = compile-green. Core suite untouched → **179/179**. `/simplify` → applied one nit (knob fill routed through `UiTheme.OnAccent` instead of a hardcoded `Color.White`, so a future dark-mode swap catches it; `OnAccent` *is* white → zero behaviour change). `/code-review` → found + **fixed one real correctness bug**: the focus ring was painted `if (Focused)` but nothing repainted on focus change, so the keyboard focus indicator never appeared/cleared on Tab — added `OnGotFocus`/`OnLostFocus` overrides that `Invalidate()`. **Visual + manual toggle behaviour: laptop screenshot/keyboard test comes with UI-3 (when it's first placed in a window).**
+- **Notes / decisions:**
+  - **Cosmetic knob-centering asymmetry deferred to the screenshot loop:** the off-state knob inset is 2px and the on-state is 1px (from the plan's exact pixels). Review flagged the slight asymmetry; rather than blind-guess pixel values on a Mac that can't render WinForms, this is left for the agreed laptop screenshot pass to tune against mockup B.
+  - **Programmatic-set contract:** setting `Checked` raises `CheckedChanged`, but setting to the current value early-returns (no spurious fire); callers (SettingsForm in UI-3) set `Checked` before attaching the handler and gate with `_loading`, mirroring the old checkbox wiring.
+
 ### Brick UI-1 — UiTheme tokens + style helpers (2026-06-03)
 - **What:** First foundation brick of the modern-light UI restyle. Added a central theme — `UiTheme` (Win11 "Fluent light" palette: bg `#F3F3F3`, white surface, accent `#0067C0`, secondary text `#616161`, etc.; Segoe UI body + Segoe UI Semibold heading fonts; 20px window padding / 12px row gap) plus three styling helpers (`StyleWindow`/`StyleField`/`StyleButton`) and a `FlatMenuColorTable` (flat white context-menu colours). Single source of truth so the look changes in one place (and dark mode is a future one-place swap). **No visible change yet** — nothing consumes it until UI-3/UI-4/UI-5.
 - **Files:** `SpeakType.App/Theme/UiTheme.cs` (new). No Core/test changes.
@@ -64,15 +69,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 - **Verified:** Fully cross-platform → `dotnet test SpeakType.Tests/...` **179/179 pass** (3 new characterization tests assert each default ends with `Path.Combine(AppInfo.Name, …)` — green both before and after the swap, locking in the behavior the refactor preserves).
 - **Notes / decisions:**
   - **Scope:** `AppInfo` resolves with no `using` from the `SpeakType.Core.*` sub-namespaces (enclosing-namespace lookup). The two remaining `"SpeakType…"` strings in the App layer are **UI copy** ("SpeakType Settings" title, the "already running" balloon), not the path folder — intentionally left (display text can diverge from the folder name). Backlog item retired.
-
-### Brick 15 — Packaging (self-contained single-file win-x64) (2026-06-03)
-- **What:** Finalized v1 packaging (spec Feature 26): the documented publish command now produces **one self-contained, single-file `win-x64` `.exe`** that runs on a clean machine with no .NET install. The fix that makes it a *true* single file is `IncludeNativeLibrariesForSelfExtract` in the App csproj — without it, single-file publish drops the native whisper.cpp libraries (`Whisper.net.Runtime`) *beside* the exe; with it they're embedded and self-extracted at launch. Added a README (the repo had none) documenting build/test/run, the publish command + output path, and the expected unsigned-app SmartScreen warning. Added a CI **publish smoke step** that runs the spec publish command and asserts the exe is produced, so a broken packaging config fails the build instead of only surfacing on the clean-machine test.
-- **Files:** `SpeakType.App/SpeakType.App.csproj` (`IncludeNativeLibrariesForSelfExtract`); `.github/workflows/ci.yml` (publish + exe-exists steps); `README.md` (new). No source/test changes.
-- **Verified:** Windows-only (publish is `win-x64`, App is `net8.0-windows`) → Windows x64 **CI green incl. the new publish step** (run 26841780517) — the self-contained single-file exe built successfully on CI, which is the automated half of the verify. Core suite unchanged → **176/176**. **Manual: copy the exe to a clean profile/VM → first-run Welcome downloads the model → dictation types into a field; confirm SmartScreen "Run anyway" works — deferred to the laptop.**
-- **Notes / decisions:**
-  - **`IncludeNativeLibrariesForSelfExtract` over command-line flags:** baked into the csproj (not the publish command) so the spec's documented command (and the README's) yields a true single file unchanged. It's inert outside a single-file publish, so normal build/test is unaffected.
-  - **No trimming / no compression:** kept the publish vanilla (no `PublishTrimmed`, no `EnableCompressionInSingleFile`) — trimming risks stripping reflection/native-interop paths and compression only trades size for cold-start; neither is worth the risk for v1. The exe is larger but safe.
-  - **No single-file-analyzer risk:** confirmed our source uses no `Assembly.Location`/`AppContext.BaseDirectory`/`MainModule`, so `PublishSingleFile` under `TreatWarningsAsErrors` won't fail on IL3000-class warnings.
 
 <!-- Template for each entry:
 
