@@ -12,9 +12,10 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 ### Core (no OS dependencies — fully unit-testable)
 
-- [ ] **Brick 3 — Orchestrator state machine.** Define the ports (`IHotkeyListener`, `IAudioCapture`, `ITranscriber`, `IModelStore`, `IClipboard`/`IPasteService`). Implement the `Idle→Recording→Transcribing→Pasting→Idle` orchestrator wiring capture→transcribe→cleanup→paste, with hold guards (<300 ms discard, 60 s auto-stop) and busy = ignore. Inject a fake clock.
+- [ ] **Brick 3b — Orchestrator timing guards.** Add the two time-based hold guards to the Brick 3a orchestrator: **< 300 ms hold → discard** (no transcribe/paste) and **60 s auto-stop** (timer fires → run the same cycle as a release). Introduce `IClock` (for press→release elapsed) and an `ITimer`-style abstraction (for the 60 s auto-stop), both faked in tests. The cycle entry point already exists (`RunCycle()` extracted in 3a) — the auto-stop timer is a second caller of it, no re-cut needed.
+  - **Decision locked in 3a review:** the < 300 ms guard measures **wall-clock from press to release via the injected `IClock`**, NOT captured-sample count — keeps `CapturedAudio` a pure data carrier and duration logic in the orchestrator where the clock lives.
   - Skill: dotnet-best-practices, dotnet-xunit, run-tests
-  - Verify (unit, all fakes): normal flow pastes cleaned text; <300 ms hold discards; 60 s auto-stops; press during non-Idle ignored; silence-gate skip path; no-target → leave-on-clipboard path.
+  - Verify (unit, fakes + fake clock): hold < 300 ms → discarded (no transcribe/paste, returns Idle, timer cancelled); advance fake clock/timer to 60 s while held → auto-stops and runs the cycle; a normal-length release still works (timer cancelled on release).
 
 ### Adapters (real OS integration — thin, manual-verified)
 
@@ -79,6 +80,18 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 
+### Brick 3a — Dictation orchestrator: ports + core flow (2026-06-02)
+- **What:** The pure state machine that wires a dictation cycle, plus the ports it drives. `DictationOrchestrator` subscribes to hotkey press/release: press (Idle) → `Recording` + `audioCapture.Start()`; release → `Transcribing` → `Stop()` → if no speech skip → `Transcribe()` → `TranscriptCleaner.Clean(raw, settings.FillerRemoval)` → if empty skip → `Pasting` → `Paste()` → `Idle`, raising a single `Completed(DictationOutcome)` per cycle (`Pasted` / `LeftOnClipboard` / `NoSpeech`). Press while non-Idle is ignored (busy). **This brick is the non-timing logic only** — Brick 3b adds the `<300 ms`/`60 s` guards.
+- **Files:** `SpeakType.Core/Input/IHotkeyListener.cs`, `SpeakType.Core/Audio/IAudioCapture.cs` (+ `CapturedAudio` record), `SpeakType.Core/Transcription/ITranscriber.cs`, `SpeakType.Core/Paste/IPasteService.cs` (+ `PasteOutcome` enum), `SpeakType.Core/Orchestration/DictationOrchestrator.cs` (+ `RecordingState`, `DictationOutcome` enums); tests `SpeakType.Tests/Orchestration/{Fakes.cs, DictationOrchestratorTests.cs}`.
+- **Verified (on Mac):** `dotnet test SpeakType.Tests/...` → **47/47 pass**. Orchestrator tests cover: normal flow (asserts captured samples reach the transcriber **and** the *cleaned* text reaches paste), busy-ignore (one `Start`), silence-skip (transcriber not called), no-target → `LeftOnClipboard`, empty-after-clean → `NoSpeech` (transcriber *was* called), press→`Recording`, release-without-press ignored, second-release-after-cycle ignored, and **adapter-throws → State resets to Idle and the next cycle works**. Pure logic → no manual M#. CI on Windows covers it too.
+- **Notes / decisions:**
+  - **Brick 3 was split (3a + 3b) — it exceeded the §2a sizing ceiling** (5 ports + clock + timer + orchestrator + 6 edge cases ≈ 180+ LOC / 7 files). Seam: 3a = result-based branches (no clock); 3b = the two time-based guards (need `IClock`/`ITimer`).
+  - **`IModelStore` is NOT defined here** (the BRICKS plan originally listed it among "the ports"). The orchestrator's flow doesn't touch the model store — it belongs to Brick 6 where it's implemented. Defining it here would be a speculative, untested interface.
+  - **Code review caught a real latent bug (fixed):** with no `try/finally`, any adapter throwing (`Stop`/`Transcribe`/`Paste`) left `State` non-Idle forever, so the press-guard silently blocked *all* future dictation until restart. Fixed by `try { outcome = ProcessRecording() } finally { State = Idle }`, then raising `Completed` **after** the reset (which also closes a re-entrancy trap where a `Completed` handler could start a nested cycle). User-facing error reporting stays deferred to Brick 9; only the local "never wedge" invariant lives here. Regression test added.
+  - **`RunCycle()` is a trigger-independent entry point** (extracted in the simplify pass) precisely so Brick 3b's auto-stop timer can call it without faking a key event.
+  - **`RecordingState.Transcribing`/`Pasting` are intentionally kept** though unread today — the spec's overlay (Feature 6: `⚙ Transcribing`) needs them as distinct states for Brick 10. Not speculative; spec-traced.
+  - **Deferred (noted, not bugs):** orchestrator subscribes to hotkey events in its ctor and never unsubscribes — fine for a process-lifetime singleton; add `IDisposable` only if a later brick rebuilds the pipeline (e.g. settings reload). Threading (background-thread the cycle) is Brick 14.
+
 ### Brick 2 — Cleanup pipeline (pure) (2026-06-02)
 - **What:** `TranscriptCleaner.Clean(string? raw, bool removeFillers = true)` — turns a raw Whisper transcript into paste-ready text. Ordered stages in one class: (1) filler removal (toggleable) — always-words `um/uh/er/ah/hmm/mm` stripped even bare, phrase markers `you know/I mean/sort of/kind of` stripped only when comma-bounded or at a sentence boundary (so real uses survive); (2) always-on fixups — collapse comma/space debris, capitalize standalone `i`→`I`; (3) trim + single trailing space (no forced terminal punctuation); (4) hallucination/empty filter → returns `""` for empty, `[BLANK_AUDIO]`, and whole-output `you`/`Thank you.`.
 - **Files:** `SpeakType.Core/Cleanup/TranscriptCleaner.cs`, `SpeakType.Tests/Cleanup/TranscriptCleanerTests.cs`.
@@ -98,15 +111,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
   - **Boundary:** "invalid hotkey rejected" here means **blank/null → default only**. Full hotkey-grammar validation (which keys/combos are legal) is **Brick 4** (the hotkey listener). Don't duplicate it here.
   - Code review caught a real latent NRE: an explicit JSON `null` on a non-nullable string (e.g. `{ "modelSize": null }`) would survive deserialization as null; `Normalize()` now coerces it, with tests.
   - **Possible later hardening (not done, §2):** `Save()` is a non-atomic `File.WriteAllText`; a crash mid-write yields a corrupt file (which `Load()` already degrades to defaults). A temp-file+rename swap would make it atomic — revisit if corruption is ever observed, since settings are rewritten on every change (apply-on-change).
-
-### Brick 0b — Continuous integration (2026-06-02)
-- **What:** GitHub Actions CI (`.github/workflows/ci.yml`) on `windows-latest` (real x64): checkout → setup .NET 8 → restore → build the full solution → test, on every push/PR to `main`. Has a `concurrency` group to cancel superseded runs.
-- **Files:** `.github/workflows/ci.yml`.
-- **Verified:** pushed to `main`; the run went **green in ~1m24s** (run 26778664115). The **Build step passing is the first real proof the `net8.0-windows` App compiles on Windows x64** — it retroactively validates Brick 0's deferred App build. Test step ran the smoke test green.
-- **Notes / follow-ups:**
-  - Test step filters `Category!=Integration` so the on-device Whisper test (Brick 7) is already excluded from the fast job; Brick 7 adds its own optional integration job.
-  - **Dated follow-up — by 2026-06-16:** GitHub deprecates Node 20 actions; `actions/checkout@v4` and `actions/setup-dotnet@v4` will be forced to Node 24 (may break). Bump to the Node-24 major versions before then (verify the tags exist first).
-  - The Brick 0 "warnings-as-errors on WinForms generated code" watch-point now lives with this CI run — it'll surface here first when Brick 9/10 lands real WinForms code.
 
 <!-- Template for each entry:
 
