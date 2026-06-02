@@ -1,4 +1,5 @@
 using System.Windows.Forms;
+using SpeakType.App.Theme;
 using SpeakType.Core.Models;
 
 namespace SpeakType.App.Startup;
@@ -37,6 +38,7 @@ public sealed class WelcomeForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        UiTheme.StyleWindow(this);
 
         var layout = new TableLayoutPanel
         {
@@ -47,10 +49,11 @@ public sealed class WelcomeForm : Form
             Padding = new Padding(16),
         };
 
-        var heading = new Label { Text = headingText, AutoSize = true, Margin = new Padding(3, 3, 3, 12) };
-        _status = new Label { Text = "Downloading speech model…", AutoSize = true, Margin = new Padding(3, 3, 3, 6) };
+        var heading = new Label { Text = headingText, AutoSize = true, Font = UiTheme.Heading, Margin = new Padding(3, 3, 3, 12) };
+        _status = new Label { Text = "Downloading speech model…", AutoSize = true, ForeColor = UiTheme.TextSecondary, Margin = new Padding(3, 3, 3, 6) };
         _bar = new ProgressBar { Style = ProgressBarStyle.Continuous, Minimum = 0, Maximum = 100, Width = 280 };
         _retry = new Button { Text = "Retry", AutoSize = true, Visible = false, Margin = new Padding(3, 12, 3, 3) };
+        UiTheme.StyleButton(_retry, primary: true);
         _retry.Click += (_, _) => StartDownload();
 
         layout.Controls.Add(heading);
