@@ -36,3 +36,15 @@ jobs:
       # so it is run locally / in a future optional job, not in this fast push job.
       - name: Test
         run: dotnet test SpeakType.sln -c Release --no-build --filter "Category!=Integration"
+
+      # Packaging smoke test (spec Feature 26): prove the self-contained single-file win-x64 publish
+      # actually succeeds and emits the exe. Running that exe on a clean machine is the manual M-test.
+      - name: Publish (single-file)
+        run: dotnet publish SpeakType.App/SpeakType.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+
+      - name: Verify the single-file exe exists
+        shell: pwsh
+        run: |
+          $exe = "SpeakType.App/bin/Release/net8.0-windows/win-x64/publish/SpeakType.exe"
+          if (-not (Test-Path $exe)) { Write-Error "Publish did not produce $exe"; exit 1 }
+          Write-Host ("Published {0:N1} MB single-file exe" -f ((Get-Item $exe).Length / 1MB))

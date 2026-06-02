@@ -7,6 +7,11 @@
     <AssemblyName>SpeakType</AssemblyName>
     <!-- Required by [LibraryImport] source-generated P/Invoke (SYSLIB1062). -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Packaging (spec Feature 26): self-contained single-file win-x64 exe. The native whisper.cpp
+         libraries (Whisper.net.Runtime) would otherwise be dropped beside the exe; embed + self-extract
+         them so the documented publish command produces ONE file. Only takes effect during a
+         single-file publish, so it's inert for normal build/test. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.2.1" />
