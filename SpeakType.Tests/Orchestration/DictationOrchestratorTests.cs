@@ -568,44 +568,46 @@ public sealed class DictationOrchestratorTests
     [Fact]
     public void Correction_pipeline_runs_between_clean_and_paste()
     {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber { Result = "Um, hello." };
+        var paste = new FakePasteService();
         var pipeline = new TextCorrectionPipeline(new (ITextCorrector, Func<AppSettings, bool>)[]
         {
             (new UpperCorrector(), s => s.SpellCorrection),
         });
         var settings = new AppSettings { FillerRemoval = true, SpellCorrection = true };
         var sut = new DictationOrchestrator(
-            _hotkey, _audio, _transcriber, _paste, new TranscriptCleaner(), settings,
-            _clock, _timer, correctionPipeline: pipeline);
+            hotkey, audio, transcriber, paste, new TranscriptCleaner(), settings,
+            new FakeClock(), new FakeAutoStopTimer(), correctionPipeline: pipeline);
 
-        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
-        _transcriber.Result = "Um, hello.";
-
-        _hotkey.Press();
-        _hotkey.Release();
+        hotkey.Press();
+        hotkey.Release();
 
         // Cleaner ⇒ "Hello. " ; pipeline uppercases ⇒ "HELLO. "
-        Assert.Equal("HELLO. ", _paste.ReceivedText);
+        Assert.Equal("HELLO. ", paste.ReceivedText);
     }
 
     [Fact]
     public void Correction_pipeline_skipped_when_setting_off()
     {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber { Result = "Um, hello." };
+        var paste = new FakePasteService();
         var pipeline = new TextCorrectionPipeline(new (ITextCorrector, Func<AppSettings, bool>)[]
         {
             (new UpperCorrector(), s => s.SpellCorrection),
         });
         var settings = new AppSettings { SpellCorrection = false };
         var sut = new DictationOrchestrator(
-            _hotkey, _audio, _transcriber, _paste, new TranscriptCleaner(), settings,
-            _clock, _timer, correctionPipeline: pipeline);
+            hotkey, audio, transcriber, paste, new TranscriptCleaner(), settings,
+            new FakeClock(), new FakeAutoStopTimer(), correctionPipeline: pipeline);
 
-        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
-        _transcriber.Result = "Um, hello.";
+        hotkey.Press();
+        hotkey.Release();
 
-        _hotkey.Press();
-        _hotkey.Release();
-
-        Assert.Equal("Hello. ", _paste.ReceivedText); // unchanged by the (disabled) stage
+        Assert.Equal("Hello. ", paste.ReceivedText); // unchanged by the (disabled) stage
     }
 
     private sealed class UpperCorrector : ITextCorrector
