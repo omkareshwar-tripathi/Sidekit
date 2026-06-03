@@ -4,6 +4,15 @@ Append-only archive of completed bricks, moved out of `BRICKS.md` to keep the ac
 
 ---
 
+### Brick CE-2 — CoEdIT inference engine (greedy decode loop) (2026-06-03)
+- **What:** The engine that turns text into polished text. `CoEditPolisher : ITextPolisher` tokenizes `instruction + text` (default `"Fix the grammar: "`), runs the encoder once, greedily decodes one token at a time (argmax → append) until EOS or a safety cap, then detokenizes. All ONNX/tensor/KV-cache work is hidden behind the `ICoEditModel` seam, so the loop is **pure, fully-tested logic** — the real 800 MB model isn't needed to prove it correct.
+- **Files:** `SpeakType.Core/Polishing/ITextPolisher.cs` (port); `SpeakType.Onnx/Inference/ICoEditModel.cs` (seam + `IEncoderOutput` opaque handle); `SpeakType.Onnx/Inference/CoEditPolisher.cs` (engine); `SpeakType.Onnx.Tests/Inference/CoEditPolisherTests.cs` (6 tests w/ a scripted `FakeModel` + the real tokenizer for detokenization).
+- **Verified:** `SpeakType.Onnx.Tests` **19/19** (13 + 6) on macOS — covers: scripted tokens → exact text, instruction-prefix applied, encoder-runs-once, stop-at-EOS, runaway cap, null guard. Core **179/179** unchanged; Core/Onnx build.
+- **Notes / decisions:**
+  - **Seam named `ICoEditModel`, not the plan's `IOnnxSession`** — it abstracts the *model* (`Encode` / `DecodeNextLogits`), not a raw ORT session. The real ONNX two-session + KV-cache impl (`OnnxCoEditModel`) is **CE-3**.
+  - **Fail-open is deferred to CE-4** (orchestrator wraps `Polish` in try/catch → paste raw text). The engine itself only guards null input.
+  - **CE-4 spacing watch:** `TranscriptCleaner` adds a trailing space; the model output won't have it. Decide in CE-4 whether to polish before/after the trailing-space step and re-add it for paste.
+
 ### Brick CE-1 — SpeakType.Onnx project + CoEditTokenizer (2026-06-03)
 - **What:** First brick of the CoEdIT Polish feature. New **cross-platform** `SpeakType.Onnx` project (net8.0, builds/tests on Mac+CI, unlike the WinForms App) holding `CoEditTokenizer` — encode text → T5 token ids (EOS appended) / decode ids → text (special tokens stripped) for the Flan-T5 CoEdIT model. Bundles `assets/tokenizer.json` (~2.4 MB). De-risks the feature's #1 unknown: correct T5 tokenization in C#.
 - **Files:** `SpeakType.Onnx/SpeakType.Onnx.csproj`, `SpeakType.Onnx/Tokenization/CoEditTokenizer.cs`, `SpeakType.Onnx/assets/tokenizer.json`; `SpeakType.Onnx.Tests/SpeakType.Onnx.Tests.csproj` + `Tokenization/CoEditTokenizerTests.cs` (13 tests); `SpeakType.sln` (2 projects added).
