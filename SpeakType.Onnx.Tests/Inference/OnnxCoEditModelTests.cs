@@ -23,7 +23,7 @@ public sealed class OnnxCoEditModelTests
     }
 
     private static CoEditPolisher Polisher(OnnxCoEditModel model) =>
-        new(new CoEditTokenizer(CoEditTokenizer.DefaultTokenizerPath), model);
+        new(new CoEditTokenizer(), model);
 
     [SkippableTheory]
     [InlineData("he go to school every days.")]

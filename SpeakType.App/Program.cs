@@ -161,7 +161,7 @@ internal static class Program
             coeditModel = new OnnxCoEditModel(
                 Path.Combine(coeditDir, "encoder_model.onnx"),
                 Path.Combine(coeditDir, "decoder_model_merged.onnx"));
-            polisher = new CoEditPolisher(new CoEditTokenizer(CoEditTokenizer.DefaultTokenizerPath), coeditModel);
+            polisher = new CoEditPolisher(new CoEditTokenizer(), coeditModel);
         }
         catch (Exception ex)
         {

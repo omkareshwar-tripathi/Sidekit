@@ -22,8 +22,16 @@ public sealed class CoEditTokenizerTests
             new[] { 14269, 8, 19519, 10, 3, 1 } },
     };
 
-    private static CoEditTokenizer NewTokenizer() =>
-        new(CoEditTokenizer.DefaultTokenizerPath);
+    private static CoEditTokenizer NewTokenizer() => new();
+
+    [Fact]
+    public void Parameterless_constructor_loads_the_bundled_tokenizer()
+    {
+        // The tokenizer.json is embedded in the assembly and extracted to disk on construction,
+        // so this works even in a single-file published exe (no content file beside the binary).
+        var ids = new CoEditTokenizer().Encode("Hello world.");
+        Assert.Equal(new[] { 8774, 296, 5, 1 }, ids);
+    }
 
     [Theory]
     [MemberData(nameof(GoldenVectors))]

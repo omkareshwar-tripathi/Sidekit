@@ -9,7 +9,7 @@ public sealed class CoEditPolisherTests
     private const int VocabSize = 32100; // CoEdIT/Flan-T5 vocab
     private const int EosTokenId = 1;
 
-    private static CoEditTokenizer Tokenizer() => new(CoEditTokenizer.DefaultTokenizerPath);
+    private static CoEditTokenizer Tokenizer() => new();
 
     /// <summary>
     /// Fake model: emits a scripted sequence of next-tokens (one per decode step),

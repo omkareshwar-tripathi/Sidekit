@@ -12,11 +12,21 @@ namespace SpeakType.Onnx.Tokenization;
 /// </summary>
 public sealed class CoEditTokenizer
 {
+    // The LogicalName set on the EmbeddedResource in the .csproj.
+    private const string ResourceName = "tokenizer.json";
+
     private readonly Tokenizer _tokenizer;
 
-    /// <summary>Path to the <c>tokenizer.json</c> bundled next to this assembly.</summary>
-    public static string DefaultTokenizerPath =>
-        Path.Combine(AppContext.BaseDirectory, "assets", "tokenizer.json");
+    /// <summary>
+    /// Loads the tokenizer bundled in this assembly. The <c>tokenizer.json</c> is an embedded
+    /// resource, extracted to a per-user cache file on construction because Tokenizers.DotNet loads
+    /// by file path. This is the production path: it works in a single-file published exe, where a
+    /// content file beside the binary would not exist.
+    /// </summary>
+    public CoEditTokenizer()
+        : this(ExtractBundledTokenizer())
+    {
+    }
 
     /// <param name="tokenizerJsonPath">Path to a HuggingFace <c>tokenizer.json</c>.</param>
     public CoEditTokenizer(string tokenizerJsonPath)
@@ -26,6 +36,38 @@ public sealed class CoEditTokenizer
             throw new FileNotFoundException("CoEdIT tokenizer file not found.", tokenizerJsonPath);
 
         _tokenizer = new Tokenizer(vocabPath: tokenizerJsonPath);
+    }
+
+    // Materializes the embedded tokenizer.json to a stable per-user cache file and returns its path.
+    // Idempotent: rewrites only when the file is missing or a different size (so a changed bundle or
+    // a half-written file from a crashed run is refreshed), avoiding a 2.4 MB write on every startup.
+    private static string ExtractBundledTokenizer()
+    {
+        using var resource = typeof(CoEditTokenizer).Assembly.GetManifestResourceStream(ResourceName)
+            ?? throw new InvalidOperationException($"Embedded tokenizer resource '{ResourceName}' was not found.");
+
+        var cacheDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SpeakType", "onnx");
+        Directory.CreateDirectory(cacheDir);
+        var path = Path.Combine(cacheDir, "coedit-tokenizer.json");
+
+        if (!File.Exists(path) || new FileInfo(path).Length != resource.Length)
+        {
+            // Write to a per-caller unique temp then move into place, so a concurrent reader never
+            // sees a partial file and two concurrent extractors (parallel test runs, or just a racy
+            // startup) don't collide on a shared temp path. Move overwrites: last writer wins, and
+            // both wrote identical bytes.
+            var temp = $"{path}.{Guid.NewGuid():N}.tmp";
+            using (var file = File.Create(temp))
+            {
+                resource.CopyTo(file);
+            }
+
+            File.Move(temp, path, overwrite: true);
+        }
+
+        return path;
     }
 
     /// <summary>Encodes text to token ids, with the trailing EOS token included.</summary>
