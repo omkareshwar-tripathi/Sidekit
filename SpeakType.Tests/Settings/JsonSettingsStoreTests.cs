@@ -67,7 +67,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
         Assert.Equal(defaults.Autostart, loaded.Autostart);
         Assert.Equal(defaults.DebugLogging, loaded.DebugLogging);
         Assert.Equal(defaults.CoEditPolishing, loaded.CoEditPolishing);
-        Assert.True(loaded.CoEditPolishing); // CoEdIT Polish is on by default (spec)
+        Assert.False(loaded.CoEditPolishing); // CoEdIT Polish is OFF by default (opt-in; downloads on enable)
     }
 
     [Fact]

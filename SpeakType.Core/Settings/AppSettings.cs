@@ -21,11 +21,13 @@ public sealed class AppSettings
     public bool DebugLogging { get; set; } = false;
 
     /// <summary>
-    /// When true (default), every dictation is run through the on-device CoEdIT
-    /// model to fix grammar/spelling before paste. Fail-open: if polishing throws,
-    /// the cleaned (unpolished) text is pasted instead.
+    /// When true, every dictation is run through the on-device CoEdIT model to fix
+    /// grammar/spelling before paste. Off by default: CoEdIT needs a ~2.4 GB model
+    /// that downloads only when the user enables this, so the app works out of the
+    /// box with no large download. Fail-open: if polishing throws or no model is
+    /// loaded, the cleaned (unpolished) text is pasted instead.
     /// </summary>
-    public bool CoEditPolishing { get; set; } = true;
+    public bool CoEditPolishing { get; set; }
 
     /// <summary>
     /// Coerces a loaded settings object to a usable baseline, regardless of where it

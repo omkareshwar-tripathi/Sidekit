@@ -583,7 +583,7 @@ public sealed class DictationOrchestratorTests
     public void Polishes_cleaned_text_before_paste_when_enabled()
     {
         var polisher = new FakeTextPolisher { Result = "He goes to school every day." };
-        var h = BuildWithPolisher(polisher, new AppSettings()); // CoEditPolishing defaults true
+        var h = BuildWithPolisher(polisher, new AppSettings { CoEditPolishing = true });
         h.Transcriber.Result = "he go to school every days.";
 
         h.Hotkey.Press();
@@ -600,7 +600,7 @@ public sealed class DictationOrchestratorTests
     public void Polishing_failure_falls_open_to_the_cleaned_text()
     {
         var polisher = new FakeTextPolisher { ThrowOnCall = new InvalidOperationException("model boom") };
-        var h = BuildWithPolisher(polisher, new AppSettings());
+        var h = BuildWithPolisher(polisher, new AppSettings { CoEditPolishing = true });
         h.Transcriber.Result = "Hello there.";
 
         h.Hotkey.Press();
@@ -631,7 +631,7 @@ public sealed class DictationOrchestratorTests
         var polisher = new FakeTextPolisher { Result = "He goes to school every day." };
         var sink = new FakeLogSink();
         var logger = new AppLogger(sink, () => false);
-        var h = BuildWithPolisher(polisher, new AppSettings(), logger);
+        var h = BuildWithPolisher(polisher, new AppSettings { CoEditPolishing = true }, logger);
         h.Transcriber.Result = "he go to school every days.";
 
         h.Hotkey.Press();
