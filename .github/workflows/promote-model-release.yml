@@ -1,0 +1,44 @@
+name: Promote model artifact to Release
+
+# Publishes an already-built coedit model artifact as a GitHub Release, WITHOUT
+# re-exporting from HuggingFace (avoids the HF 429 rate-limit). Runs entirely on
+# the runner, where downloading the artifact + uploading the Release asset is
+# fast — so you then download the model from the fast Release CDN instead of the
+# throttled Actions-artifact storage.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run ID that produced the coedit-large-fp16 artifact"
+        required: true
+      tag:
+        description: "Release tag to publish under"
+        required: true
+        default: "coedit-large-v1"
+
+permissions:
+  contents: write # create the Release
+  actions: read # download the artifact from another run
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the existing artifact (runner <-> GitHub is fast)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.run_id }}" -n coedit-large-fp16 -D dist \
+            --repo "${{ github.repository }}"
+          ls -lh dist/
+
+      - name: Publish / update the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.tag }}" dist/coedit-large-fp16.zip \
+            --repo "${{ github.repository }}" \
+            --title "CoEdIT model (${{ inputs.tag }})" \
+            --notes-file dist/coedit-large-fp16.metadata.txt \
+          || gh release upload "${{ inputs.tag }}" dist/coedit-large-fp16.zip \
+            --repo "${{ github.repository }}" --clobber
