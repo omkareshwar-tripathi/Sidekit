@@ -102,6 +102,52 @@ public sealed class ModelStore : IModelStore
             lastError);
     }
 
+    /// <summary>
+    /// Installs a model from an in-memory source (e.g. a bundled embedded resource) rather than a
+    /// download: writes <paramref name="content"/> to the model's canonical path, verifying it against
+    /// the catalog (size + SHA256) before swapping it in atomically. A no-op (returns the existing path)
+    /// if the model is already installed and valid. Throws for an unknown model, or if the content fails
+    /// verification (the temp file is cleaned up). Lets the app ship the model inside the exe and
+    /// materialize it on first run with no network.
+    /// </summary>
+    public string InstallFromStream(string modelName, Stream content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        if (!_catalog.TryGetValue(modelName, out var info))
+        {
+            throw new ArgumentException($"Unknown model '{modelName}'.", nameof(modelName));
+        }
+
+        var finalPath = PathFor(info.Name);
+        if (File.Exists(finalPath) && Verify(finalPath, info))
+        {
+            return finalPath;
+        }
+
+        Directory.CreateDirectory(_modelsDirectory);
+        var tempPath = finalPath + ".bundled";
+        try
+        {
+            using (var file = File.Create(tempPath))
+            {
+                content.CopyTo(file);
+            }
+
+            if (!Verify(tempPath, info))
+            {
+                throw new InvalidOperationException($"Bundled '{info.Name}' model failed verification.");
+            }
+
+            File.Move(tempPath, finalPath, overwrite: true);
+            return finalPath;
+        }
+        catch
+        {
+            DeleteIfExists(tempPath);
+            throw;
+        }
+    }
+
     private string PathFor(string name) => Path.Combine(_modelsDirectory, $"ggml-{name}.bin");
 
     private static bool Verify(string path, ModelInfo info)

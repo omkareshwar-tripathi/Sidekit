@@ -185,6 +185,58 @@ public sealed class ModelStoreTests : IDisposable
         Assert.Equal(PathFor("good"), store.GetInstalledModelPath("GOOD"));
     }
 
+    [Fact]
+    public void InstallFromStream_writes_and_returns_path_when_content_verifies()
+    {
+        var bytes = new byte[] { 3, 1, 4, 1, 5, 9 };
+        var info = InfoFor("base.en", bytes);
+        var store = new ModelStore(new FakeDownloader(), _tempDir, CatalogOf(info));
+
+        using var stream = new MemoryStream(bytes);
+        var path = store.InstallFromStream("base.en", stream);
+
+        Assert.Equal(PathFor("base.en"), path);
+        Assert.Equal(bytes, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void InstallFromStream_short_circuits_when_already_installed()
+    {
+        var bytes = new byte[] { 7, 7, 7 };
+        var info = InfoFor("base.en", bytes);
+        File.WriteAllBytes(PathFor("base.en"), bytes);
+        var store = new ModelStore(new FakeDownloader(), _tempDir, CatalogOf(info));
+
+        // A stream that would FAIL verification — proves it's never read when already installed.
+        using var wrong = new MemoryStream(new byte[] { 0 });
+        var path = store.InstallFromStream("base.en", wrong);
+
+        Assert.Equal(PathFor("base.en"), path);
+        Assert.Equal(bytes, File.ReadAllBytes(path)); // untouched
+    }
+
+    [Fact]
+    public void InstallFromStream_throws_and_cleans_temp_when_content_fails_verification()
+    {
+        var info = InfoFor("base.en", new byte[] { 1, 2, 3, 4 });
+        var store = new ModelStore(new FakeDownloader(), _tempDir, CatalogOf(info));
+
+        using var corrupt = new MemoryStream(new byte[] { 9, 9 }); // wrong bytes
+        Assert.Throws<InvalidOperationException>(() => store.InstallFromStream("base.en", corrupt));
+
+        Assert.False(File.Exists(PathFor("base.en")));
+        Assert.False(File.Exists(PathFor("base.en") + ".bundled"));
+    }
+
+    [Fact]
+    public void InstallFromStream_throws_for_unknown_model()
+    {
+        var store = new ModelStore(new FakeDownloader(), _tempDir, CatalogOf(InfoFor("base.en", new byte[] { 1 })));
+
+        using var stream = new MemoryStream(new byte[] { 1 });
+        Assert.Throws<ArgumentException>(() => store.InstallFromStream("nope", stream));
+    }
+
     private static IReadOnlyDictionary<string, ModelInfo> CatalogOf(params ModelInfo[] infos)
     {
         var dict = new Dictionary<string, ModelInfo>(StringComparer.OrdinalIgnoreCase);
