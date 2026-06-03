@@ -57,8 +57,7 @@ public sealed class OnnxCoEditModel : ICoEditModel, IDisposable
         });
 
         var hidden = results.First(r => r.Name == "last_hidden_state").AsTensor<float>();
-        var hiddenCopy = new DenseTensor<float>(hidden.ToArray(), hidden.Dimensions.ToArray());
-        return new State(hiddenCopy, attention);
+        return new State(hidden.ToArray(), hidden.Dimensions.ToArray(), n);
     }
 
     public float[] DecodeNextLogits(IEncoderOutput encoderOutput, IReadOnlyList<int> decodedSoFar)
@@ -71,11 +70,19 @@ public sealed class OnnxCoEditModel : ICoEditModel, IDisposable
         var inputIds = new DenseTensor<long>(new[] { 1, 1 });
         inputIds[0, 0] = decodedSoFar[^1];
 
+        // Build fresh tensors per step — ORT does not support feeding the same
+        // DenseTensor instance to multiple Run() calls (it mangles the shape,
+        // surfacing as "cannot broadcast on dim 0" in cross-attention).
+        var attention = new DenseTensor<long>(new[] { 1, state.EncoderLen });
+        for (int i = 0; i < state.EncoderLen; i++)
+            attention[0, i] = 1;
+        var encoderHidden = new DenseTensor<float>(state.EncoderHidden, state.EncoderHiddenDims);
+
         var inputs = new List<NamedOnnxValue>(4 + NumLayers * 4)
         {
-            NamedOnnxValue.CreateFromTensor("encoder_attention_mask", state.AttentionMask),
+            NamedOnnxValue.CreateFromTensor("encoder_attention_mask", attention),
             NamedOnnxValue.CreateFromTensor("input_ids", inputIds),
-            NamedOnnxValue.CreateFromTensor("encoder_hidden_states", state.EncoderHidden),
+            NamedOnnxValue.CreateFromTensor("encoder_hidden_states", encoderHidden),
             NamedOnnxValue.CreateFromTensor(
                 "use_cache_branch", new DenseTensor<bool>(new[] { !firstStep }, new[] { 1 })),
         };
@@ -97,12 +104,23 @@ public sealed class OnnxCoEditModel : ICoEditModel, IDisposable
         for (int v = 0; v < vocab; v++)
             logits[v] = logitsTensor[0, 0, v];
 
+        var previous = state.Cache;
         var newCache = new Dictionary<string, DenseTensor<float>>(NumLayers * 4);
         ForEachKv((i, kind, kv) =>
         {
             string name = Present(i, kind, kv);
-            var t = byName[name];
-            newCache[name] = new DenseTensor<float>(t.ToArray(), t.Dimensions.ToArray());
+            // Encoder (cross-attention) KV is computed once on the first step and is
+            // constant thereafter — the cached decoder pass does not re-emit it, so
+            // carry the first-step value forward. Decoder self-attention KV grows.
+            if (kind == "encoder" && previous is not null)
+            {
+                newCache[name] = previous[name];
+            }
+            else
+            {
+                var t = byName[name];
+                newCache[name] = new DenseTensor<float>(t.ToArray(), t.Dimensions.ToArray());
+            }
         });
         state.Cache = newCache;
 
@@ -127,16 +145,18 @@ public sealed class OnnxCoEditModel : ICoEditModel, IDisposable
 
     private sealed class State : IEncoderOutput
     {
-        public DenseTensor<float> EncoderHidden { get; }
-        public DenseTensor<long> AttentionMask { get; }
+        public float[] EncoderHidden { get; }       // flat last_hidden_state
+        public int[] EncoderHiddenDims { get; }      // [1, EncoderLen, 1024]
+        public int EncoderLen { get; }
 
         /// <summary>Present key/values from the previous decode step; null before the first step.</summary>
         public Dictionary<string, DenseTensor<float>>? Cache { get; set; }
 
-        public State(DenseTensor<float> encoderHidden, DenseTensor<long> attentionMask)
+        public State(float[] encoderHidden, int[] encoderHiddenDims, int encoderLen)
         {
             EncoderHidden = encoderHidden;
-            AttentionMask = attentionMask;
+            EncoderHiddenDims = encoderHiddenDims;
+            EncoderLen = encoderLen;
         }
     }
 }
