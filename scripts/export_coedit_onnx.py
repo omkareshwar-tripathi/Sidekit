@@ -28,11 +28,16 @@ from pathlib import Path
 MODEL_ID = "grammarly/coedit-large"
 ARCHIVE_NAME = "coedit-large-int8.zip"
 
-# Files the SpeakType.Onnx adapter loads. Decoder: prefer the merged graph
-# (one file handles the first pass and the cached steps); fall back to the split pair.
-ENCODER = "encoder_model.onnx"
-DECODER_MERGED = "decoder_model_merged.onnx"
-DECODER_SPLIT = ["decoder_model.onnx", "decoder_with_past_model.onnx"]
+# Files the SpeakType.Onnx adapter loads. `optimum-cli quantize` appends a
+# "_quantized" suffix, so each entry lists the quantized name first, then the
+# plain name as a fallback. Decoder: prefer the merged graph (one file handles
+# the first pass and the cached steps); fall back to the split pair.
+ENCODER = ["encoder_model_quantized.onnx", "encoder_model.onnx"]
+DECODER_MERGED = ["decoder_model_merged_quantized.onnx", "decoder_model_merged.onnx"]
+DECODER_SPLIT = [
+    ["decoder_model_quantized.onnx", "decoder_model.onnx"],
+    ["decoder_with_past_model_quantized.onnx", "decoder_with_past_model.onnx"],
+]
 EXTRA = ["config.json", "generation_config.json"]
 
 
@@ -67,22 +72,32 @@ def quantize_int8(fp32: Path, work: Path) -> Path:
     return out
 
 
+def _first_existing(src: Path, candidates: list[str]) -> Path | None:
+    for name in candidates:
+        p = src / name
+        if p.exists():
+            return p
+    return None
+
+
 def collect(src: Path) -> list[Path]:
+    available = sorted(p.name for p in src.glob("*.onnx"))
     files: list[Path] = []
 
-    enc = src / ENCODER
-    if not enc.exists():
-        sys.exit(f"ERROR: missing {ENCODER} in {src}")
+    enc = _first_existing(src, ENCODER)
+    if enc is None:
+        sys.exit(f"ERROR: no encoder model in {src}; have: {available}")
     files.append(enc)
 
-    if (src / DECODER_MERGED).exists():
-        files.append(src / DECODER_MERGED)
+    merged = _first_existing(src, DECODER_MERGED)
+    if merged is not None:
+        files.append(merged)
     else:
-        print(f"    note: {DECODER_MERGED} not produced; packaging the split decoder")
-        for name in DECODER_SPLIT:
-            p = src / name
-            if not p.exists():
-                sys.exit(f"ERROR: missing decoder file {name} in {src}")
+        print("    note: no merged decoder; packaging the split decoder")
+        for candidates in DECODER_SPLIT:
+            p = _first_existing(src, candidates)
+            if p is None:
+                sys.exit(f"ERROR: missing decoder {candidates} in {src}; have: {available}")
             files.append(p)
 
     for name in EXTRA:
@@ -99,8 +114,11 @@ def package(files: list[Path], out_dir: Path) -> Path:
     print(f"[3/4] Package -> {archive}")
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
         for f in files:
-            print(f"    + {f.name} ({f.stat().st_size:,} bytes)")
-            z.write(f, arcname=f.name)
+            # Normalize names inside the zip so the C# adapter loads stable
+            # filenames (e.g. encoder_model.onnx, not encoder_model_quantized.onnx).
+            arcname = f.name.replace("_quantized", "")
+            print(f"    + {f.name} -> {arcname} ({f.stat().st_size:,} bytes)")
+            z.write(f, arcname=arcname)
     return archive
 
 
