@@ -44,5 +44,6 @@ logs/
 __pycache__/
 *.pyc
 
-# Local CoEdIT model (downloaded/exported; never committed — too large)
-coedit-large-int8/
+# Local CoEdIT model + export output (downloaded/exported; never committed — too large)
+coedit-large*/
+dist/

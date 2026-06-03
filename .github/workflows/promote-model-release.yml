@@ -1,0 +1,50 @@
+name: Promote model artifact to Release
+
+# Publishes an already-built coedit model artifact as a GitHub Release, WITHOUT
+# re-exporting from HuggingFace (avoids the HF 429 rate-limit). Runs entirely on
+# the runner, where downloading the artifact + uploading the Release asset is
+# fast — so you then download the model from the fast Release CDN instead of the
+# throttled Actions-artifact storage.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run ID that produced the coedit-large-fp16 artifact"
+        required: true
+      tag:
+        description: "Release tag to publish under"
+        required: true
+        default: "coedit-large-v1"
+
+permissions:
+  contents: write # create the Release
+  actions: read # download the artifact from another run
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the existing artifact (runner <-> GitHub is fast)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.run_id }}" -n coedit-large-fp16 -D dist \
+            --repo "${{ github.repository }}"
+          ls -lh dist/
+
+      - name: Split (>2 GiB) and publish to a Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          # GitHub Release assets are capped at 2 GiB; split into <2 GiB parts.
+          # Reassemble on download: cat coedit-large-fp16.zip.part* > coedit-large-fp16.zip
+          split -b 1900M -d coedit-large-fp16.zip coedit-large-fp16.zip.part
+          ls -lh coedit-large-fp16.zip.part*
+          # Recreate the release cleanly (drop any partial tag from earlier attempts).
+          gh release delete "${{ inputs.tag }}" --repo "${{ github.repository }}" --yes --cleanup-tag || true
+          gh release create "${{ inputs.tag }}" \
+            coedit-large-fp16.zip.part* coedit-large-fp16.metadata.txt \
+            --repo "${{ github.repository }}" \
+            --title "CoEdIT model (${{ inputs.tag }})" \
+            --notes "fp16 encoder + fp32 merged decoder. Reassemble: \`cat coedit-large-fp16.zip.part* > coedit-large-fp16.zip\`"
