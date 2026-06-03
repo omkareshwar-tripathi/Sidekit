@@ -69,10 +69,8 @@ public sealed partial class SymSpellCorrector : ITextCorrector
         }
 
         var top = suggestions[0];
-        if (top.distance == 0 || top.count < FrequencyFloor)
-        {
-            return token; // already a known word, or candidate too rare to trust
-        }
+        if (top.distance == 0) return token;            // exact match: word is already valid
+        if (top.count < FrequencyFloor) return token;   // suggestion too rare to trust
 
         return top.term;
     }

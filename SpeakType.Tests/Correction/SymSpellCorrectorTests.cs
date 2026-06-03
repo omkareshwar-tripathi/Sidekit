@@ -2,9 +2,15 @@ using SpeakType.Core.Correction;
 
 namespace SpeakType.Tests.Correction;
 
-public sealed class SymSpellCorrectorTests
+public sealed class SymSpellCorrectorFixture
 {
-    private readonly SymSpellCorrector _sut = new();
+    public SymSpellCorrector Sut { get; } = new();
+}
+
+public sealed class SymSpellCorrectorTests(SymSpellCorrectorFixture fixture)
+    : IClassFixture<SymSpellCorrectorFixture>
+{
+    private readonly SymSpellCorrector _sut = fixture.Sut;
 
     [Fact]
     public void Fixes_a_clear_lowercase_typo()
@@ -48,5 +54,19 @@ public sealed class SymSpellCorrectorTests
     public void Empty_string_returns_empty()
     {
         Assert.Equal("", _sut.Correct(""));
+    }
+
+    [Fact]
+    public void Leaves_unknown_lowercase_word_with_no_suggestion_unchanged()
+    {
+        // No dictionary word is within edit-distance 1, so it must pass through.
+        Assert.Equal("xyzzyx", _sut.Correct("xyzzyx"));
+    }
+
+    [Fact]
+    public void Skips_mixed_case_tokens()
+    {
+        // Mid-word capitals (camelCase / brand spellings) are not all-lowercase ⇒ skipped.
+        Assert.Equal("iPhone and WiFi", _sut.Correct("iPhone and WiFi"));
     }
 }
