@@ -10,6 +10,14 @@ Plan derived from `SpeakType-v1-spec.md` (the complete, decision-resolved spec).
 
 _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick that grows past ~150 LOC / 5 source files.)_
 
+### CoEdIT Polish
+
+_On-device text improvement: CoEdIT (Flan-T5-large) runs **automatically on every dictation** before paste (toggle, default-on), fail-open. Replaces the abandoned 4-stage "Fix & Polish" — we dropped Punctuation/GECToR/SymSpell as redundant-with-Whisper. Spec: `docs/superpowers/specs/2026-06-03-coedit-polish-design.md` (records all decisions + the CE-1→CE-4 decomposition + the tokenizer finding). **CE-1 (SpeakType.Onnx project + CoEditTokenizer) shipped.**_
+
+- **Next: CE-2 — CoEdIT inference engine.** Encoder + greedy autoregressive decoder loop behind an `IOnnxSession` seam, implementing `ITextPolisher`. TDD the decode loop against a **fake session** (canned logits) so it's proven without the 800 MB model. Then CE-3 (download/unpack the model on first run, reusing `ModelStore`), CE-4 (orchestrator wiring + `CoEditPolishing` setting + Settings toggle + logging, Windows-verified). External: a one-time `optimum-cli` export+quantize+host of coedit-large — I write the script, user runs/hosts it.
+  - Skill: brainstorming (CE-2 if needed), dotnet-best-practices, dotnet-xunit, run-tests
+- **Heads-up for CE-2:** encoder/decoder ONNX I/O dtypes — T5 `input_ids` are **int64**; watch the "Int64 vs Float" tensor mismatch others hit. Use the **merged decoder** (`decoder_model_merged.onnx`) from Optimum to keep the past-key-values loop simple. `decoder_start_token_id=0`, `eos_token_id=1`.
+
 ### App shell, UI & polish
 
 _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2026-06-03-ui-modern-light-restyle-design.md`; plan: `docs/superpowers/plans/2026-06-03-ui-modern-light-restyle.md`. All Windows-only → verify = CI compile-green + a laptop screenshot vs mockup B (no Core changes; 179 tests stay green)._
@@ -40,6 +48,15 @@ _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 
+### Brick CE-1 — SpeakType.Onnx project + CoEditTokenizer (2026-06-03)
+- **What:** First brick of the CoEdIT Polish feature. New **cross-platform** `SpeakType.Onnx` project (net8.0, builds/tests on Mac+CI, unlike the WinForms App) holding `CoEditTokenizer` — encode text → T5 token ids (EOS appended) / decode ids → text (special tokens stripped) for the Flan-T5 CoEdIT model. Bundles `assets/tokenizer.json` (~2.4 MB). De-risks the feature's #1 unknown: correct T5 tokenization in C#.
+- **Files:** `SpeakType.Onnx/SpeakType.Onnx.csproj`, `SpeakType.Onnx/Tokenization/CoEditTokenizer.cs`, `SpeakType.Onnx/assets/tokenizer.json`; `SpeakType.Onnx.Tests/SpeakType.Onnx.Tests.csproj` + `Tokenization/CoEditTokenizerTests.cs` (13 tests); `SpeakType.sln` (2 projects added).
+- **Verified:** `SpeakType.Onnx.Tests` **13/13** on macOS (5 golden vectors from the reference HF `tokenizers` lib, encode + round-trip + EOS + guards). Core **179/179** unchanged; Core/Whisper/Onnx all build.
+- **Notes / decisions:**
+  - **Tokenizer library = `Tokenizers.DotNet` 1.4.1, NOT `Microsoft.ML.Tokenizers`** (the design's assumption). MS.ML.Tokenizers **crashes** (`IndexOutOfRangeException`) loading the T5 Unigram `spiece.model` on both 2.0.0 and 3.0.0-preview; onnxruntime-extensions supports it but ships **Windows-only** natives. `Tokenizers.DotNet` wraps the HF Rust tokenizer, loads `tokenizer.json` directly, ships osx/win/linux natives → cross-platform + exact-correct (matches reference ids). Native dep, but portable like `Whisper.net.Runtime`.
+  - Golden vectors are generated from a Python venv (`pip install tokenizers`) — regenerate the same way if the tokenizer asset changes.
+  - Built on a **fresh branch `feat/coedit-polish` off `main`** (not stacked on the abandoned SymSpell PR #1).
+
 ### Brick 18 — CI publishes a downloadable SpeakType.exe (2026-06-03)
 - **What:** Made the app installable without a build. CI already published the self-contained single-file exe on every run but threw it away; added an `actions/upload-artifact@v4` step so each run attaches **`SpeakType-win-x64` → SpeakType.exe** to its "Artifacts" section. Installing is now: download the exe from a green run and double-click it — no .NET SDK, no Git, no local build. Updated the README with this download path.
 - **Files:** `.github/workflows/ci.yml` (upload-artifact step); `README.md` (new "Download (no build)" section).
@@ -57,13 +74,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
   - **The `.ico` is the single brand source** (exe + windows load it); only the **tray** is drawn programmatically, because it needs runtime per-state tinting (a static asset can't recolour). The tray glyph's bar proportions are hand-matched to the .ico.
   - **`AppIcon.Brand` is shared & never disposed** (process-lifetime, like the `UiTheme` fonts) — safe because Form doesn't own/dispose an assigned Icon.
   - **Tooling:** the `.ico` was generated on the Mac with Python/Pillow (no ImageMagick needed); regenerate via the same waveform proportions if the mark is revised.
-
-### Brick UI-5 — Flat tray menu (2026-06-03)
-- **What:** Final brick of the modern-light restyle. The tray right-click `ContextMenuStrip` now uses a `ToolStripProfessionalRenderer` backed by `FlatMenuColorTable` plus light font/colours (`UiTheme.Body`/`TextPrimary`/`Surface`, `RoundedEdges = false`) — a flat white menu with accent hover and a thin grey separator, replacing the legacy gray-gradient chrome. Menu items, the separator, checkmarks (Pause / Start with Windows) and **all Click wiring are unchanged**.
-- **Files:** `SpeakType.App/Tray/TrayIcon.cs` (using + 4 lines in `BuildMenu`). No Core/test changes.
-- **Verified:** Windows-only → **Windows x64 CI green** (run 26845342026, build + publish) = compile-green. Core suite untouched → **179/179**. Combined `/code-review` + `/simplify` → **clean**: `RoundedEdges` is a valid property; subclassing only the colour table leaves checkmark rendering intact; the renderer + `FlatMenuColorTable` aren't `IDisposable` and hold no unmanaged handles → no leak, nothing to dispose; behaviour-preserving. **Visual + menu actions = laptop screenshot (right-click the tray icon).**
-- **Notes / decisions:**
-  - **Tray *icon* glyphs unchanged** — the four state circles (SteelBlue/Red/Orange/DarkRed via `MakeIcon`) still convey Idle/Recording/Busy/Error; only the *menu* chrome changed. (A logo for the icon itself is the separate Brick UI-6.)
 
 <!-- Template for each entry:
 

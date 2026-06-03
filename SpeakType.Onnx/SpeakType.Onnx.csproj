@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Tokenizers.DotNet" Version="1.4.1" />
+    <!-- Native HF tokenizer runtimes for every platform we build/test/ship on
+         (dev: osx; CI: linux/windows; app: win-x64). The host RID's native is
+         resolved at runtime; the others are inert. -->
+    <PackageReference Include="Tokenizers.DotNet.runtime.osx-arm64" Version="1.4.1" />
+    <PackageReference Include="Tokenizers.DotNet.runtime.osx-x64" Version="1.4.1" />
+    <PackageReference Include="Tokenizers.DotNet.runtime.win-x64" Version="1.4.1" />
+    <PackageReference Include="Tokenizers.DotNet.runtime.linux-x64" Version="1.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- T5/CoEdIT SentencePiece tokenizer (~2.4 MB, bundled; the ~800 MB model
+         downloads separately). Copied next to the assembly for path-based load. -->
+    <Content Include="assets\tokenizer.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SpeakType.Core\SpeakType.Core.csproj" />
+  </ItemGroup>
+
+</Project>
