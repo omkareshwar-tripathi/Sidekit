@@ -25,6 +25,7 @@ public sealed class SettingsForm : Form
     private readonly ErrorProvider _errorProvider = new();
     private readonly TextBox _hotkeyBox = new();
     private readonly ComboBox _modelBox = new();
+    private readonly ToggleSwitch _coeditToggle;
     private bool _loading = true;
 
     public SettingsForm(AppSettings settings, ISettingsStore store)
@@ -64,7 +65,16 @@ public sealed class SettingsForm : Form
         AddRow(layout, "Model size", BuildModelBox());
 
         AddRow(layout, "Remove filler words", MakeToggle(_settings.FillerRemoval, v => _settings.FillerRemoval = v));
-        AddRow(layout, "Improve text (CoEdIT)", MakeToggle(_settings.CoEditPolishing, v => _settings.CoEditPolishing = v));
+        AddRow(layout, "Improve text (CoEdIT)", _coeditToggle = MakeToggle(_settings.CoEditPolishing, v =>
+        {
+            _settings.CoEditPolishing = v;
+            if (v)
+            {
+                // Turning it on may need a ~2.4 GB model download — the composition root handles that
+                // and reverts the toggle (RevertCoEditToggle) if it's cancelled or fails.
+                CoEditEnableRequested?.Invoke(this, EventArgs.Empty);
+            }
+        }));
         AddRow(layout, "Show recording overlay", MakeToggle(_settings.Overlay, v => _settings.Overlay = v));
         AddRow(layout, "Start with Windows", MakeToggle(_settings.Autostart, v =>
         {
@@ -85,6 +95,10 @@ public sealed class SettingsForm : Form
 
     /// <summary>Raised when Start with Windows is toggled so the composition root writes/removes the Run key.</summary>
     public event EventHandler<bool>? AutostartChanged;
+
+    /// <summary>Raised when "Improve text (CoEdIT)" is switched ON so the composition root can download
+    /// the model (if needed) and activate polishing. It calls <see cref="RevertCoEditToggle"/> on failure.</summary>
+    public event EventHandler? CoEditEnableRequested;
 
     // Closing the window hides it instead of disposing, so the single instance can be reshown.
     // Commit a typed-but-not-yet-defocused valid hotkey first; discard any still-invalid edit so
@@ -168,6 +182,24 @@ public sealed class SettingsForm : Form
                     break;
                 }
             }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>
+    /// Switches the CoEdIT toggle back OFF without re-raising <see cref="CoEditEnableRequested"/>. The
+    /// composition root calls this when the model download is cancelled or the model fails to load, so
+    /// the toggle reflects that CoEdIT is not actually on.
+    /// </summary>
+    public void RevertCoEditToggle()
+    {
+        _loading = true; // suppress the CheckedChanged handler for this programmatic change
+        try
+        {
+            _coeditToggle.Checked = false;
         }
         finally
         {

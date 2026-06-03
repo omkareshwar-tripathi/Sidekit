@@ -114,24 +114,10 @@ internal static class Program
             tray.ShowBalloon(AppInfo.Name, "Ready!");
         }
 
-        // CoEdIT text-improvement model (multi-part, ~2.4 GB). Required, like the speech model:
-        // if it isn't already installed, download it before the app is usable — a cancelled/failed
-        // download exits cleanly rather than auto-launching into the same broken first-run each login.
-        // Independent of the Whisper gate above so an upgrade that already has Whisper still fetches it.
+        // CoEdIT text-improvement model (multi-part, ~2.4 GB) is OPT-IN: NOT downloaded here, so the app
+        // is usable immediately with no large download and the launch can never hang/crash on it. The
+        // Settings "Improve text (CoEdIT)" toggle triggers the download + activation on demand (below).
         var coeditStore = new CoEditModelStore(new HttpModelDownloader(httpClient), CoEditModelStore.DefaultModelsDirectory);
-        if (coeditStore.GetInstalledModelDirectory() is null)
-        {
-            using var coeditWelcome = new WelcomeForm(
-                (progress, ct) => coeditStore.EnsureAsync(progress, ct),
-                "Setting up SpeakType",
-                "Downloading the text-improvement model (~2.4 GB, one time).",
-                "Downloading text-improvement model…");
-            if (coeditWelcome.ShowDialog() != DialogResult.OK)
-            {
-                tray.Dispose();
-                return;
-            }
-        }
 
         // Reflect the real Run-key state in the menu (the user may have toggled it off on a prior run).
         tray.SetStartWithWindowsChecked(autostart.IsEnabled());
@@ -149,26 +135,53 @@ internal static class Program
         var swappable = new SwappableTranscriber(transcriber);
         var activeModel = modelName;
 
-        // CoEdIT polisher: the model is guaranteed present by the first-run gate above. Load the two
-        // ONNX sessions once at startup (they hold ~2.4 GB — never per-dictation). Fail-open: if loading
-        // throws, run unpolished (null polisher) rather than blocking dictation. coeditModel is disposed
-        // with the rest of the pipeline at shutdown.
-        ITextPolisher? polisher = null;
+        // Diagnostic log (spec Logging & Privacy): metadata always; the transcript only when Debug
+        // logging is on — read live via the Func so the Settings toggle applies without a restart.
+        // Built here (before CoEdIT activation) so a model-load failure is logged.
+        var logger = new AppLogger(new FileLogSink(FileLogSink.DefaultLogPath), () => settings.DebugLogging);
+
+        // CoEdIT polishing is opt-in and hot-swappable. The orchestrator always holds this pass-through
+        // wrapper; it polishes only once a model is loaded into it (ActivateCoEdit). coeditModel keeps
+        // the ~2.4 GB ONNX sessions referenced for disposal at shutdown.
+        var coeditPolisher = new SwappableTextPolisher();
         OnnxCoEditModel? coeditModel = null;
-        try
+
+        // Loads the installed CoEdIT model and switches polishing on. Fail-open: a load failure (e.g. a
+        // missing Visual C++ runtime or a corrupt model) is logged and leaves CoEdIT inactive rather than
+        // crashing dictation. Returns false if no model is installed or the load failed.
+        bool ActivateCoEdit()
         {
-            var coeditDir = coeditStore.GetInstalledModelDirectory()!;
-            coeditModel = new OnnxCoEditModel(
-                Path.Combine(coeditDir, "encoder_model.onnx"),
-                Path.Combine(coeditDir, "decoder_model_merged.onnx"));
-            polisher = new CoEditPolisher(new CoEditTokenizer(), coeditModel);
+            if (coeditPolisher.IsActive)
+            {
+                return true;
+            }
+
+            var dir = coeditStore.GetInstalledModelDirectory();
+            if (dir is null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var model = new OnnxCoEditModel(
+                    Path.Combine(dir, "encoder_model.onnx"),
+                    Path.Combine(dir, "decoder_model_merged.onnx"));
+                coeditPolisher.Set(new CoEditPolisher(new CoEditTokenizer(), model));
+                coeditModel = model;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"coedit load failed: {ex.Message}");
+                return false;
+            }
         }
-        catch (Exception ex)
+
+        // If the user enabled CoEdIT on a previous run and the model is present, load it now.
+        if (settings.CoEditPolishing)
         {
-            System.Diagnostics.Trace.WriteLine(ex);
-            coeditModel?.Dispose();
-            coeditModel = null;
-            polisher = null;
+            ActivateCoEdit();
         }
 
         using var uiMarshaller = new UiMarshaller();
@@ -189,13 +202,9 @@ internal static class Program
             overlay.FadeOut();
         }));
 
-        // Diagnostic log (spec Logging & Privacy): metadata always; the transcript only when Debug
-        // logging is on — read live via the Func so the Settings toggle applies without a restart.
-        var logger = new AppLogger(new FileLogSink(FileLogSink.DefaultLogPath), () => settings.DebugLogging);
-
         var orchestrator = new DictationOrchestrator(
             hotkey, capture, swappable, pasteService, new TranscriptCleaner(), settings,
-            new SystemClock(), autoStopTimer, dispatcher, logger, polisher);
+            new SystemClock(), autoStopTimer, dispatcher, logger, coeditPolisher);
 
         // Settings window — single instance; Show/Activate on each request, it hides itself on close.
         using var settingsForm = new SettingsForm(settings, settingsStore);
@@ -205,6 +214,46 @@ internal static class Program
             orchestrator.Cancel(); // a rebind mid-hold won't fire Released — drop any active capture
         };
         settingsForm.AutostartChanged += (_, enabled) => ApplyAutostart(enabled);
+
+        // Enabling CoEdIT downloads its ~2.4 GB model on demand (if not already present), then switches
+        // polishing on live. On cancel/failure, revert the setting + toggle so the UI matches reality.
+        settingsForm.CoEditEnableRequested += (_, _) =>
+        {
+            void Revert()
+            {
+                settings.CoEditPolishing = false;
+                settingsStore.Save(settings);
+                settingsForm.RevertCoEditToggle();
+            }
+
+            if (coeditPolisher.IsActive)
+            {
+                return; // already on
+            }
+
+            if (coeditStore.GetInstalledModelDirectory() is null)
+            {
+                // Need the model first. A modal keeps the message loop pumping, so dictation still works
+                // while it downloads. The old, no-CoEdIT pipeline stays live throughout.
+                using var download = new WelcomeForm(
+                    (progress, ct) => coeditStore.EnsureAsync(progress, ct),
+                    "Enable text improvement",
+                    "Downloading the text-improvement model (~2.4 GB, one time).",
+                    "Downloading text-improvement model…");
+                if (download.ShowDialog() != DialogResult.OK)
+                {
+                    Revert(); // download cancelled/failed
+                    return;
+                }
+            }
+
+            if (!ActivateCoEdit())
+            {
+                // Model present but failed to load (e.g. missing Visual C++ runtime). Don't re-download.
+                tray.ShowBalloon(AppInfo.Name, "Couldn't start text improvement — see the log.");
+                Revert();
+            }
+        };
         settingsForm.ModelChangeRequested += (_, requested) =>
         {
             if (string.Equals(requested, activeModel, StringComparison.OrdinalIgnoreCase))
@@ -326,8 +375,9 @@ internal static class Program
         // throws if disposed mid-run, and the process is exiting anyway.
         try
         {
-            swappable.Dispose(); // disposes whichever model is currently active
-            coeditModel?.Dispose(); // releases the ~2.4 GB CoEdIT ONNX sessions
+            swappable.Dispose(); // disposes whichever speech model is currently active
+            coeditPolisher.Dispose();
+            coeditModel?.Dispose(); // releases the ~2.4 GB CoEdIT ONNX sessions, if loaded
         }
         catch
         {
