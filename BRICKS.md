@@ -12,11 +12,11 @@ _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick 
 
 ### CoEdIT Polish
 
-_On-device text improvement: CoEdIT (Flan-T5-large) runs **automatically on every dictation** before paste (toggle, default-on), fail-open. Replaces the abandoned 4-stage "Fix & Polish" — we dropped Punctuation/GECToR/SymSpell as redundant-with-Whisper. Spec: `docs/superpowers/specs/2026-06-03-coedit-polish-design.md` (records all decisions + the CE-1→CE-4 decomposition + the tokenizer finding). **CE-1 (SpeakType.Onnx project + CoEditTokenizer) shipped.**_
+_On-device text improvement: CoEdIT (Flan-T5-large) runs **automatically on every dictation** before paste (toggle, default-on), fail-open. Replaces the abandoned 4-stage "Fix & Polish" — we dropped Punctuation/GECToR/SymSpell as redundant-with-Whisper. Spec: `docs/superpowers/specs/2026-06-03-coedit-polish-design.md` (records all decisions + the CE-1→CE-4 decomposition + the tokenizer finding). **CE-1 (tokenizer) + CE-2 (inference engine) shipped.**_
 
-- **Next: CE-2 — CoEdIT inference engine.** Encoder + greedy autoregressive decoder loop behind an `IOnnxSession` seam, implementing `ITextPolisher`. TDD the decode loop against a **fake session** (canned logits) so it's proven without the 800 MB model. Then CE-3 (download/unpack the model on first run, reusing `ModelStore`), CE-4 (orchestrator wiring + `CoEditPolishing` setting + Settings toggle + logging, Windows-verified). External: a one-time `optimum-cli` export+quantize+host of coedit-large — I write the script, user runs/hosts it.
-  - Skill: brainstorming (CE-2 if needed), dotnet-best-practices, dotnet-xunit, run-tests
-- **Heads-up for CE-2:** encoder/decoder ONNX I/O dtypes — T5 `input_ids` are **int64**; watch the "Int64 vs Float" tensor mismatch others hit. Use the **merged decoder** (`decoder_model_merged.onnx`) from Optimum to keep the past-key-values loop simple. `decoder_start_token_id=0`, `eos_token_id=1`.
+- **Next: CE-3 — model acquisition.** Download + unpack the coedit-large ONNX archive on first run, reusing the existing `IModelDownloader`/`ModelStore` plumbing (single-archive → extract; the current store is single-file, so extend it or add a small sibling). Then build the **real** `OnnxCoEditModel : ICoEditModel` (two ONNX Runtime sessions: encoder + merged decoder w/ KV cache) — this is where the int64 `input_ids` / "Int64 vs Float" tensor-dtype gotchas live; use Optimum's **merged decoder**. Then CE-4 (orchestrator wiring + `CoEditPolishing` setting + Settings toggle + logging, Windows-verified). **CE-3 needs the real exported model** — pair with the external one-time `optimum-cli` export+quantize+host (script I write; run via GitHub Actions or user's Python box).
+  - Skill: dotnet-best-practices, dotnet-xunit, run-tests
+- **Seam already in place:** `SpeakType.Onnx/Inference/ICoEditModel.cs` — `Encode(sourceIds) → IEncoderOutput` (run once) + `DecodeNextLogits(encoderOutput, decodedSoFar) → float[] logits` (per token). `CoEditPolisher` (the greedy loop) consumes it; CE-3 just supplies the real ONNX-backed implementation. `decoder_start_token_id=0`, `eos_token_id=1`, vocab 32100.
 
 ### App shell, UI & polish
 
@@ -48,6 +48,15 @@ _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 
+### Brick CE-2 — CoEdIT inference engine (greedy decode loop) (2026-06-03)
+- **What:** The engine that turns text into polished text. `CoEditPolisher : ITextPolisher` tokenizes `instruction + text` (default `"Fix the grammar: "`), runs the encoder once, greedily decodes one token at a time (argmax → append) until EOS or a safety cap, then detokenizes. All ONNX/tensor/KV-cache work is hidden behind the `ICoEditModel` seam, so the loop is **pure, fully-tested logic** — the real 800 MB model isn't needed to prove it correct.
+- **Files:** `SpeakType.Core/Polishing/ITextPolisher.cs` (port); `SpeakType.Onnx/Inference/ICoEditModel.cs` (seam + `IEncoderOutput` opaque handle); `SpeakType.Onnx/Inference/CoEditPolisher.cs` (engine); `SpeakType.Onnx.Tests/Inference/CoEditPolisherTests.cs` (6 tests w/ a scripted `FakeModel` + the real tokenizer for detokenization).
+- **Verified:** `SpeakType.Onnx.Tests` **19/19** (13 + 6) on macOS — covers: scripted tokens → exact text, instruction-prefix applied, encoder-runs-once, stop-at-EOS, runaway cap, null guard. Core **179/179** unchanged; Core/Onnx build.
+- **Notes / decisions:**
+  - **Seam named `ICoEditModel`, not the plan's `IOnnxSession`** — it abstracts the *model* (`Encode` / `DecodeNextLogits`), not a raw ORT session. The real ONNX two-session + KV-cache impl (`OnnxCoEditModel`) is **CE-3**.
+  - **Fail-open is deferred to CE-4** (orchestrator wraps `Polish` in try/catch → paste raw text). The engine itself only guards null input.
+  - **CE-4 spacing watch:** `TranscriptCleaner` adds a trailing space; the model output won't have it. Decide in CE-4 whether to polish before/after the trailing-space step and re-add it for paste.
+
 ### Brick CE-1 — SpeakType.Onnx project + CoEditTokenizer (2026-06-03)
 - **What:** First brick of the CoEdIT Polish feature. New **cross-platform** `SpeakType.Onnx` project (net8.0, builds/tests on Mac+CI, unlike the WinForms App) holding `CoEditTokenizer` — encode text → T5 token ids (EOS appended) / decode ids → text (special tokens stripped) for the Flan-T5 CoEdIT model. Bundles `assets/tokenizer.json` (~2.4 MB). De-risks the feature's #1 unknown: correct T5 tokenization in C#.
 - **Files:** `SpeakType.Onnx/SpeakType.Onnx.csproj`, `SpeakType.Onnx/Tokenization/CoEditTokenizer.cs`, `SpeakType.Onnx/assets/tokenizer.json`; `SpeakType.Onnx.Tests/SpeakType.Onnx.Tests.csproj` + `Tokenization/CoEditTokenizerTests.cs` (13 tests); `SpeakType.sln` (2 projects added).
@@ -65,15 +74,6 @@ _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
   - **Artifact, not a tagged Release:** every green run yields a downloadable exe (simplest, always-on) — no tagging step. A versioned GitHub **Release** (attach the exe on a `v*` tag) is the natural next step if/when we want stable, non-expiring download links.
   - **`if-no-files-found: error`** turns a silently-missing exe into a red run (defence-in-depth alongside the existing verify step, which still logs the size).
   - The exe is **unsigned** → SmartScreen "More info → Run anyway" still applies (code signing remains out of scope for v1).
-
-### Brick UI-6 — App logo (waveform mark) (2026-06-03)
-- **What:** Gave SpeakType a real logo (user request; concept **C** — a white equalizer/waveform on an accent-blue rounded tile). New `AppIcon` brand helper + a multi-size `Assets/speaktype.ico` (16–256px). The icon now appears as: the **.exe icon** (`<ApplicationIcon>`), the **Settings & Welcome window title bars / taskbar / Alt-Tab** (`Icon = AppIcon.Brand`, loaded from the embedded ico), and the **tray icon** — which keeps its per-state colour signal by drawing the *same waveform glyph* tinted blue/red/orange/dark-red (`AppIcon.ForState`) instead of the old plain circles.
-- **Files:** `SpeakType.App/Assets/speaktype.ico` (new asset); `SpeakType.App/Branding/AppIcon.cs` (new — `Brand` + `ForState`, plus the GetHicon/DestroyIcon idiom moved here from TrayIcon); `SpeakType.App/SpeakType.App.csproj` (`ApplicationIcon` + embedded resource w/ `LogicalName`); `SpeakType.App/Tray/TrayIcon.cs` (use `ForState`, removed `MakeIcon`/`DestroyIcon`/`partial`); `SpeakType.App/Settings/SettingsForm.cs` + `SpeakType.App/Startup/WelcomeForm.cs` (`Icon = AppIcon.Brand`). No Core/test changes.
-- **Verified:** Windows-only → **Windows x64 CI green** (run 26846172886) — incl. the publish step, which proves `<ApplicationIcon>` resolved and the exe built with the icon. Core suite untouched → **179/179**. `/code-review` → **all 8 risks REFUTED** (key one: WinForms `Form` does NOT dispose an assigned `Icon` — only its own derived small icon — so the shared process-lifetime `Brand` is safe across the repeatedly-created Welcome window; `LogicalName` makes `GetManifestResourceStream("speaktype.ico")` resolve; `partial`/using removals compile clean; HICON cleanup leak-free). `/simplify` → applied 2 nits (reworded an overstated comment; `FillRoundedBar` de-extension-methodised). **Visual = laptop: check the exe icon in Explorer, the window title-bar/taskbar icon, and the tray glyph colour per state — screenshot if anything's off.**
-- **Notes / decisions:**
-  - **The `.ico` is the single brand source** (exe + windows load it); only the **tray** is drawn programmatically, because it needs runtime per-state tinting (a static asset can't recolour). The tray glyph's bar proportions are hand-matched to the .ico.
-  - **`AppIcon.Brand` is shared & never disposed** (process-lifetime, like the `UiTheme` fonts) — safe because Form doesn't own/dispose an assigned Icon.
-  - **Tooling:** the `.ico` was generated on the Mac with Python/Pillow (no ImageMagick needed); regenerate via the same waveform proportions if the mark is revised.
 
 <!-- Template for each entry:
 
