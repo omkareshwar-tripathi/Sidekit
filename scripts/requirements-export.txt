@@ -1,0 +1,11 @@
+# Dependencies for the one-time CoEdIT ONNX export (scripts/export_coedit_onnx.py).
+# Run on Python 3.10–3.12 (NOT 3.13/3.14 — torch has no wheels there yet).
+# These are the heavy ML libraries; they are NOT a dependency of the SpeakType app.
+optimum[onnxruntime]==1.24.0
+transformers==4.46.3
+torch==2.5.1
+onnx==1.17.0
+onnxruntime==1.20.1
+sentencepiece==0.2.0
+protobuf==5.28.3
+accelerate==1.1.1

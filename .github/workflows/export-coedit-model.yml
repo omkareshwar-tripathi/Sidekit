@@ -1,0 +1,62 @@
+name: Export CoEdIT model
+
+# One-time (re-runnable) job that converts grammarly/coedit-large into the int8
+# ONNX zip the SpeakType app downloads for CoEdIT Polish. Manual trigger only —
+# it pulls ~3 GB and runs for several minutes, so it must never run automatically.
+#
+# Leave `release_tag` blank to just attach a 90-day build artifact. Set it (e.g.
+# `coedit-large-v1`) to also publish a GitHub Release, which gives a stable,
+# non-expiring download URL for the app's model catalog:
+#   https://github.com/<owner>/<repo>/releases/download/<release_tag>/coedit-large-int8.zip
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Optional release tag to publish the zip under (blank = artifact only)."
+        required: false
+        default: ""
+
+permissions:
+  contents: write # required to create a Release
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install export dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements-export.txt
+
+      - name: Export + quantize
+        run: python scripts/export_coedit_onnx.py --out dist
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coedit-large-int8
+          path: |
+            dist/coedit-large-int8.zip
+            dist/coedit-large-int8.metadata.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: ${{ inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: CoEdIT model (${{ inputs.release_tag }})
+          files: dist/coedit-large-int8.zip
+          body_path: dist/coedit-large-int8.metadata.txt
+          fail_on_unmatched_files: true
