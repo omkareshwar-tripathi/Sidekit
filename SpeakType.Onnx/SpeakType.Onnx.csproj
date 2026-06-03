@@ -5,6 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- ONNX Runtime (CPU); the single package ships native libs for win/linux/osx. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
     <PackageReference Include="Tokenizers.DotNet" Version="1.4.1" />
     <!-- Native HF tokenizer runtimes for every platform we build/test/ship on
          (dev: osx; CI: linux/windows; app: win-x64). The host RID's native is
