@@ -3,6 +3,7 @@ using SpeakType.Core.Input;
 using SpeakType.Core.Logging;
 using SpeakType.Core.Orchestration;
 using SpeakType.Core.Paste;
+using SpeakType.Core.Polishing;
 using SpeakType.Core.Time;
 using SpeakType.Core.Transcription;
 
@@ -79,6 +80,31 @@ internal sealed class FakePasteService : IPasteService
     {
         CallCount++;
         ReceivedText = text;
+        return Result;
+    }
+}
+
+/// <summary>Scripted polisher: records the text it received and returns a configurable result.</summary>
+internal sealed class FakeTextPolisher : ITextPolisher
+{
+    public int CallCount { get; private set; }
+    public string? ReceivedText { get; private set; }
+
+    /// <summary>What <see cref="Polish"/> returns. Defaults to a recognizable polished form.</summary>
+    public string Result { get; set; } = "Polished.";
+
+    /// <summary>When set, <see cref="Polish"/> throws it (simulates a model failure → fail-open).</summary>
+    public Exception? ThrowOnCall { get; set; }
+
+    public string Polish(string text)
+    {
+        CallCount++;
+        ReceivedText = text;
+        if (ThrowOnCall is not null)
+        {
+            throw ThrowOnCall;
+        }
+
         return Result;
     }
 }

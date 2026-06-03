@@ -3,6 +3,7 @@ using SpeakType.Core.Cleanup;
 using SpeakType.Core.Logging;
 using SpeakType.Core.Orchestration;
 using SpeakType.Core.Paste;
+using SpeakType.Core.Polishing;
 using SpeakType.Core.Settings;
 using SpeakType.Core.Time;
 
@@ -545,6 +546,98 @@ public sealed class DictationOrchestratorTests
 
         Assert.Contains("recording 1.0s", sink.Lines);
         Assert.Contains("error: boom", sink.Lines);
+    }
+
+    // --- CoEdIT polishing (CE-4b) ---
+    // These build their own isolated fakes (not the shared _sut's) so a single press/release
+    // drives exactly one orchestrator.
+
+    private sealed class PolishHarness
+    {
+        public required FakeHotkeyListener Hotkey { get; init; }
+        public required FakeTranscriber Transcriber { get; init; }
+        public required FakePasteService Paste { get; init; }
+        public required List<DictationOutcome> Outcomes { get; init; }
+        public required DictationOrchestrator Sut { get; init; }
+    }
+
+    private static PolishHarness BuildWithPolisher(
+        ITextPolisher polisher, AppSettings settings, AppLogger? logger = null)
+    {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber();
+        var paste = new FakePasteService();
+        var outcomes = new List<DictationOutcome>();
+        var sut = new DictationOrchestrator(
+            hotkey, audio, transcriber, paste, new TranscriptCleaner(), settings,
+            new FakeClock(), new FakeAutoStopTimer(), dispatcher: null, logger: logger, polisher: polisher);
+        sut.Completed += (_, outcome) => outcomes.Add(outcome);
+        return new PolishHarness
+        {
+            Hotkey = hotkey, Transcriber = transcriber, Paste = paste, Outcomes = outcomes, Sut = sut,
+        };
+    }
+
+    [Fact]
+    public void Polishes_cleaned_text_before_paste_when_enabled()
+    {
+        var polisher = new FakeTextPolisher { Result = "He goes to school every day." };
+        var h = BuildWithPolisher(polisher, new AppSettings()); // CoEditPolishing defaults true
+        h.Transcriber.Result = "he go to school every days.";
+
+        h.Hotkey.Press();
+        h.Hotkey.Release();
+
+        // The polisher receives the cleaned text without the cleaner's trailing space …
+        Assert.Equal("he go to school every days.", polisher.ReceivedText);
+        // … and its output is pasted with a single trailing space re-added.
+        Assert.Equal("He goes to school every day. ", h.Paste.ReceivedText);
+        Assert.Equal(new[] { DictationOutcome.Pasted }, h.Outcomes);
+    }
+
+    [Fact]
+    public void Polishing_failure_falls_open_to_the_cleaned_text()
+    {
+        var polisher = new FakeTextPolisher { ThrowOnCall = new InvalidOperationException("model boom") };
+        var h = BuildWithPolisher(polisher, new AppSettings());
+        h.Transcriber.Result = "Hello there.";
+
+        h.Hotkey.Press();
+        h.Hotkey.Release(); // must NOT throw — polishing is fail-open
+
+        Assert.Equal("Hello there. ", h.Paste.ReceivedText); // unpolished, cleaned text
+        Assert.Equal(new[] { DictationOutcome.Pasted }, h.Outcomes);
+        Assert.Equal(RecordingState.Idle, h.Sut.State);
+    }
+
+    [Fact]
+    public void Polishing_is_skipped_when_the_setting_is_off()
+    {
+        var polisher = new FakeTextPolisher { Result = "Polished." };
+        var h = BuildWithPolisher(polisher, new AppSettings { CoEditPolishing = false });
+        h.Transcriber.Result = "Hello there.";
+
+        h.Hotkey.Press();
+        h.Hotkey.Release();
+
+        Assert.Equal(0, polisher.CallCount);
+        Assert.Equal("Hello there. ", h.Paste.ReceivedText);
+    }
+
+    [Fact]
+    public void Logs_polish_duration_on_a_polished_cycle()
+    {
+        var polisher = new FakeTextPolisher { Result = "He goes to school every day." };
+        var sink = new FakeLogSink();
+        var logger = new AppLogger(sink, () => false);
+        var h = BuildWithPolisher(polisher, new AppSettings(), logger);
+        h.Transcriber.Result = "he go to school every days.";
+
+        h.Hotkey.Press();
+        h.Hotkey.Release();
+
+        Assert.Contains(sink.Lines, line => line.StartsWith("polish 1.0s,", StringComparison.Ordinal));
     }
 
     [Fact]

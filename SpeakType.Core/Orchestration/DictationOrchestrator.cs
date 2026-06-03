@@ -3,6 +3,7 @@ using SpeakType.Core.Cleanup;
 using SpeakType.Core.Input;
 using SpeakType.Core.Logging;
 using SpeakType.Core.Paste;
+using SpeakType.Core.Polishing;
 using SpeakType.Core.Settings;
 using SpeakType.Core.Time;
 using SpeakType.Core.Transcription;
@@ -39,6 +40,7 @@ public sealed class DictationOrchestrator
     private readonly IAutoStopTimer _autoStopTimer;
     private readonly ICycleDispatcher _dispatcher;
     private readonly AppLogger? _logger;
+    private readonly ITextPolisher? _polisher;
     private readonly object _gate = new();
 
     private RecordingState _state = RecordingState.Idle;
@@ -56,7 +58,8 @@ public sealed class DictationOrchestrator
         IClock clock,
         IAutoStopTimer autoStopTimer,
         ICycleDispatcher? dispatcher = null,
-        AppLogger? logger = null)
+        AppLogger? logger = null,
+        ITextPolisher? polisher = null)
     {
         ArgumentNullException.ThrowIfNull(hotkey);
         ArgumentNullException.ThrowIfNull(audioCapture);
@@ -76,6 +79,7 @@ public sealed class DictationOrchestrator
         _autoStopTimer = autoStopTimer;
         _dispatcher = dispatcher ?? new SynchronousCycleDispatcher();
         _logger = logger;
+        _polisher = polisher;
 
         hotkey.Pressed += OnPressed;
         hotkey.Released += OnReleased;
@@ -312,6 +316,8 @@ public sealed class DictationOrchestrator
 
         _logger?.Transcript(cleaned);
 
+        var textToPaste = Polish(cleaned);
+
         lock (_gate)
         {
             _state = RecordingState.Pasting;
@@ -319,10 +325,41 @@ public sealed class DictationOrchestrator
 
         RaiseStateChanged(RecordingState.Pasting);
 
-        var outcome = _pasteService.Paste(cleaned);
+        var outcome = _pasteService.Paste(textToPaste);
         _logger?.Latency(_clock.GetElapsedTime(_releaseTimestamp));
         return outcome == PasteOutcome.LeftOnClipboard
             ? DictationOutcome.LeftOnClipboard
             : DictationOutcome.Pasted;
+    }
+
+    // Runs the cleaned text through the on-device CoEdIT model when enabled. The cleaner adds a
+    // single trailing space (so consecutive dictations don't run together); the model output won't
+    // have it, so it's re-added. Fail-open: if polishing is off, no polisher is wired, or the model
+    // throws/returns nothing usable, the original cleaned text is pasted unchanged.
+    private string Polish(string cleaned)
+    {
+        if (!_settings.CoEditPolishing || _polisher is null)
+        {
+            return cleaned;
+        }
+
+        var t0 = _clock.GetTimestamp();
+        try
+        {
+            var polished = _polisher.Polish(cleaned.TrimEnd());
+            if (string.IsNullOrWhiteSpace(polished))
+            {
+                return cleaned;
+            }
+
+            var result = polished.Trim() + " ";
+            _logger?.Polished(_clock.GetElapsedTime(t0), result.Length);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error(ex.Message);
+            return cleaned;
+        }
     }
 }
