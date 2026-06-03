@@ -12,6 +12,10 @@
          them so the documented publish command produces ONE file. Only takes effect during a
          single-file publish, so it's inert for normal build/test. -->
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Compress the embedded bundle. CoEdIT's ONNX Runtime + tokenizer natives roughly doubled
+         the exe (66 MB -> 175 MB uncompressed); compression ~halves it for a small one-time
+         decompress at launch (negligible for a tray app). Single-file publish only. -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <!-- Brand logo (Brick UI-6): the .exe icon. The same file is embedded below so the windows
          and tray can load it at runtime. -->
     <ApplicationIcon>Assets\speaktype.ico</ApplicationIcon>
