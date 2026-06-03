@@ -43,3 +43,6 @@ logs/
 # Python bytecode (export tooling)
 __pycache__/
 *.pyc
+
+# Local CoEdIT model (downloaded/exported; never committed — too large)
+coedit-large-int8/
