@@ -39,3 +39,7 @@ coverage/
 /models/
 # Local logs
 logs/
+
+# Python bytecode (export tooling)
+__pycache__/
+*.pyc
