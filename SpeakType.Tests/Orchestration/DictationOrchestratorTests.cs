@@ -1,5 +1,6 @@
 using SpeakType.Core.Audio;
 using SpeakType.Core.Cleanup;
+using SpeakType.Core.Correction;
 using SpeakType.Core.Logging;
 using SpeakType.Core.Orchestration;
 using SpeakType.Core.Paste;
@@ -562,5 +563,53 @@ public sealed class DictationOrchestratorTests
         hotkey.Release();
 
         Assert.Equal(new[] { "recording 1.0s" }, sink.Lines);
+    }
+
+    [Fact]
+    public void Correction_pipeline_runs_between_clean_and_paste()
+    {
+        var pipeline = new TextCorrectionPipeline(new (ITextCorrector, Func<AppSettings, bool>)[]
+        {
+            (new UpperCorrector(), s => s.SpellCorrection),
+        });
+        var settings = new AppSettings { FillerRemoval = true, SpellCorrection = true };
+        var sut = new DictationOrchestrator(
+            _hotkey, _audio, _transcriber, _paste, new TranscriptCleaner(), settings,
+            _clock, _timer, correctionPipeline: pipeline);
+
+        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
+        _transcriber.Result = "Um, hello.";
+
+        _hotkey.Press();
+        _hotkey.Release();
+
+        // Cleaner ⇒ "Hello. " ; pipeline uppercases ⇒ "HELLO. "
+        Assert.Equal("HELLO. ", _paste.ReceivedText);
+    }
+
+    [Fact]
+    public void Correction_pipeline_skipped_when_setting_off()
+    {
+        var pipeline = new TextCorrectionPipeline(new (ITextCorrector, Func<AppSettings, bool>)[]
+        {
+            (new UpperCorrector(), s => s.SpellCorrection),
+        });
+        var settings = new AppSettings { SpellCorrection = false };
+        var sut = new DictationOrchestrator(
+            _hotkey, _audio, _transcriber, _paste, new TranscriptCleaner(), settings,
+            _clock, _timer, correctionPipeline: pipeline);
+
+        _audio.Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true);
+        _transcriber.Result = "Um, hello.";
+
+        _hotkey.Press();
+        _hotkey.Release();
+
+        Assert.Equal("Hello. ", _paste.ReceivedText); // unchanged by the (disabled) stage
+    }
+
+    private sealed class UpperCorrector : ITextCorrector
+    {
+        public string Correct(string text) => text.ToUpperInvariant();
     }
 }
