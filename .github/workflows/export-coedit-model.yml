@@ -53,16 +53,16 @@ jobs:
           pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
           pip install -r scripts/requirements-export.txt
 
-      - name: Export + quantize
+      - name: Export + convert + smoke test
         run: python scripts/export_coedit_onnx.py --out dist
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coedit-large-int8
+          name: coedit-large-fp16
           path: |
-            dist/coedit-large-int8.zip
-            dist/coedit-large-int8.metadata.txt
+            dist/coedit-large-fp16.zip
+            dist/coedit-large-fp16.metadata.txt
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -71,6 +71,6 @@ jobs:
         with:
           tag_name: ${{ inputs.release_tag }}
           name: CoEdIT model (${{ inputs.release_tag }})
-          files: dist/coedit-large-int8.zip
-          body_path: dist/coedit-large-int8.metadata.txt
+          files: dist/coedit-large-fp16.zip
+          body_path: dist/coedit-large-fp16.metadata.txt
           fail_on_unmatched_files: true
