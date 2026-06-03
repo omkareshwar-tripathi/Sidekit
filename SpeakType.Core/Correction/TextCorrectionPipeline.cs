@@ -21,6 +21,7 @@ public sealed class TextCorrectionPipeline
 
     public string Correct(string text, AppSettings settings)
     {
+        ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(settings);
         foreach (var (corrector, isEnabled) in _stages)
         {

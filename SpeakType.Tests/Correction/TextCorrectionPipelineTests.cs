@@ -54,7 +54,13 @@ public sealed class TextCorrectionPipelineTests
             (Appender("A"), s => s.SpellCorrection),
         });
 
-        Assert.Equal("x",  pipeline.Correct("x", new AppSettings { SpellCorrection = false }));
+        Assert.Equal("x", pipeline.Correct("x", new AppSettings { SpellCorrection = false }));
         Assert.Equal("xA", pipeline.Correct("x", new AppSettings { SpellCorrection = true }));
+    }
+
+    [Fact]
+    public void Null_stages_throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => new TextCorrectionPipeline(null!));
     }
 }
