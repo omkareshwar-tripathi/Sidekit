@@ -62,7 +62,9 @@ def export_fp32(work: Path) -> Path:
 
 def convert_fp16(fp32: Path, work: Path) -> Path:
     import onnx
-    from onnxconverter_common import float16
+    # ONNX Runtime ships its own fp16 converter (same algorithm as
+    # onnxconverter-common) with no extra dependency / protobuf-version conflict.
+    from onnxruntime.transformers.float16 import convert_float_to_float16
 
     out = work / "coedit-large-onnx-fp16"
     out.mkdir(parents=True, exist_ok=True)
@@ -70,7 +72,7 @@ def convert_fp16(fp32: Path, work: Path) -> Path:
     for name in [ENCODER, DECODER]:
         print(f"    converting {name} ...", flush=True)
         model = onnx.load(str(fp32 / name))  # external data auto-loaded from same dir
-        model16 = float16.convert_float_to_float16(
+        model16 = convert_float_to_float16(
             model, keep_io_types=True, disable_shape_infer=True,
         )
         onnx.save(model16, str(out / name))
