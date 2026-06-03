@@ -4,6 +4,15 @@ Append-only archive of completed bricks, moved out of `BRICKS.md` to keep the ac
 
 ---
 
+### Brick CE-1 — SpeakType.Onnx project + CoEditTokenizer (2026-06-03)
+- **What:** First brick of the CoEdIT Polish feature. New **cross-platform** `SpeakType.Onnx` project (net8.0, builds/tests on Mac+CI, unlike the WinForms App) holding `CoEditTokenizer` — encode text → T5 token ids (EOS appended) / decode ids → text (special tokens stripped) for the Flan-T5 CoEdIT model. Bundles `assets/tokenizer.json` (~2.4 MB). De-risks the feature's #1 unknown: correct T5 tokenization in C#.
+- **Files:** `SpeakType.Onnx/SpeakType.Onnx.csproj`, `SpeakType.Onnx/Tokenization/CoEditTokenizer.cs`, `SpeakType.Onnx/assets/tokenizer.json`; `SpeakType.Onnx.Tests/SpeakType.Onnx.Tests.csproj` + `Tokenization/CoEditTokenizerTests.cs` (13 tests); `SpeakType.sln` (2 projects added).
+- **Verified:** `SpeakType.Onnx.Tests` **13/13** on macOS (5 golden vectors from the reference HF `tokenizers` lib, encode + round-trip + EOS + guards). Core **179/179** unchanged; Core/Whisper/Onnx all build.
+- **Notes / decisions:**
+  - **Tokenizer library = `Tokenizers.DotNet` 1.4.1, NOT `Microsoft.ML.Tokenizers`** (the design's assumption). MS.ML.Tokenizers **crashes** (`IndexOutOfRangeException`) loading the T5 Unigram `spiece.model` on both 2.0.0 and 3.0.0-preview; onnxruntime-extensions supports it but ships **Windows-only** natives. `Tokenizers.DotNet` wraps the HF Rust tokenizer, loads `tokenizer.json` directly, ships osx/win/linux natives → cross-platform + exact-correct (matches reference ids). Native dep, but portable like `Whisper.net.Runtime`.
+  - Golden vectors are generated from a Python venv (`pip install tokenizers`) — regenerate the same way if the tokenizer asset changes.
+  - Built on a **fresh branch `feat/coedit-polish` off `main`** (not stacked on the abandoned SymSpell PR #1).
+
 ### Brick 18 — CI publishes a downloadable SpeakType.exe (2026-06-03)
 - **What:** Made the app installable without a build. CI already published the self-contained single-file exe on every run but threw it away; added an `actions/upload-artifact@v4` step so each run attaches **`SpeakType-win-x64` → SpeakType.exe** to its "Artifacts" section. Installing is now: download the exe from a green run and double-click it — no .NET SDK, no Git, no local build. Updated the README with this download path.
 - **Files:** `.github/workflows/ci.yml` (upload-artifact step); `README.md` (new "Download (no build)" section).
