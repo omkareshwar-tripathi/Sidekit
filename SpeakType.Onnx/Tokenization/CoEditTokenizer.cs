@@ -15,6 +15,12 @@ public sealed class CoEditTokenizer
     // The LogicalName set on the EmbeddedResource in the .csproj.
     private const string ResourceName = "tokenizer.json";
 
+    // Serializes extraction across threads. Without it, concurrent first-run extractors race on the
+    // destination file: on Windows, File.Move(overwrite) throws UnauthorizedAccessException when
+    // another thread already has the freshly-extracted file open for reading (POSIX rename on macOS
+    // tolerates this, which is why it only failed on the CI runner).
+    private static readonly object ExtractGate = new();
+
     private readonly Tokenizer _tokenizer;
 
     /// <summary>
@@ -52,19 +58,23 @@ public sealed class CoEditTokenizer
         Directory.CreateDirectory(cacheDir);
         var path = Path.Combine(cacheDir, "coedit-tokenizer.json");
 
-        if (!File.Exists(path) || new FileInfo(path).Length != resource.Length)
+        // Serialize so exactly one thread writes the cache file; the rest wait, then see it present
+        // and only read it. This is what makes the write race-free — the first thread does the move
+        // before any reader opens the file, and every later thread skips the move entirely.
+        lock (ExtractGate)
         {
-            // Write to a per-caller unique temp then move into place, so a concurrent reader never
-            // sees a partial file and two concurrent extractors (parallel test runs, or just a racy
-            // startup) don't collide on a shared temp path. Move overwrites: last writer wins, and
-            // both wrote identical bytes.
-            var temp = $"{path}.{Guid.NewGuid():N}.tmp";
-            using (var file = File.Create(temp))
+            if (!File.Exists(path) || new FileInfo(path).Length != resource.Length)
             {
-                resource.CopyTo(file);
-            }
+                // Write to a temp file then move into place, so a reader (this or another process)
+                // never sees a partial file. Unique temp name avoids colliding with a leftover temp.
+                var temp = $"{path}.{Guid.NewGuid():N}.tmp";
+                using (var file = File.Create(temp))
+                {
+                    resource.CopyTo(file);
+                }
 
-            File.Move(temp, path, overwrite: true);
+                File.Move(temp, path, overwrite: true);
+            }
         }
 
         return path;
