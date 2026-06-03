@@ -11,9 +11,11 @@ Pipeline:
   4. zip the files the C# adapter loads (encoder + merged decoder + config)
   5. print + record SHA256 and byte size (paste into the app's model catalog)
 
-Why fp16 and not int8: int8 dynamic quantization breaks T5 cross-attention at
-runtime in ONNX Runtime (DynamicQuantizeMatMul "cannot broadcast on dim 0").
-fp16 is numerically robust, ~half the fp32 size (~1.5 GB), quality ~= fp32.
+Why not int8: int8 dynamic quantization breaks T5 cross-attention at runtime in
+ONNX Runtime (DynamicQuantizeMatMul "cannot broadcast on dim 0"). We fp16 the
+encoder (robust, ~half size) but keep the merged decoder fp32, because fp16
+conversion of its `If` subgraph yields an invalid model. Net ~2.4 GB, quality
+~= fp32. A full-fp16 decoder is a later size optimization.
 
 Usage (Python 3.10-3.12 with torch; or via the export-coedit-model GH Actions workflow):
     pip install -r scripts/requirements-export.txt
@@ -68,14 +70,20 @@ def convert_fp16(fp32: Path, work: Path) -> Path:
 
     out = work / "coedit-large-onnx-fp16"
     out.mkdir(parents=True, exist_ok=True)
-    print("[2/5] Convert fp32 -> fp16 (keep_io_types: graph I/O stays fp32)")
-    for name in [ENCODER, DECODER]:
-        print(f"    converting {name} ...", flush=True)
-        model = onnx.load(str(fp32 / name))  # external data auto-loaded from same dir
-        model16 = convert_float_to_float16(
-            model, keep_io_types=True, disable_shape_infer=True,
-        )
-        onnx.save(model16, str(out / name))
+    # fp16 the ENCODER only (saves ~600 MB, converts cleanly). The merged decoder
+    # has an `If` subgraph that the fp16 converter turns into an invalid model
+    # ("subgraph output is an outer scope value"), so keep it fp32. Net ~2.4 GB;
+    # both halves are validated by the smoke test below. A full-fp16 decoder is a
+    # later size optimization (needs graph surgery on the If subgraph).
+    print("[2/5] Convert encoder -> fp16 (keep_io_types); keep merged decoder fp32")
+    enc = onnx.load(str(fp32 / ENCODER))  # external data auto-loaded from same dir
+    enc16 = convert_float_to_float16(enc, keep_io_types=True, disable_shape_infer=True)
+    onnx.save(enc16, str(out / ENCODER))
+
+    # Copy the fp32 decoder verbatim (incl. any external-data sidecar files).
+    for f in fp32.glob("decoder_model_merged.onnx*"):
+        shutil.copy(f, out / f.name)
+
     for extra in EXTRA:
         p = fp32 / extra
         if p.exists():
