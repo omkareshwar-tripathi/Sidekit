@@ -4,6 +4,12 @@ Append-only archive of completed bricks, moved out of `BRICKS.md` to keep the ac
 
 ---
 
+### Brick CE-3 — real ONNX inference (OnnxCoEditModel) (2026-06-03)
+- **What:** The real `ICoEditModel`: two ONNX Runtime sessions (fp16 encoder + fp32 merged decoder) running the KV-cache greedy decode. Proven end-to-end on the Mac — `"he go to school every days." → "He goes to school every day."`. This is the first time CoEdIT actually polishes text in the app's code.
+- **Files:** `SpeakType.Onnx/Inference/OnnxCoEditModel.cs`; `SpeakType.Onnx/SpeakType.Onnx.csproj` (+`Microsoft.ML.OnnxRuntime` 1.20.1); `SpeakType.Onnx.Tests/SpeakType.Onnx.Tests.csproj` (+`Xunit.SkippableFact`); `SpeakType.Onnx.Tests/Inference/OnnxCoEditModelTests.cs` (3 integration `SkippableFact`s, gated on `COEDIT_MODEL_DIR`).
+- **Verified:** With the model → **Onnx 22/22**; without → **19 pass + 3 skip** (CI-safe). Core **179/179**. Manual: the full greedy loop emits He→goes→to→school→every→day→.→EOS.
+- **Notes / decisions:** Two bugs the real model exposed, both fixed: (1) **don't reuse a `DenseTensor` across `Run()` calls** (build fresh per step, else "broadcast on dim 0"); (2) **the merged decoder doesn't re-emit encoder/cross-attention KV on cached steps** — preserve the first-step encoder KV, grow only decoder KV. Default ORT graph optimization is fine (the fusion isn't the bug). See the CoEdIT "Next up" section for the model/Release/gotcha details CE-4 needs.
+
 ### Brick CE-2 — CoEdIT inference engine (greedy decode loop) (2026-06-03)
 - **What:** The engine that turns text into polished text. `CoEditPolisher : ITextPolisher` tokenizes `instruction + text` (default `"Fix the grammar: "`), runs the encoder once, greedily decodes one token at a time (argmax → append) until EOS or a safety cap, then detokenizes. All ONNX/tensor/KV-cache work is hidden behind the `ICoEditModel` seam, so the loop is **pure, fully-tested logic** — the real 800 MB model isn't needed to prove it correct.
 - **Files:** `SpeakType.Core/Polishing/ITextPolisher.cs` (port); `SpeakType.Onnx/Inference/ICoEditModel.cs` (seam + `IEncoderOutput` opaque handle); `SpeakType.Onnx/Inference/CoEditPolisher.cs` (engine); `SpeakType.Onnx.Tests/Inference/CoEditPolisherTests.cs` (6 tests w/ a scripted `FakeModel` + the real tokenizer for detokenization).
