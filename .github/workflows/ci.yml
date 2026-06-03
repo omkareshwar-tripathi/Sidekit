@@ -23,6 +23,25 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      # The speech model is baked into the exe (SpeakType.App.csproj embeds .bundled/ggml-base.en.bin).
+      # It must exist BEFORE the build — MSBuild snapshots embedded resources at evaluation, so an
+      # in-build download would be too late. Cache it across runs, then download on a cache miss.
+      - name: Cache bundled speech model
+        uses: actions/cache@v4
+        with:
+          path: SpeakType.App/.bundled
+          key: speech-model-ggml-base.en-v1
+
+      - name: Download speech model (baked into the exe)
+        shell: pwsh
+        run: |
+          $dst = "SpeakType.App/.bundled/ggml-base.en.bin"
+          if (-not (Test-Path $dst)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
+            Invoke-WebRequest -Uri "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin" -OutFile $dst
+          }
+          Write-Host ("speech model: {0:N1} MB" -f ((Get-Item $dst).Length / 1MB))
+
       - name: Restore
         run: dotnet restore SpeakType.sln
 

@@ -37,4 +37,19 @@
          libraries (win-x64) and the bundled assets\tokenizer.json content. -->
     <ProjectReference Include="..\SpeakType.Onnx\SpeakType.Onnx.csproj" />
   </ItemGroup>
+
+  <!-- Bake the default speech model (ggml-base.en.bin, ~148 MB) into the exe so first run needs no
+       download; Program.TryInstallBundledSpeechModel materializes it. The file must exist at MSBuild
+       EVALUATION time to embed (a file created by an in-build target is NOT embedded — the resource
+       list is snapshotted before any target runs), so it is fetched into .bundled/ BEFORE the build:
+       the CI "Download speech model" step does this (cached across runs). When the file is absent
+       (a plain local build), the build still succeeds and the app falls back to the first-run download.
+       WithCulture=false is REQUIRED: the SDK otherwise reads the ".en." in the filename as an English
+       culture suffix and routes the resource to a satellite assembly instead of embedding it. -->
+  <PropertyGroup>
+    <SpeechModelFile>$(MSBuildProjectDirectory)/.bundled/ggml-base.en.bin</SpeechModelFile>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(SpeechModelFile)')">
+    <EmbeddedResource Include="$(SpeechModelFile)" LogicalName="ggml-base.en.bin" WithCulture="false" Visible="false" />
+  </ItemGroup>
 </Project>

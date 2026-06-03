@@ -94,6 +94,10 @@ internal static class Program
         using var httpClient = new HttpClient();
         var modelStore = new ModelStore(new HttpModelDownloader(httpClient), ModelStore.DefaultModelsDirectory);
 
+        // If the default speech model is baked into the exe, materialize it now so first run needs no
+        // download. Best-effort: any failure falls through to the normal Welcome download below.
+        TryInstallBundledSpeechModel(modelStore);
+
         // Honor the persisted model (fall back to the default if it isn't a known catalog entry), so a
         // model chosen in Settings survives a restart instead of always reverting to the default.
         var modelName = ModelCatalog.Resolve(settings.ModelSize);
@@ -382,6 +386,33 @@ internal static class Program
         catch
         {
             // Ignore — a cycle was still in flight at quit; the OS reclaims native resources on exit.
+        }
+    }
+
+    // Materializes the speech model that's embedded in the exe (EmbeddedResource "ggml-base.en.bin",
+    // added by the build) into the model store, so the default model needs no download on first run.
+    // Best-effort and no-op when: the model is already installed, the build didn't embed it, or the
+    // embedded bytes fail verification — all fall through to the normal Welcome download.
+    private static void TryInstallBundledSpeechModel(ModelStore modelStore)
+    {
+        if (modelStore.GetInstalledModelPath(AppSettings.DefaultModelSize) is not null)
+        {
+            return;
+        }
+
+        using var stream = typeof(Program).Assembly.GetManifestResourceStream("ggml-base.en.bin");
+        if (stream is null)
+        {
+            return; // not bundled in this build
+        }
+
+        try
+        {
+            modelStore.InstallFromStream(AppSettings.DefaultModelSize, stream);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(ex);
         }
     }
 

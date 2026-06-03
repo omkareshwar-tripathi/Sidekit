@@ -47,3 +47,6 @@ __pycache__/
 # Local CoEdIT model + export output (downloaded/exported; never committed — too large)
 coedit-large*/
 dist/
+
+# Speech model baked into the exe at build time (fetched by SpeakType.App.csproj; never committed)
+SpeakType.App/.bundled/
