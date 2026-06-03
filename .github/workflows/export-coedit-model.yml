@@ -32,12 +32,14 @@ jobs:
 
       - name: Add swap space
         # Exporting a 770M-param T5 to ONNX spikes RAM past the runner's 16 GB and
-        # gets OOM-killed ("operation was canceled"). A big swapfile absorbs the spike.
+        # gets OOM-killed ("operation was canceled"). Add a big swapfile to absorb it.
+        # The runner already has an active /swapfile, so put ours on the larger /mnt
+        # disk under a different name (an extra swap area, in addition to the existing).
         run: |
-          sudo fallocate -l 13G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          sudo fallocate -l 13G /mnt/swapfile
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
           free -h
 
       - uses: actions/setup-python@v5
