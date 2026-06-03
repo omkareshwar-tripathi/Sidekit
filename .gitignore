@@ -50,3 +50,6 @@ dist/
 
 # Speech model baked into the exe at build time (fetched by SpeakType.App.csproj; never committed)
 SpeakType.App/.bundled/
+
+# Inno Setup installer output (built by CI; never committed)
+installer/output/

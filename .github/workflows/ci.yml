@@ -76,3 +76,22 @@ jobs:
           name: SpeakType-win-x64
           path: SpeakType.App/bin/Release/net8.0-windows/win-x64/publish/SpeakType.exe
           if-no-files-found: error
+
+      # Wrap the exe in a per-user installer (Start Menu + Desktop shortcut + uninstall) via Inno Setup.
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\SpeakType.iss
+          $setup = "installer\output\SpeakTypeSetup.exe"
+          if (-not (Test-Path $setup)) { Write-Error "Inno Setup did not produce $setup"; exit 1 }
+          Write-Host ("Built {0:N1} MB installer" -f ((Get-Item $setup).Length / 1MB))
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeakTypeSetup
+          path: installer/output/SpeakTypeSetup.exe
+          if-no-files-found: error
