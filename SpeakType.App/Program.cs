@@ -11,6 +11,7 @@ using SpeakType.App.Threading;
 using SpeakType.App.Tray;
 using SpeakType.Core;
 using SpeakType.Core.Cleanup;
+using SpeakType.Core.Correction;
 using SpeakType.Core.Input;
 using SpeakType.Core.Logging;
 using SpeakType.Core.Models;
@@ -148,9 +149,15 @@ internal static class Program
         // logging is on — read live via the Func so the Settings toggle applies without a restart.
         var logger = new AppLogger(new FileLogSink(FileLogSink.DefaultLogPath), () => settings.DebugLogging);
 
+        var correctionPipeline = new TextCorrectionPipeline(
+            new (ITextCorrector, Func<AppSettings, bool>)[]
+            {
+                (new SymSpellCorrector(), s => s.SpellCorrection),
+            });
+
         var orchestrator = new DictationOrchestrator(
             hotkey, capture, swappable, pasteService, new TranscriptCleaner(), settings,
-            new SystemClock(), autoStopTimer, dispatcher, logger);
+            new SystemClock(), autoStopTimer, dispatcher, logger, correctionPipeline);
 
         // Settings window — single instance; Show/Activate on each request, it hides itself on close.
         using var settingsForm = new SettingsForm(settings, settingsStore);

@@ -4,6 +4,37 @@ Append-only archive of completed bricks, moved out of `BRICKS.md` to keep the ac
 
 ---
 
+### Brick 0a — ITextCorrector port + TextCorrectionPipeline (2026-06-03)
+- **What:** The correction-pipeline spine. `ITextCorrector` port (`string Correct(string)`) + `TextCorrectionPipeline` that runs an ordered list of `(stage, Func<AppSettings,bool> isEnabled)`, applying each only when its gate returns true for the current settings (evaluated per call, so toggles apply live). Added `AppSettings.SpellCorrection` (bool, default true). Pure Core.
+- **Files:** `SpeakType.Core/Correction/ITextCorrector.cs`, `TextCorrectionPipeline.cs`; `SpeakType.Core/Settings/AppSettings.cs` (+1 field); `SpeakType.Tests/Correction/TextCorrectionPipelineTests.cs` (5 tests).
+- **Verified:** Core → **184/184**. Spec + quality review ✓ — added a null-`text` guard + a null-stages ctor test the review requested.
+- **Notes:** Spine for the rest of Fix & Polish — stages 2–4 (punctuation, GECToR, CoEdIT) drop in as more `ITextCorrector`s. Per-`(corrector, predicate)` registration keeps stages settings-agnostic; null pipeline = passthrough.
+
+### Brick 18 — CI publishes a downloadable SpeakType.exe (2026-06-03)
+- **What:** Made the app installable without a build. CI already published the self-contained single-file exe on every run but threw it away; added an `actions/upload-artifact@v4` step so each run attaches **`SpeakType-win-x64` → SpeakType.exe** to its "Artifacts" section. Installing is now: download the exe from a green run and double-click it — no .NET SDK, no Git, no local build. Updated the README with this download path.
+- **Files:** `.github/workflows/ci.yml` (upload-artifact step); `README.md` (new "Download (no build)" section).
+- **Verified:** Windows-only (CI) → **Windows x64 CI green** (run 26846751774) and the artifact is confirmed attached via the GitHub API: `SpeakType-win-x64`, **69,848,648 bytes (~66.6 MB)**, 90-day retention. Core suite untouched → **179/179**. Reviewed: YAML indentation matches sibling steps, `@v4` is current, `with:` schema valid (`name`/`path`/`if-no-files-found: error`), `path` matches the publish/verify exe path, step runs after publish so the file exists, and artifact upload is fine on PR runs too.
+- **Notes / decisions:**
+  - **Artifact, not a tagged Release:** every green run yields a downloadable exe (simplest, always-on) — no tagging step. A versioned GitHub **Release** (attach the exe on a `v*` tag) is the natural next step if/when we want stable, non-expiring download links.
+  - **`if-no-files-found: error`** turns a silently-missing exe into a red run (defence-in-depth alongside the existing verify step, which still logs the size).
+  - The exe is **unsigned** → SmartScreen "More info → Run anyway" still applies (code signing remains out of scope for v1).
+
+### Brick UI-6 — App logo (waveform mark) (2026-06-03)
+- **What:** Gave SpeakType a real logo (user request; concept **C** — a white equalizer/waveform on an accent-blue rounded tile). New `AppIcon` brand helper + a multi-size `Assets/speaktype.ico` (16–256px). The icon now appears as: the **.exe icon** (`<ApplicationIcon>`), the **Settings & Welcome window title bars / taskbar / Alt-Tab** (`Icon = AppIcon.Brand`, loaded from the embedded ico), and the **tray icon** — which keeps its per-state colour signal by drawing the *same waveform glyph* tinted blue/red/orange/dark-red (`AppIcon.ForState`) instead of the old plain circles.
+- **Files:** `SpeakType.App/Assets/speaktype.ico` (new asset); `SpeakType.App/Branding/AppIcon.cs` (new — `Brand` + `ForState`, plus the GetHicon/DestroyIcon idiom moved here from TrayIcon); `SpeakType.App/SpeakType.App.csproj` (`ApplicationIcon` + embedded resource w/ `LogicalName`); `SpeakType.App/Tray/TrayIcon.cs` (use `ForState`, removed `MakeIcon`/`DestroyIcon`/`partial`); `SpeakType.App/Settings/SettingsForm.cs` + `SpeakType.App/Startup/WelcomeForm.cs` (`Icon = AppIcon.Brand`). No Core/test changes.
+- **Verified:** Windows-only → **Windows x64 CI green** (run 26846172886) — incl. the publish step, which proves `<ApplicationIcon>` resolved and the exe built with the icon. Core suite untouched → **179/179**. `/code-review` → **all 8 risks REFUTED** (key one: WinForms `Form` does NOT dispose an assigned `Icon` — only its own derived small icon — so the shared process-lifetime `Brand` is safe across the repeatedly-created Welcome window; `LogicalName` makes `GetManifestResourceStream("speaktype.ico")` resolve; `partial`/using removals compile clean; HICON cleanup leak-free). `/simplify` → applied 2 nits (reworded an overstated comment; `FillRoundedBar` de-extension-methodised). **Visual = laptop: check the exe icon in Explorer, the window title-bar/taskbar icon, and the tray glyph colour per state — screenshot if anything's off.**
+- **Notes / decisions:**
+  - **The `.ico` is the single brand source** (exe + windows load it); only the **tray** is drawn programmatically, because it needs runtime per-state tinting (a static asset can't recolour). The tray glyph's bar proportions are hand-matched to the .ico.
+  - **`AppIcon.Brand` is shared & never disposed** (process-lifetime, like the `UiTheme` fonts) — safe because Form doesn't own/dispose an assigned Icon.
+  - **Tooling:** the `.ico` was generated on the Mac with Python/Pillow (no ImageMagick needed); regenerate via the same waveform proportions if the mark is revised.
+
+### Brick UI-5 — Flat tray menu (2026-06-03)
+- **What:** Final brick of the modern-light restyle. The tray right-click `ContextMenuStrip` now uses a `ToolStripProfessionalRenderer` backed by `FlatMenuColorTable` plus light font/colours (`UiTheme.Body`/`TextPrimary`/`Surface`, `RoundedEdges = false`) — a flat white menu with accent hover and a thin grey separator, replacing the legacy gray-gradient chrome. Menu items, the separator, checkmarks (Pause / Start with Windows) and **all Click wiring are unchanged**.
+- **Files:** `SpeakType.App/Tray/TrayIcon.cs` (using + 4 lines in `BuildMenu`). No Core/test changes.
+- **Verified:** Windows-only → **Windows x64 CI green** (run 26845342026, build + publish) = compile-green. Core suite untouched → **179/179**. Combined `/code-review` + `/simplify` → **clean**: `RoundedEdges` is a valid property; subclassing only the colour table leaves checkmark rendering intact; the renderer + `FlatMenuColorTable` aren't `IDisposable` and hold no unmanaged handles → no leak, nothing to dispose; behaviour-preserving. **Visual + menu actions = laptop screenshot (right-click the tray icon).**
+- **Notes / decisions:**
+  - **Tray *icon* glyphs unchanged** — the four state circles (SteelBlue/Red/Orange/DarkRed via `MakeIcon`) still convey Idle/Recording/Busy/Error; only the *menu* chrome changed. (A logo for the icon itself is the separate Brick UI-6.)
+
 ### Brick UI-4 — Restyle WelcomeForm (2026-06-03)
 - **What:** Restyled the model-download / first-run Welcome window (also reused for a mid-session model switch) to the modern-light look: light background + Segoe UI via `StyleWindow`, a **Segoe UI Semibold heading**, **muted (TextSecondary) status text**, and the **Retry button as a primary accent button** via `StyleButton`. The system `ProgressBar` is left as-is (already accent-coloured on Win11). **Behaviour unchanged** — the async download, the `_downloading` re-entrancy guard, Retry, and cancel-on-close are untouched.
 - **Files:** `SpeakType.App/Startup/WelcomeForm.cs` (using + `StyleWindow` + heading font + status colour + `StyleButton(_retry)`). No Core/test changes.

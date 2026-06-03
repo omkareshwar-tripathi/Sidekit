@@ -10,6 +10,11 @@ Plan derived from `SpeakType-v1-spec.md` (the complete, decision-resolved spec).
 
 _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick that grows past ~150 LOC / 5 source files.)_
 
+### Fix & Polish pipeline
+
+_Sub-project 0 (correction spine + SymSpell) **shipped** — bricks 0a–0d. Spec: `docs/superpowers/specs/2026-06-03-fix-polish-correction-pipeline-design.md`; plan: `docs/superpowers/plans/2026-06-03-fix-polish-correction-pipeline.md`. The spec records the full decomposition + user decisions (full 4-stage scope; **bundle** models in the exe; SymSpell on-but-conservative). **Next: sub-project 1 — ONNX Runtime foundation** (ONNX Runtime + a shared tokenizer/inference helper + embedded-model packaging), then stage 2 Punctuation, stage 3 GECToR, stage 4 CoEdIT Polish (seq2seq + "Polish" button). Each sub-project gets its own brainstorm → spec → plan. Heads-up: the "bundle in exe" choice will stress exe size at the CoEdIT stage — revisit delivery then._
+  - Skill: brainstorming (each new sub-project), dotnet-best-practices, dotnet-xunit, run-tests
+
 ### App shell, UI & polish
 
 _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2026-06-03-ui-modern-light-restyle-design.md`; plan: `docs/superpowers/plans/2026-06-03-ui-modern-light-restyle.md`. All Windows-only → verify = CI compile-green + a laptop screenshot vs mockup B (no Core changes; 179 tests stay green)._
@@ -40,30 +45,23 @@ _Modern-light UI restyle (Option 1, light-only). Spec: `docs/superpowers/specs/2
 
 _(Newest first. Older entries archived to `BRICKS-ARCHIVE.md`.)_
 
-### Brick 18 — CI publishes a downloadable SpeakType.exe (2026-06-03)
-- **What:** Made the app installable without a build. CI already published the self-contained single-file exe on every run but threw it away; added an `actions/upload-artifact@v4` step so each run attaches **`SpeakType-win-x64` → SpeakType.exe** to its "Artifacts" section. Installing is now: download the exe from a green run and double-click it — no .NET SDK, no Git, no local build. Updated the README with this download path.
-- **Files:** `.github/workflows/ci.yml` (upload-artifact step); `README.md` (new "Download (no build)" section).
-- **Verified:** Windows-only (CI) → **Windows x64 CI green** (run 26846751774) and the artifact is confirmed attached via the GitHub API: `SpeakType-win-x64`, **69,848,648 bytes (~66.6 MB)**, 90-day retention. Core suite untouched → **179/179**. Reviewed: YAML indentation matches sibling steps, `@v4` is current, `with:` schema valid (`name`/`path`/`if-no-files-found: error`), `path` matches the publish/verify exe path, step runs after publish so the file exists, and artifact upload is fine on PR runs too.
-- **Notes / decisions:**
-  - **Artifact, not a tagged Release:** every green run yields a downloadable exe (simplest, always-on) — no tagging step. A versioned GitHub **Release** (attach the exe on a `v*` tag) is the natural next step if/when we want stable, non-expiring download links.
-  - **`if-no-files-found: error`** turns a silently-missing exe into a red run (defence-in-depth alongside the existing verify step, which still logs the size).
-  - The exe is **unsigned** → SmartScreen "More info → Run anyway" still applies (code signing remains out of scope for v1).
+### Brick 0d — Settings "Spelling correction" toggle (2026-06-03)
+- **What:** Added a "Spelling correction" toggle to the Settings window (grouped under "Remove filler words"), bound to `AppSettings.SpellCorrection` (default on). Lets the user turn the SymSpell stage off; persists via the shared `MakeToggle`/`_store.Save` path like the other toggles.
+- **Files:** `SpeakType.App/Settings/SettingsForm.cs` (1 line). No Core/test changes.
+- **Verified:** Windows-only → can't compile on the Mac host (WinForms SDK); **verify = CI compile-green + manual** (open Settings, toggle shows default-ON, flip it → `%APPDATA%\SpeakType\settings.json` gains `"spellCorrection": false/true`; dictate a typo-prone word → correction applies only when ON). Read-only spec+quality review: clean — matches the `FillerRemoval` row exactly; `_loading` guard prevents a spurious save on construction.
+- **Notes:** Last brick of correction sub-project 0. **Pending: push so Windows CI compiles `Program.cs` + `SettingsForm.cs` (neither builds on Mac).**
 
-### Brick UI-6 — App logo (waveform mark) (2026-06-03)
-- **What:** Gave SpeakType a real logo (user request; concept **C** — a white equalizer/waveform on an accent-blue rounded tile). New `AppIcon` brand helper + a multi-size `Assets/speaktype.ico` (16–256px). The icon now appears as: the **.exe icon** (`<ApplicationIcon>`), the **Settings & Welcome window title bars / taskbar / Alt-Tab** (`Icon = AppIcon.Brand`, loaded from the embedded ico), and the **tray icon** — which keeps its per-state colour signal by drawing the *same waveform glyph* tinted blue/red/orange/dark-red (`AppIcon.ForState`) instead of the old plain circles.
-- **Files:** `SpeakType.App/Assets/speaktype.ico` (new asset); `SpeakType.App/Branding/AppIcon.cs` (new — `Brand` + `ForState`, plus the GetHicon/DestroyIcon idiom moved here from TrayIcon); `SpeakType.App/SpeakType.App.csproj` (`ApplicationIcon` + embedded resource w/ `LogicalName`); `SpeakType.App/Tray/TrayIcon.cs` (use `ForState`, removed `MakeIcon`/`DestroyIcon`/`partial`); `SpeakType.App/Settings/SettingsForm.cs` + `SpeakType.App/Startup/WelcomeForm.cs` (`Icon = AppIcon.Brand`). No Core/test changes.
-- **Verified:** Windows-only → **Windows x64 CI green** (run 26846172886) — incl. the publish step, which proves `<ApplicationIcon>` resolved and the exe built with the icon. Core suite untouched → **179/179**. `/code-review` → **all 8 risks REFUTED** (key one: WinForms `Form` does NOT dispose an assigned `Icon` — only its own derived small icon — so the shared process-lifetime `Brand` is safe across the repeatedly-created Welcome window; `LogicalName` makes `GetManifestResourceStream("speaktype.ico")` resolve; `partial`/using removals compile clean; HICON cleanup leak-free). `/simplify` → applied 2 nits (reworded an overstated comment; `FillRoundedBar` de-extension-methodised). **Visual = laptop: check the exe icon in Explorer, the window title-bar/taskbar icon, and the tray glyph colour per state — screenshot if anything's off.**
-- **Notes / decisions:**
-  - **The `.ico` is the single brand source** (exe + windows load it); only the **tray** is drawn programmatically, because it needs runtime per-state tinting (a static asset can't recolour). The tray glyph's bar proportions are hand-matched to the .ico.
-  - **`AppIcon.Brand` is shared & never disposed** (process-lifetime, like the `UiTheme` fonts) — safe because Form doesn't own/dispose an assigned Icon.
-  - **Tooling:** the `.ico` was generated on the Mac with Python/Pillow (no ImageMagick needed); regenerate via the same waveform proportions if the mark is revised.
+### Brick 0c — Correction pipeline wired into orchestrator (2026-06-03)
+- **What:** Inserted the correction pipeline into the dictation flow between `TranscriptCleaner.Clean` and paste (Whisper → clean → **correct** → paste). Orchestrator gained a trailing-optional `TextCorrectionPipeline? correctionPipeline = null` (null ⇒ passthrough, so existing tests are untouched); `ProcessRecording` computes `corrected` after the empty-check and uses it for both the transcript log and paste. Composition root (`Program.cs`) builds the real pipeline = `[SymSpellCorrector gated on s => s.SpellCorrection]`.
+- **Files:** `SpeakType.Core/Orchestration/DictationOrchestrator.cs`; `SpeakType.App/Program.cs`; `SpeakType.Tests/Orchestration/DictationOrchestratorTests.cs` (2 integration tests + `UpperCorrector` fake, isolated with fresh fakes).
+- **Verified:** Core → **195/195** (2 new). App Windows-only (CI compile pending). Spec review ✓; quality review ✓ — fixed a shared-fake double-subscription test hazard the review caught.
+- **Notes:** Gate reads the live `AppSettings`, so the Settings toggle applies on the next dictation, no restart. `_logger?.Transcribed(…, cleaned.Length)` deliberately left on the pre-correction length.
 
-### Brick UI-5 — Flat tray menu (2026-06-03)
-- **What:** Final brick of the modern-light restyle. The tray right-click `ContextMenuStrip` now uses a `ToolStripProfessionalRenderer` backed by `FlatMenuColorTable` plus light font/colours (`UiTheme.Body`/`TextPrimary`/`Surface`, `RoundedEdges = false`) — a flat white menu with accent hover and a thin grey separator, replacing the legacy gray-gradient chrome. Menu items, the separator, checkmarks (Pause / Start with Windows) and **all Click wiring are unchanged**.
-- **Files:** `SpeakType.App/Tray/TrayIcon.cs` (using + 4 lines in `BuildMenu`). No Core/test changes.
-- **Verified:** Windows-only → **Windows x64 CI green** (run 26845342026, build + publish) = compile-green. Core suite untouched → **179/179**. Combined `/code-review` + `/simplify` → **clean**: `RoundedEdges` is a valid property; subclassing only the colour table leaves checkmark rendering intact; the renderer + `FlatMenuColorTable` aren't `IDisposable` and hold no unmanaged handles → no leak, nothing to dispose; behaviour-preserving. **Visual + menu actions = laptop screenshot (right-click the tray icon).**
-- **Notes / decisions:**
-  - **Tray *icon* glyphs unchanged** — the four state circles (SteelBlue/Red/Orange/DarkRed via `MakeIcon`) still convey Idle/Recording/Busy/Error; only the *menu* chrome changed. (A logo for the icon itself is the separate Brick UI-6.)
+### Brick 0b — Conservative SymSpellCorrector stage (2026-06-03)
+- **What:** First concrete `ITextCorrector`: conservative SymSpell spelling correction. Token-by-token via `[A-Za-z]+` regex (preserves punctuation + the cleaner's trailing space). Skips tokens ≤2 chars, any non-all-lowercase token (protects Names/ACRONYMS/MixedCase/jargon), and known words (edit-distance 0); for unknown lowercase words, looks up at edit-distance 1 and only replaces when the suggestion clears a frequency floor (1,000,000). Fail-open (errors return input unchanged); fail-fast if the dict can't load.
+- **Files:** `SpeakType.Core/Correction/SymSpellCorrector.cs`; embedded `frequency_dictionary_en_82_765.txt` (~1.3 MB, MIT); `SpeakType.Core/SpeakType.Core.csproj` (SymSpell **6.7.3** PackageReference + EmbeddedResource w/ `LogicalName`); `SpeakType.Tests/Correction/SymSpellCorrectorTests.cs` (9 tests, shared via `IClassFixture`).
+- **Verified:** Core → **193/193** at brick end. Spec + quality review ✓.
+- **Notes:** **First NuGet dependency in Core** (was dependency-free) — deliberate (spec §3): deterministic algorithm, keeps the stage Mac/CI-testable. API note: it's `LoadDictionary(Stream,0,1)` — the plan's `LoadDictionaryStream` name doesn't exist in 6.7.3. Dict is **bundled/embedded** per the user's delivery choice.
 
 <!-- Template for each entry:
 

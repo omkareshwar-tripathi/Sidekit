@@ -16,6 +16,7 @@ public sealed class AppSettings
     public string Hotkey { get; set; } = DefaultHotkey;
     public string ModelSize { get; set; } = DefaultModelSize;
     public bool FillerRemoval { get; set; } = true;
+    public bool SpellCorrection { get; set; } = true;
     public bool Overlay { get; set; } = true;
     public bool Autostart { get; set; } = true;
     public bool DebugLogging { get; set; } = false;

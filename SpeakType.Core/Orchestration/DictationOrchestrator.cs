@@ -1,5 +1,6 @@
 using SpeakType.Core.Audio;
 using SpeakType.Core.Cleanup;
+using SpeakType.Core.Correction;
 using SpeakType.Core.Input;
 using SpeakType.Core.Logging;
 using SpeakType.Core.Paste;
@@ -34,6 +35,7 @@ public sealed class DictationOrchestrator
     private readonly ITranscriber _transcriber;
     private readonly IPasteService _pasteService;
     private readonly TranscriptCleaner _cleaner;
+    private readonly TextCorrectionPipeline? _correctionPipeline;
     private readonly AppSettings _settings;
     private readonly IClock _clock;
     private readonly IAutoStopTimer _autoStopTimer;
@@ -56,7 +58,8 @@ public sealed class DictationOrchestrator
         IClock clock,
         IAutoStopTimer autoStopTimer,
         ICycleDispatcher? dispatcher = null,
-        AppLogger? logger = null)
+        AppLogger? logger = null,
+        TextCorrectionPipeline? correctionPipeline = null)
     {
         ArgumentNullException.ThrowIfNull(hotkey);
         ArgumentNullException.ThrowIfNull(audioCapture);
@@ -76,6 +79,7 @@ public sealed class DictationOrchestrator
         _autoStopTimer = autoStopTimer;
         _dispatcher = dispatcher ?? new SynchronousCycleDispatcher();
         _logger = logger;
+        _correctionPipeline = correctionPipeline;
 
         hotkey.Pressed += OnPressed;
         hotkey.Released += OnReleased;
@@ -310,7 +314,8 @@ public sealed class DictationOrchestrator
             return DictationOutcome.NoSpeech;
         }
 
-        _logger?.Transcript(cleaned);
+        var corrected = _correctionPipeline?.Correct(cleaned, _settings) ?? cleaned;
+        _logger?.Transcript(corrected);
 
         lock (_gate)
         {
@@ -319,7 +324,7 @@ public sealed class DictationOrchestrator
 
         RaiseStateChanged(RecordingState.Pasting);
 
-        var outcome = _pasteService.Paste(cleaned);
+        var outcome = _pasteService.Paste(corrected);
         _logger?.Latency(_clock.GetElapsedTime(_releaseTimestamp));
         return outcome == PasteOutcome.LeftOnClipboard
             ? DictationOutcome.LeftOnClipboard

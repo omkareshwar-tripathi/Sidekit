@@ -1,5 +1,6 @@
 using SpeakType.Core.Audio;
 using SpeakType.Core.Cleanup;
+using SpeakType.Core.Correction;
 using SpeakType.Core.Logging;
 using SpeakType.Core.Orchestration;
 using SpeakType.Core.Paste;
@@ -562,5 +563,55 @@ public sealed class DictationOrchestratorTests
         hotkey.Release();
 
         Assert.Equal(new[] { "recording 1.0s" }, sink.Lines);
+    }
+
+    [Fact]
+    public void Correction_pipeline_runs_between_clean_and_paste()
+    {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber { Result = "Um, hello." };
+        var paste = new FakePasteService();
+        var pipeline = new TextCorrectionPipeline(new (ITextCorrector, Func<AppSettings, bool>)[]
+        {
+            (new UpperCorrector(), s => s.SpellCorrection),
+        });
+        var settings = new AppSettings { FillerRemoval = true, SpellCorrection = true };
+        var sut = new DictationOrchestrator(
+            hotkey, audio, transcriber, paste, new TranscriptCleaner(), settings,
+            new FakeClock(), new FakeAutoStopTimer(), correctionPipeline: pipeline);
+
+        hotkey.Press();
+        hotkey.Release();
+
+        // Cleaner ⇒ "Hello. " ; pipeline uppercases ⇒ "HELLO. "
+        Assert.Equal("HELLO. ", paste.ReceivedText);
+    }
+
+    [Fact]
+    public void Correction_pipeline_skipped_when_setting_off()
+    {
+        var hotkey = new FakeHotkeyListener();
+        var audio = new FakeAudioCapture { Result = new CapturedAudio(new[] { 0.1f }, HasSpeech: true) };
+        var transcriber = new FakeTranscriber { Result = "Um, hello." };
+        var paste = new FakePasteService();
+        var pipeline = new TextCorrectionPipeline(new (ITextCorrector, Func<AppSettings, bool>)[]
+        {
+            (new UpperCorrector(), s => s.SpellCorrection),
+        });
+        var settings = new AppSettings { SpellCorrection = false };
+        var sut = new DictationOrchestrator(
+            hotkey, audio, transcriber, paste, new TranscriptCleaner(), settings,
+            new FakeClock(), new FakeAutoStopTimer(), correctionPipeline: pipeline);
+
+        hotkey.Press();
+        hotkey.Release();
+
+        Assert.Equal("Hello. ", paste.ReceivedText); // unchanged by the (disabled) stage
+    }
+
+    private sealed class UpperCorrector : ITextCorrector
+    {
+        public string Correct(string text) => text.ToUpperInvariant();
     }
 }
