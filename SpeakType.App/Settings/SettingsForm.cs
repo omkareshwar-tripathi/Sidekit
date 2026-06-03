@@ -64,6 +64,7 @@ public sealed class SettingsForm : Form
         AddRow(layout, "Model size", BuildModelBox());
 
         AddRow(layout, "Remove filler words", MakeToggle(_settings.FillerRemoval, v => _settings.FillerRemoval = v));
+        AddRow(layout, "Improve text (CoEdIT)", MakeToggle(_settings.CoEditPolishing, v => _settings.CoEditPolishing = v));
         AddRow(layout, "Show recording overlay", MakeToggle(_settings.Overlay, v => _settings.Overlay = v));
         AddRow(layout, "Start with Windows", MakeToggle(_settings.Autostart, v =>
         {

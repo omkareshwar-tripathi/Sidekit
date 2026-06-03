@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.IO;
 using System.Net.Http;
 using System.Windows.Forms;
 using SpeakType.App.Audio;
@@ -17,9 +18,12 @@ using SpeakType.Core.Models;
 using SpeakType.Core.Orchestration;
 using SpeakType.Core.Overlay;
 using SpeakType.Core.Paste;
+using SpeakType.Core.Polishing;
 using SpeakType.Core.Settings;
 using SpeakType.Core.Time;
 using SpeakType.Core.Transcription;
+using SpeakType.Onnx.Inference;
+using SpeakType.Onnx.Tokenization;
 using SpeakType.Whisper;
 
 namespace SpeakType.App;
@@ -110,6 +114,25 @@ internal static class Program
             tray.ShowBalloon(AppInfo.Name, "Ready!");
         }
 
+        // CoEdIT text-improvement model (multi-part, ~2.4 GB). Required, like the speech model:
+        // if it isn't already installed, download it before the app is usable — a cancelled/failed
+        // download exits cleanly rather than auto-launching into the same broken first-run each login.
+        // Independent of the Whisper gate above so an upgrade that already has Whisper still fetches it.
+        var coeditStore = new CoEditModelStore(new HttpModelDownloader(httpClient), CoEditModelStore.DefaultModelsDirectory);
+        if (coeditStore.GetInstalledModelDirectory() is null)
+        {
+            using var coeditWelcome = new WelcomeForm(
+                (progress, ct) => coeditStore.EnsureAsync(progress, ct),
+                "Setting up SpeakType",
+                "Downloading the text-improvement model (~2.4 GB, one time).",
+                "Downloading text-improvement model…");
+            if (coeditWelcome.ShowDialog() != DialogResult.OK)
+            {
+                tray.Dispose();
+                return;
+            }
+        }
+
         // Reflect the real Run-key state in the menu (the user may have toggled it off on a prior run).
         tray.SetStartWithWindowsChecked(autostart.IsEnabled());
 
@@ -125,6 +148,28 @@ internal static class Program
         // (spec Feature 4). activeModel tracks what's actually loaded, for the roll-back on a failed switch.
         var swappable = new SwappableTranscriber(transcriber);
         var activeModel = modelName;
+
+        // CoEdIT polisher: the model is guaranteed present by the first-run gate above. Load the two
+        // ONNX sessions once at startup (they hold ~2.4 GB — never per-dictation). Fail-open: if loading
+        // throws, run unpolished (null polisher) rather than blocking dictation. coeditModel is disposed
+        // with the rest of the pipeline at shutdown.
+        ITextPolisher? polisher = null;
+        OnnxCoEditModel? coeditModel = null;
+        try
+        {
+            var coeditDir = coeditStore.GetInstalledModelDirectory()!;
+            coeditModel = new OnnxCoEditModel(
+                Path.Combine(coeditDir, "encoder_model.onnx"),
+                Path.Combine(coeditDir, "decoder_model_merged.onnx"));
+            polisher = new CoEditPolisher(new CoEditTokenizer(CoEditTokenizer.DefaultTokenizerPath), coeditModel);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine(ex);
+            coeditModel?.Dispose();
+            coeditModel = null;
+            polisher = null;
+        }
 
         using var uiMarshaller = new UiMarshaller();
         using var overlay = new RecordingOverlay();
@@ -150,7 +195,7 @@ internal static class Program
 
         var orchestrator = new DictationOrchestrator(
             hotkey, capture, swappable, pasteService, new TranscriptCleaner(), settings,
-            new SystemClock(), autoStopTimer, dispatcher, logger);
+            new SystemClock(), autoStopTimer, dispatcher, logger, polisher);
 
         // Settings window — single instance; Show/Activate on each request, it hides itself on close.
         using var settingsForm = new SettingsForm(settings, settingsStore);
@@ -282,6 +327,7 @@ internal static class Program
         try
         {
             swappable.Dispose(); // disposes whichever model is currently active
+            coeditModel?.Dispose(); // releases the ~2.4 GB CoEdIT ONNX sessions
         }
         catch
         {

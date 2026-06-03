@@ -29,5 +29,8 @@
   <ItemGroup>
     <ProjectReference Include="..\SpeakType.Core\SpeakType.Core.csproj" />
     <ProjectReference Include="..\SpeakType.Whisper\SpeakType.Whisper.csproj" />
+    <!-- CoEdIT on-device text polishing. Brings in ONNX Runtime + Tokenizers.DotNet native
+         libraries (win-x64) and the bundled assets\tokenizer.json content. -->
+    <ProjectReference Include="..\SpeakType.Onnx\SpeakType.Onnx.csproj" />
   </ItemGroup>
 </Project>

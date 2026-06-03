@@ -13,24 +13,43 @@ namespace SpeakType.App.Startup;
 /// </summary>
 public sealed class WelcomeForm : Form
 {
-    private readonly IModelStore _modelStore;
-    private readonly string _modelName;
+    private readonly Func<IProgress<double>, CancellationToken, Task> _download;
+    private readonly string _statusText;
     private readonly Label _status;
     private readonly ProgressBar _bar;
     private readonly Button _retry;
     private readonly CancellationTokenSource _cts = new();
     private bool _downloading;
 
+    /// <summary>Whisper first-run / model-switch flow: downloads <paramref name="modelName"/> via the store.</summary>
     public WelcomeForm(
         IModelStore modelStore,
         string modelName,
         string windowTitle = "Welcome to SpeakType",
         string headingText = "Hold Right Ctrl, speak, release.")
+        : this(
+            DownloadFor(modelStore, modelName),
+            windowTitle,
+            headingText,
+            "Downloading speech model…")
     {
-        ArgumentNullException.ThrowIfNull(modelStore);
-        ArgumentNullException.ThrowIfNull(modelName);
-        _modelStore = modelStore;
-        _modelName = modelName;
+    }
+
+    /// <summary>
+    /// General flow: drives an arbitrary <paramref name="download"/> (e.g. the multi-part CoEdIT
+    /// model, whose store has a different signature than <see cref="IModelStore"/>) behind the same
+    /// progress + Retry UI.
+    /// </summary>
+    public WelcomeForm(
+        Func<IProgress<double>, CancellationToken, Task> download,
+        string windowTitle,
+        string headingText,
+        string statusText)
+    {
+        ArgumentNullException.ThrowIfNull(download);
+        ArgumentNullException.ThrowIfNull(statusText);
+        _download = download;
+        _statusText = statusText;
 
         Text = windowTitle;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -52,7 +71,7 @@ public sealed class WelcomeForm : Form
         };
 
         var heading = new Label { Text = headingText, AutoSize = true, Font = UiTheme.Heading, Margin = new Padding(3, 3, 3, 12) };
-        _status = new Label { Text = "Downloading speech model…", AutoSize = true, ForeColor = UiTheme.TextSecondary, Margin = new Padding(3, 3, 3, 6) };
+        _status = new Label { Text = _statusText, AutoSize = true, ForeColor = UiTheme.TextSecondary, Margin = new Padding(3, 3, 3, 6) };
         _bar = new ProgressBar { Style = ProgressBarStyle.Continuous, Minimum = 0, Maximum = 100, Width = 280 };
         _retry = new Button { Text = "Retry", AutoSize = true, Visible = false, Margin = new Padding(3, 12, 3, 3) };
         UiTheme.StyleButton(_retry, primary: true);
@@ -63,6 +82,16 @@ public sealed class WelcomeForm : Form
         layout.Controls.Add(_bar);
         layout.Controls.Add(_retry);
         Controls.Add(layout);
+    }
+
+    // Adapts the IModelStore signature to the download delegate. Static so it can be called in the
+    // constructor-chaining initializer (before `this` exists); validates its args up front.
+    private static Func<IProgress<double>, CancellationToken, Task> DownloadFor(
+        IModelStore modelStore, string modelName)
+    {
+        ArgumentNullException.ThrowIfNull(modelStore);
+        ArgumentNullException.ThrowIfNull(modelName);
+        return (progress, ct) => modelStore.EnsureAsync(modelName, progress, ct);
     }
 
     protected override void OnShown(EventArgs e)
@@ -101,13 +130,13 @@ public sealed class WelcomeForm : Form
 
         _downloading = true;
         _retry.Visible = false;
-        _status.Text = "Downloading speech model…";
+        _status.Text = _statusText;
         _bar.Value = 0;
 
         var progress = new Progress<double>(f => _bar.Value = Math.Clamp((int)(f * 100), 0, 100));
         try
         {
-            await _modelStore.EnsureAsync(_modelName, progress, _cts.Token);
+            await _download(progress, _cts.Token);
             DialogResult = DialogResult.OK;
             Close();
         }
