@@ -35,6 +35,17 @@ public sealed class AppLoggerTests
     }
 
     [Fact]
+    public void Polished_writes_duration_and_char_count()
+    {
+        var fake = new FakeSink();
+        var logger = new AppLogger(fake, () => false);
+
+        logger.Polished(TimeSpan.FromSeconds(2.3), 42);
+
+        Assert.Equal("polish 2.3s, 42 chars", Assert.Single(fake.Lines));
+    }
+
+    [Fact]
     public void Latency_writes_release_to_paste_seconds()
     {
         var fake = new FakeSink();

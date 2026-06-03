@@ -21,6 +21,13 @@ public sealed class AppSettings
     public bool DebugLogging { get; set; } = false;
 
     /// <summary>
+    /// When true (default), every dictation is run through the on-device CoEdIT
+    /// model to fix grammar/spelling before paste. Fail-open: if polishing throws,
+    /// the cleaned (unpolished) text is pasted instead.
+    /// </summary>
+    public bool CoEditPolishing { get; set; } = true;
+
+    /// <summary>
     /// Coerces a loaded settings object to a usable baseline, regardless of where it
     /// came from: any blank/whitespace string field (including an explicit JSON
     /// <c>null</c> in a hand-edited file, which would otherwise leave a non-nullable

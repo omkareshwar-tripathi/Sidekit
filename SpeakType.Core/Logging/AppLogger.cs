@@ -30,6 +30,9 @@ public sealed class AppLogger
     public void Transcribed(TimeSpan duration, int charCount) =>
         _sink.Write($"transcribe {Seconds(duration)}s, {charCount} chars");
 
+    public void Polished(TimeSpan duration, int charCount) =>
+        _sink.Write($"polish {Seconds(duration)}s, {charCount} chars");
+
     public void Latency(TimeSpan releaseToPaste) =>
         _sink.Write($"latency {Seconds(releaseToPaste)}s");
 

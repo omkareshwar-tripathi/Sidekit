@@ -37,6 +37,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
             Overlay = false,
             Autostart = false,
             DebugLogging = true,
+            CoEditPolishing = false,
         };
 
         store.Save(saved);
@@ -48,6 +49,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
         Assert.False(loaded.Overlay);
         Assert.False(loaded.Autostart);
         Assert.True(loaded.DebugLogging);
+        Assert.False(loaded.CoEditPolishing);
     }
 
     [Fact]
@@ -64,6 +66,8 @@ public sealed class JsonSettingsStoreTests : IDisposable
         Assert.Equal(defaults.Overlay, loaded.Overlay);
         Assert.Equal(defaults.Autostart, loaded.Autostart);
         Assert.Equal(defaults.DebugLogging, loaded.DebugLogging);
+        Assert.Equal(defaults.CoEditPolishing, loaded.CoEditPolishing);
+        Assert.True(loaded.CoEditPolishing); // CoEdIT Polish is on by default (spec)
     }
 
     [Fact]
@@ -166,6 +170,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
         Assert.Contains("\"overlay\"", text);
         Assert.Contains("\"autostart\"", text);
         Assert.Contains("\"debugLogging\"", text);
+        Assert.Contains("\"coEditPolishing\"", text);
         Assert.DoesNotContain("\"Hotkey\"", text);
         Assert.DoesNotContain("\"ModelSize\"", text);
     }
