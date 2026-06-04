@@ -133,6 +133,25 @@ struct DictationCoordinatorTests {
         #expect(sut.currentState == .idle)
     }
 
+    @Test func settingsFillerRemovalFlagFlowsToCleaner() async {
+        let audio = FakeAudioCapture()
+        let transcriber = FakeTranscriber()
+        let paste = FakePaste()
+        let clock = FakeClock()
+        let timer = FakeAutoStopTimer()
+        transcriber.result = "Um, we should ship it."
+        let sut = DictationCoordinator(
+            audio: audio, transcriber: transcriber, paste: paste,
+            clock: clock, autoStop: timer, settings: Settings(fillerRemoval: false)
+        )
+
+        sut.pressed()
+        clock.ticksMs = 500
+        await sut.released()
+
+        #expect(paste.pasted == ["Um, we should ship it. "]) // filler kept when removal is off
+    }
+
     @Test func emitsStateSequenceForANormalCycle() async {
         let (sut, _, _, _, clock, _) = makeSUT()
         var states: [DictationState] = []

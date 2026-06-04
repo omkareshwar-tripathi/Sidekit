@@ -29,6 +29,7 @@ public final class DictationCoordinator {
     private let cleaner: TranscriptCleaner
     private let clock: MonotonicClock
     private let autoStop: AutoStopTimer
+    private let settings: Settings
 
     /// Raised on each UI-meaningful state transition (recording / transcribing / pasting / idle).
     public var onStateChanged: ((DictationState) -> Void)?
@@ -44,7 +45,8 @@ public final class DictationCoordinator {
         paste: Pasting,
         cleaner: TranscriptCleaner = TranscriptCleaner(),
         clock: MonotonicClock,
-        autoStop: AutoStopTimer
+        autoStop: AutoStopTimer,
+        settings: Settings = Settings()
     ) {
         self.audio = audio
         self.transcriber = transcriber
@@ -52,6 +54,7 @@ public final class DictationCoordinator {
         self.cleaner = cleaner
         self.clock = clock
         self.autoStop = autoStop
+        self.settings = settings
     }
 
     public var currentState: DictationState { state }
@@ -92,7 +95,7 @@ public final class DictationCoordinator {
         guard captured.hasSpeech else { return finish(.noSpeech) }
 
         let raw = await transcriber.transcribe(captured.samples)
-        let cleaned = cleaner.clean(raw)
+        let cleaned = cleaner.clean(raw, removeFillers: settings.fillerRemoval)
         guard !cleaned.isEmpty else { return finish(.noSpeech) }
 
         setState(.pasting)
