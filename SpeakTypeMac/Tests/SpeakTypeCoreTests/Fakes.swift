@@ -1,3 +1,4 @@
+import Foundation
 @testable import SpeakTypeCore
 
 // Fake ports for deterministic coordinator tests.
@@ -44,4 +45,20 @@ final class FakeAutoStopTimer: AutoStopTimer {
     private(set) var cancelCount = 0
     func start(after delay: Duration, onElapsed: @escaping @Sendable () -> Void) { startedDelay = delay }
     func cancel() { cancelCount += 1 }
+}
+
+/// In-memory NotesPersisting: seeds the store on load and records what it saved.
+final class FakeNotesPersistence: NotesPersisting, @unchecked Sendable {
+    var stored: [Note]
+    private(set) var saveCount = 0
+    private(set) var lastSaved: [Note] = []
+    init(_ initial: [Note] = []) { stored = initial }
+    func load() -> [Note] { stored }
+    func save(_ notes: [Note]) { saveCount += 1; lastSaved = notes; stored = notes }
+}
+
+/// Monotonic date source so updatedAt ordering is deterministic (each call is one second later).
+final class FakeDates {
+    private var seconds: TimeInterval = 0
+    func next() -> Date { seconds += 1; return Date(timeIntervalSinceReferenceDate: seconds) }
 }

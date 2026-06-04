@@ -67,3 +67,10 @@ public protocol DictationSink: AnyObject {
 public protocol Transcribing: Sendable {
     func transcribe(_ samples: [Float]) async -> String
 }
+
+/// Loads and saves the scratchpad notes. The store calls `load()` once at init and `save(_:)`
+/// after every mutation; the adapter (UI-3) backs this with a JSON file.
+public protocol NotesPersisting: Sendable {
+    func load() -> [Note]
+    func save(_ notes: [Note])
+}
