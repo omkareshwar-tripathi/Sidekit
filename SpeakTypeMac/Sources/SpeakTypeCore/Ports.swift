@@ -54,6 +54,13 @@ public protocol Pasting: AnyObject {
     func paste(_ text: String) -> PasteOutcome
 }
 
+/// Destination for a finished, cleaned transcript. The coordinator hands the text here and
+/// reports the returned outcome; it stays unaware of clipboards, windows, or notes. The app
+/// supplies the implementation (paste-at-cursor today; route-to-focused-note later).
+public protocol DictationSink: AnyObject {
+    func deliver(_ text: String) -> DictationOutcome
+}
+
 /// Turns 16 kHz mono samples into a transcript. Async because WhisperKit is async, and
 /// `Sendable` because the coordinator calls it from the main actor but the work runs
 /// off-main (so it never blocks the UI).

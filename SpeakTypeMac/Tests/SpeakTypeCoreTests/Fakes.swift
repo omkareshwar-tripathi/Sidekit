@@ -24,6 +24,14 @@ final class FakePaste: Pasting {
     func paste(_ text: String) -> PasteOutcome { pasted.append(text); return outcome }
 }
 
+/// Records the text delivered and returns a configurable outcome — lets a test drive the
+/// coordinator's destination without a real paste/note.
+final class FakeSink: DictationSink {
+    private(set) var delivered: [String] = []
+    var outcome: DictationOutcome = .pasted
+    func deliver(_ text: String) -> DictationOutcome { delivered.append(text); return outcome }
+}
+
 /// Tick == milliseconds. Tests set `ticksMs` to simulate the press→release hold.
 final class FakeClock: MonotonicClock {
     var ticksMs: UInt64 = 0

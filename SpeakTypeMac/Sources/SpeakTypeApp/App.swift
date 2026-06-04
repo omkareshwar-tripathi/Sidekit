@@ -44,7 +44,7 @@ final class AppController: ObservableObject {
         let coordinator = DictationCoordinator(
             audio: audio,
             transcriber: transcriber,
-            paste: paste,
+            sink: PasteSink(paste: paste),
             clock: SystemClock(),
             autoStop: SystemAutoStopTimer()
         )
@@ -91,6 +91,7 @@ final class AppController: ObservableObject {
         case .idle:
             switch lastOutcome {
             case .pasted: return "Pasted ✓ — hold Fn to dictate"
+            case .addedToNote: return "Added to note ✓ — hold Fn to dictate"
             case .leftOnClipboard: return "Left on clipboard (paste manually)"
             case .noSpeech: return "No speech heard — hold Fn to dictate"
             case nil: return "SpeakType — hold Fn to dictate"

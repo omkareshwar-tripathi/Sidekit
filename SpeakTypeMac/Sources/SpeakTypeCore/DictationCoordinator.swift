@@ -1,7 +1,8 @@
-/// Outcome of one dictation cycle, for the menu-bar UI to surface.
+/// Outcome of one dictation cycle, for the UI to surface.
 public enum DictationOutcome: Sendable, Equatable {
     case pasted
     case leftOnClipboard
+    case addedToNote
     case noSpeech
 }
 
@@ -25,7 +26,7 @@ public final class DictationCoordinator {
 
     private let audio: AudioCapturing
     private let transcriber: Transcribing
-    private let paste: Pasting
+    private let sink: DictationSink
     private let cleaner: TranscriptCleaner
     private let clock: MonotonicClock
     private let autoStop: AutoStopTimer
@@ -42,7 +43,7 @@ public final class DictationCoordinator {
     public init(
         audio: AudioCapturing,
         transcriber: Transcribing,
-        paste: Pasting,
+        sink: DictationSink,
         cleaner: TranscriptCleaner = TranscriptCleaner(),
         clock: MonotonicClock,
         autoStop: AutoStopTimer,
@@ -50,7 +51,7 @@ public final class DictationCoordinator {
     ) {
         self.audio = audio
         self.transcriber = transcriber
-        self.paste = paste
+        self.sink = sink
         self.cleaner = cleaner
         self.clock = clock
         self.autoStop = autoStop
@@ -110,8 +111,7 @@ public final class DictationCoordinator {
         guard !cleaned.isEmpty else { return finish(.noSpeech) }
 
         setState(.pasting)
-        let outcome = paste.paste(cleaned)
-        finish(outcome == .pasted ? .pasted : .leftOnClipboard)
+        finish(sink.deliver(cleaned))
     }
 
     private func discard() {

@@ -13,8 +13,10 @@ struct DictationCoordinatorTests {
         let paste = FakePaste()
         let clock = FakeClock()
         let timer = FakeAutoStopTimer()
+        // Drive the coordinator through the real PasteSink so the existing `paste.*`
+        // assertions keep exercising the default paste-at-cursor destination.
         let sut = DictationCoordinator(
-            audio: audio, transcriber: transcriber, paste: paste,
+            audio: audio, transcriber: transcriber, sink: PasteSink(paste: paste),
             clock: clock, autoStop: timer
         )
         return (sut, audio, transcriber, paste, clock, timer)
@@ -141,7 +143,7 @@ struct DictationCoordinatorTests {
         let timer = FakeAutoStopTimer()
         transcriber.result = "Um, we should ship it."
         let sut = DictationCoordinator(
-            audio: audio, transcriber: transcriber, paste: paste,
+            audio: audio, transcriber: transcriber, sink: PasteSink(paste: paste),
             clock: clock, autoStop: timer, settings: Settings(fillerRemoval: false)
         )
 
@@ -150,6 +152,31 @@ struct DictationCoordinatorTests {
         await sut.released()
 
         #expect(paste.pasted == ["Um, we should ship it. "]) // filler kept when removal is off
+    }
+
+    // The sink is the coordinator's only destination: it receives the cleaned transcript and
+    // its outcome (here .addedToNote, the new in-app destination) is reported verbatim.
+    @Test func deliversCleanedTranscriptToSinkAndReportsItsOutcome() async {
+        let audio = FakeAudioCapture()
+        let transcriber = FakeTranscriber()
+        transcriber.result = "  hello   world  "
+        let sink = FakeSink()
+        sink.outcome = .addedToNote
+        let clock = FakeClock()
+        let sut = DictationCoordinator(
+            audio: audio, transcriber: transcriber, sink: sink,
+            clock: clock, autoStop: FakeAutoStopTimer()
+        )
+        var outcome: DictationOutcome?
+        sut.onCompleted = { outcome = $0 }
+
+        clock.ticksMs = 0
+        sut.pressed()
+        clock.ticksMs = 500 // held 500 ms > 300 ms guard
+        await sut.released()
+
+        #expect(sink.delivered == ["hello world "]) // cleaned text reaches the sink
+        #expect(outcome == .addedToNote)             // sink's outcome reported verbatim
     }
 
     @Test func cancelWhileRecordingDiscardsAndReturnsToIdle() {
