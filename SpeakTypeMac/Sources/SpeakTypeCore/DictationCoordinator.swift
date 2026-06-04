@@ -30,7 +30,8 @@ public final class DictationCoordinator {
     private let cleaner: TranscriptCleaner
     private let clock: MonotonicClock
     private let autoStop: AutoStopTimer
-    private let settings: Settings
+    /// Live-updatable so the settings UI can flip filler removal mid-session; read at clean time.
+    public var settings: Settings
 
     /// Raised on each UI-meaningful state transition (recording / transcribing / pasting / idle).
     public var onStateChanged: ((DictationState) -> Void)?

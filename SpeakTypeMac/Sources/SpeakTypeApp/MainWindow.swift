@@ -8,6 +8,9 @@ struct MainWindow: View {
     static let id = "main"
 
     @ObservedObject var notes: NotesModel
+    let settings: SettingsModel
+
+    @State private var showSettings = false
 
     var body: some View {
         NavigationSplitView {
@@ -19,6 +22,7 @@ struct MainWindow: View {
         }
         .animation(.easeInOut(duration: 0.2), value: notes.activeID)
         .frame(minWidth: 640, minHeight: 420)
+        .sheet(isPresented: $showSettings) { SettingsView(model: settings) }
     }
 
     // MARK: - Sidebar
@@ -26,12 +30,17 @@ struct MainWindow: View {
     private var sidebar: some View {
         List(selection: selection) {
             ForEach(notes.notes) { note in
-                NoteRow(note: note).tag(note.id)
+                NoteRow(note: note)
+                    .tag(note.id)
+                    .contextMenu {
+                        Button("Delete", role: .destructive) { notes.delete(note.id) }
+                    }
             }
         }
         .navigationTitle("Notes")
         .toolbar {
             Button { notes.newNote() } label: { Label("New note", systemImage: "square.and.pencil") }
+            Button { showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
         }
     }
 

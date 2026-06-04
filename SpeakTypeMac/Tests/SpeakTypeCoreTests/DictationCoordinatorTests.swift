@@ -154,6 +154,27 @@ struct DictationCoordinatorTests {
         #expect(paste.pasted == ["Um, we should ship it. "]) // filler kept when removal is off
     }
 
+    @Test func updatingSettingsLiveAffectsTheNextCycle() async {
+        let audio = FakeAudioCapture()
+        let transcriber = FakeTranscriber()
+        let paste = FakePaste()
+        let clock = FakeClock()
+        let timer = FakeAutoStopTimer()
+        transcriber.result = "Um, we should ship it."
+        let sut = DictationCoordinator( // default settings: filler removal ON
+            audio: audio, transcriber: transcriber, sink: PasteSink(paste: paste),
+            clock: clock, autoStop: timer
+        )
+
+        sut.settings = Settings(fillerRemoval: false) // flip it like the settings UI would
+
+        sut.pressed()
+        clock.ticksMs = 500
+        await sut.released()
+
+        #expect(paste.pasted == ["Um, we should ship it. "]) // live change took effect → filler kept
+    }
+
     // The sink is the coordinator's only destination: it receives the cleaned transcript and
     // its outcome (here .addedToNote, the new in-app destination) is reported verbatim.
     @Test func deliversCleanedTranscriptToSinkAndReportsItsOutcome() async {

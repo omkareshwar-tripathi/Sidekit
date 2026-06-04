@@ -18,7 +18,7 @@ struct SpeakTypeApp: App {
         // The main window stays closed until "Open SpeakType" is chosen; opening it flips the
         // app to a Dock-present `.regular` app, closing it returns to the menu-bar-only utility.
         Window("SpeakType", id: MainWindow.id) {
-            MainWindow(notes: controller.notes)
+            MainWindow(notes: controller.notes, settings: controller.settings)
                 .onAppear { AppController.setWindowMode(true) }
                 .onDisappear { AppController.setWindowMode(false) }
         }
@@ -60,6 +60,8 @@ final class AppController: ObservableObject {
     /// The scratchpad notes (observable wrapper over the pure store). Surfaced to the window and
     /// to the routing sink.
     let notes: NotesModel
+    /// User settings (filler removal, launch-at-login, permission status). Drives the settings sheet.
+    let settings: SettingsModel
 
     private let coordinator: DictationCoordinator
     private let hotkey: FnKeyMonitor
@@ -94,7 +96,10 @@ final class AppController: ObservableObject {
             autoStop: SystemAutoStopTimer()
         )
         let hotkey = FnKeyMonitor()
+        // Settings push the persisted filler-removal flag into the live coordinator.
+        let settings = SettingsModel(applySettings: { [weak coordinator] s in coordinator?.settings = s })
         self.notes = notes
+        self.settings = settings
         self.coordinator = coordinator
         self.hotkey = hotkey
 
