@@ -20,7 +20,9 @@ final class MacClipboard: SystemClipboard {
     func clear() { pasteboard.clearContents() }
 
     func sendPaste() -> Bool {
-        guard AXIsProcessTrusted() else { return false } // no Accessibility → keystroke can't land
+        let trusted = AXIsProcessTrusted()
+        Diag.log("paste: AXIsProcessTrusted=\(trusted)")
+        guard trusted else { return false } // no Accessibility → keystroke can't land
         guard let source = CGEventSource(stateID: .combinedSessionState),
               let down = CGEvent(keyboardEventSource: source, virtualKey: Self.vKeyCode, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: Self.vKeyCode, keyDown: false)

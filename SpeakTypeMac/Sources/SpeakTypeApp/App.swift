@@ -71,6 +71,7 @@ final class AppController: ObservableObject {
         // directly to avoid Swift 6's concurrency check on the global CFString symbol.
         accessibilityTrusted = AXIsProcessTrustedWithOptions(
             ["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+        Diag.log("launch: AXIsProcessTrusted=\(AXIsProcessTrusted()) bundle=\(Bundle.main.bundleURL.path)")
     }
 
     var iconName: String {

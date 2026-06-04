@@ -33,7 +33,7 @@ final class AVAudioCapture: AudioCapturing, @unchecked Sendable {
         converter = AVAudioConverter(from: inputFormat, to: targetFormat)
 
         let auth = AVCaptureDevice.authorizationStatus(for: .audio)
-        NSLog("SpeakType.mic: start authStatus=\(auth.rawValue) inputFormat=\(inputFormat.sampleRate)Hz ch=\(inputFormat.channelCount)")
+        Diag.log("mic.start: authStatus=\(auth.rawValue) inputFormat=\(inputFormat.sampleRate)Hz ch=\(inputFormat.channelCount)")
 
         input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
             self?.append(buffer)
@@ -44,7 +44,7 @@ final class AVAudioCapture: AudioCapturing, @unchecked Sendable {
             running = true
         } catch {
             running = false
-            NSLog("SpeakType.mic: engine.start FAILED: \(error)")
+            Diag.log("mic.start: engine.start FAILED: \(error)")
         }
     }
 
@@ -58,7 +58,7 @@ final class AVAudioCapture: AudioCapturing, @unchecked Sendable {
         let speech = AudioMath.hasSpeech(captured)
         var peak: Float = 0
         for s in captured { peak = max(peak, abs(s)) }
-        NSLog("SpeakType.mic: stop taps=\(taps) samples=\(captured.count) peak=\(peak) hasSpeech=\(speech)")
+        Diag.log("mic.stop: taps=\(taps) samples=\(captured.count) peak=\(peak) hasSpeech=\(speech)")
         return CapturedAudio(samples: captured, hasSpeech: speech)
     }
 

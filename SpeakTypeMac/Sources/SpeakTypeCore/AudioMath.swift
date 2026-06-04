@@ -1,17 +1,19 @@
-/// Pure audio math for capture adapters — the RMS silence gate (a port of the C#
-/// `AudioMath.HasSpeech`). Resampling is left to the platform's `AVAudioConverter`, so
-/// only the gate is needed here, and it stays deterministic and unit-testable.
+/// Pure audio math for capture adapters — the speech-presence gate.
+///
+/// Uses PEAK amplitude, not RMS. Push-to-talk buffers include the quiet moments before and
+/// after you actually speak, so RMS averaged over the whole buffer badly underestimates
+/// speech presence: on a real Mac mic, clear speech peaked at ~0.08 while the buffer's RMS
+/// fell below an 0.01 RMS gate → speech was wrongly rejected. Peak is independent of how
+/// much silence padding the buffer holds: quiet-room noise stays well under the threshold,
+/// while any real speech clears it.
 public enum AudioMath {
-    /// Default RMS gate: a near-silent buffer (quiet room) is rejected, normal speech
-    /// passes. Matches the C# `DefaultRmsThreshold`.
-    public static let defaultRmsThreshold: Float = 0.01
+    /// Default peak gate. Room/line noise peaks well below this; normal speech peaks far above.
+    public static let speechPeakThreshold: Float = 0.02
 
-    /// True when the buffer's RMS is at or above `threshold`. Empty → silent (false).
-    public static func hasSpeech(_ samples: [Float], threshold: Float = defaultRmsThreshold) -> Bool {
-        guard !samples.isEmpty else { return false }
-        var sumOfSquares = 0.0
-        for s in samples { sumOfSquares += Double(s) * Double(s) }
-        let rms = (sumOfSquares / Double(samples.count)).squareRoot()
-        return rms >= Double(threshold)
+    /// True when the buffer's peak amplitude reaches `threshold`. Empty → silent (false).
+    public static func hasSpeech(_ samples: [Float], threshold: Float = speechPeakThreshold) -> Bool {
+        var peak: Float = 0
+        for s in samples { peak = max(peak, abs(s)) }
+        return peak >= threshold
     }
 }
