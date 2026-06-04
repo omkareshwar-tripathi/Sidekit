@@ -69,8 +69,15 @@ public protocol Transcribing: Sendable {
 }
 
 /// Loads and saves the scratchpad notes. The store calls `load()` once at init and `save(_:)`
-/// after every mutation; the adapter (UI-3) backs this with a JSON file.
+/// after every mutation; the adapter (UI-3) backs this with a JSON file. `flush()` forces any
+/// buffered/debounced write to disk immediately (called on app termination).
 public protocol NotesPersisting: Sendable {
     func load() -> [Note]
     func save(_ notes: [Note])
+    func flush()
+}
+
+public extension NotesPersisting {
+    /// Default: nothing is buffered, so there's nothing to flush. A debouncing adapter overrides.
+    func flush() {}
 }

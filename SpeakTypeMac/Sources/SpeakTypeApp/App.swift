@@ -57,6 +57,10 @@ final class AppController: ObservableObject {
     /// Live 0…1 mic level during recording; drives the pill waveform. Resets to 0 when idle.
     @Published private(set) var level: Float = 0
 
+    /// The scratchpad notes (observable wrapper over the pure store). Surfaced to the window in
+    /// UI-8b and to the routing sink in UI-9.
+    let notes = NotesModel()
+
     private let coordinator: DictationCoordinator
     private let hotkey: FnKeyMonitor
     private var pill: PillPanel?
