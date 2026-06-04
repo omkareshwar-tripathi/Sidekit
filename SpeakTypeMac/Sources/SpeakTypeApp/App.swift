@@ -39,7 +39,7 @@ final class AppController: ObservableObject {
         let clipboard = MacClipboard()
         let paste = ClipboardSafePaste(clipboard: clipboard)
         let audio = AVAudioCapture()
-        let transcriber = StubTranscriber()
+        let transcriber = WhisperKitTranscriber()
         let coordinator = DictationCoordinator(
             audio: audio,
             transcriber: transcriber,

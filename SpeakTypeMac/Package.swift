@@ -8,11 +8,18 @@ import PackageDescription
 let package = Package(
     name: "SpeakTypeMac",
     platforms: [.macOS(.v14)],
+    dependencies: [
+        // On-device Whisper on the Neural Engine (brick MAC-6).
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
+    ],
     targets: [
         .target(name: "SpeakTypeCore"),
         .executableTarget(
             name: "SpeakTypeApp",
-            dependencies: ["SpeakTypeCore"]
+            dependencies: [
+                "SpeakTypeCore",
+                .product(name: "WhisperKit", package: "WhisperKit"),
+            ]
         ),
         .testTarget(
             name: "SpeakTypeCoreTests",
