@@ -57,9 +57,9 @@ final class AppController: ObservableObject {
     /// Live 0…1 mic level during recording; drives the pill waveform. Resets to 0 when idle.
     @Published private(set) var level: Float = 0
 
-    /// The scratchpad notes (observable wrapper over the pure store). Surfaced to the window in
-    /// UI-8b and to the routing sink in UI-9.
-    let notes = NotesModel()
+    /// The scratchpad notes (observable wrapper over the pure store). Surfaced to the window and
+    /// to the routing sink.
+    let notes: NotesModel
 
     private let coordinator: DictationCoordinator
     private let hotkey: FnKeyMonitor
@@ -70,14 +70,31 @@ final class AppController: ObservableObject {
         let paste = ClipboardSafePaste(clipboard: clipboard)
         let audio = AVAudioCapture()
         let transcriber = WhisperKitTranscriber(modelFolder: Self.bundledModelFolder())
+        let notes = NotesModel()
+
+        // Route the cleaned transcript: into the active note when SpeakType is the focused app
+        // (creating one if the list is empty), otherwise paste at the cursor as before (spec §3).
+        // The sink's `deliver` is invoked on the main actor by the coordinator, so the AppKit /
+        // notes touches below are safe under `assumeIsolated`.
+        let sink = RoutingSink(
+            isAppFocused: { MainActor.assumeIsolated { NSApp.isActive } },
+            appendToNote: { text in
+                MainActor.assumeIsolated {
+                    let id = notes.activeID ?? notes.newNote().id
+                    notes.append(text, to: id)
+                }
+            },
+            pasteSink: PasteSink(paste: paste))
+
         let coordinator = DictationCoordinator(
             audio: audio,
             transcriber: transcriber,
-            sink: PasteSink(paste: paste),
+            sink: sink,
             clock: SystemClock(),
             autoStop: SystemAutoStopTimer()
         )
         let hotkey = FnKeyMonitor()
+        self.notes = notes
         self.coordinator = coordinator
         self.hotkey = hotkey
 
