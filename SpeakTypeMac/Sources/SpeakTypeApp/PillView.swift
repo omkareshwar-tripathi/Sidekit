@@ -50,7 +50,7 @@ struct PillView: View {
             glassPill(label: "Listening…") {
                 HStack(spacing: DS.Space.sm) {
                     Circle().fill(DS.Palette.recDot).frame(width: 8, height: 8)
-                    WaveformBars()
+                    WaveformBars(level: CGFloat(controller.level))
                 }
             }
         case .transcribing:
@@ -77,16 +77,22 @@ struct PillView: View {
     }
 }
 
-/// A static row of waveform bars (UI-6 makes the heights track the live mic level).
+/// Waveform bars driven by the live 0…1 mic `level`. Each bar has a fixed silhouette weight; the
+/// level scales them together (with a small floor so the bars stay visible at silence). Per-bar
+/// smoothing/animation is UI-7.
 private struct WaveformBars: View {
-    private let heights: [CGFloat] = [6, 12, 9, 16, 8, 13, 7]
+    var level: CGFloat
+    private let shape: [CGFloat] = [0.4, 0.75, 0.55, 1.0, 0.5, 0.8, 0.45]
+    private let maxBar: CGFloat = 18
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(heights.indices, id: \.self) { i in
-                Capsule().fill(DS.accentGradient).frame(width: 2.5, height: heights[i])
+            ForEach(shape.indices, id: \.self) { i in
+                Capsule()
+                    .fill(DS.accentGradient)
+                    .frame(width: 2.5, height: max(3, maxBar * shape[i] * (0.2 + 0.8 * level)))
             }
         }
-        .frame(height: 18)
+        .frame(height: maxBar)
     }
 }

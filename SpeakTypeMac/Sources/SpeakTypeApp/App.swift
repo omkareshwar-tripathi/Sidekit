@@ -54,6 +54,8 @@ final class AppController: ObservableObject {
     @Published private(set) var state: DictationState = .idle
     @Published private(set) var lastOutcome: DictationOutcome?
     @Published private(set) var accessibilityTrusted = AXIsProcessTrusted()
+    /// Live 0…1 mic level during recording; drives the pill waveform. Resets to 0 when idle.
+    @Published private(set) var level: Float = 0
 
     private let coordinator: DictationCoordinator
     private let hotkey: FnKeyMonitor
@@ -75,7 +77,11 @@ final class AppController: ObservableObject {
         self.coordinator = coordinator
         self.hotkey = hotkey
 
-        coordinator.onStateChanged = { [weak self] newState in self?.state = newState }
+        audio.onLevel = { [weak self] in self?.level = $0 }
+        coordinator.onStateChanged = { [weak self] newState in
+            self?.state = newState
+            if newState != .recording { self?.level = 0 } // settle the waveform once recording ends
+        }
         coordinator.onCompleted = { [weak self] outcome in self?.lastOutcome = outcome }
         // NSEvent monitor callbacks arrive on the main thread. press/cancel run
         // synchronously (preserving strict press-before-release ordering); release is async

@@ -16,6 +16,11 @@ final class AVAudioCapture: AudioCapturing, @unchecked Sendable {
     private var running = false
     private var tapCallbacks = 0 // diagnostic: how many tap buffers arrived this cycle
 
+    /// Live 0…1 mic level for the recording waveform, delivered on the main actor a few times a
+    /// second while recording. Set once before `start()`. Additive — the buffer/gate are
+    /// unaffected (same unlocked read pattern as `converter`).
+    var onLevel: (@MainActor (Float) -> Void)?
+
     init() {
         targetFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -82,9 +87,16 @@ final class AVAudioCapture: AudioCapturing, @unchecked Sendable {
         guard error == nil, let channel = out.floatChannelData else { return }
 
         let frames = Int(out.frameLength)
+        let frameSamples = Array(UnsafeBufferPointer(start: channel[0], count: frames))
         lock.lock()
-        samples.append(contentsOf: UnsafeBufferPointer(start: channel[0], count: frames))
+        samples.append(contentsOf: frameSamples)
         lock.unlock()
+
+        // Live waveform meter — peak of this buffer, hopped to the main actor for the UI.
+        if let onLevel {
+            let level = AudioMath.level(frameSamples)
+            Task { @MainActor in onLevel(level) }
+        }
     }
 }
 

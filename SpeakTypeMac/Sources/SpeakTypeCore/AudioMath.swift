@@ -16,4 +16,17 @@ public enum AudioMath {
         for s in samples { peak = max(peak, abs(s)) }
         return peak >= threshold
     }
+
+    /// Peak treated as "full deflection" on the 0…1 meter. Normal speech peaks well below 1.0,
+    /// so the live waveform would barely move against a 1.0 reference; this maps a realistic
+    /// loud peak to a full bar.
+    public static let loudPeak: Float = 0.3
+
+    /// A 0…1 amplitude level for the live recording waveform: the buffer's peak normalized
+    /// against `reference` and clamped to 1. Empty → 0. Shares the peak basis with `hasSpeech`.
+    public static func level(_ samples: [Float], reference: Float = loudPeak) -> Float {
+        var peak: Float = 0
+        for s in samples { peak = max(peak, abs(s)) }
+        return min(1, peak / reference)
+    }
 }
