@@ -37,6 +37,20 @@ struct MainWindow: View {
                     }
             }
         }
+        // Animate inserts/deletes and the newest-first reorder — a dictated note gliding to the
+        // top is the gentle "transcript landed" cue at the list level.
+        .animation(.easeInOut(duration: 0.25), value: notes.notes.map(\.id))
+        .overlay {
+            if notes.notes.isEmpty {
+                ContentUnavailableView {
+                    Label("No notes yet", systemImage: "note.text")
+                } description: {
+                    Text("Dictate with Fn while this window is focused, or create a note to start.")
+                } actions: {
+                    Button("New note") { notes.newNote() }
+                }
+            }
+        }
         .navigationTitle("Notes")
         .toolbar {
             Button { notes.newNote() } label: { Label("New note", systemImage: "square.and.pencil") }
