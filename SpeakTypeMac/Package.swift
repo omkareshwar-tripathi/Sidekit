@@ -25,5 +25,11 @@ let package = Package(
             name: "SpeakTypeCoreTests",
             dependencies: ["SpeakTypeCore"]
         ),
+        // Dev tool: headlessly verify the bundled model loads + transcribes offline.
+        // Usage: swift run ModelSelftest <modelFolder> <audioPath>
+        .executableTarget(
+            name: "ModelSelftest",
+            dependencies: [.product(name: "WhisperKit", package: "WhisperKit")]
+        ),
     ]
 )

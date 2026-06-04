@@ -16,10 +16,14 @@ BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
 APP="SpeakType.app"
 CONTENTS="$APP/Contents"
 
+# Ensure the speech model is present, then bundle it so the app runs fully offline.
+"$(dirname "$0")/fetch-model.sh"
+
 rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$BIN_DIR/SpeakTypeApp" "$CONTENTS/MacOS/SpeakType"
 cp "AppBundle/Info.plist" "$CONTENTS/Info.plist"
+cp -R "Models" "$CONTENTS/Resources/Models"
 
 # Ad-hoc sign so TCC remembers granted permissions across rebuilds.
 codesign --force --sign - "$APP"

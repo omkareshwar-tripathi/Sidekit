@@ -1,18 +1,22 @@
 // @preconcurrency: WhisperKit predates strict concurrency and its types aren't Sendable;
 // the actor serializes all access, so calling its async API is safe here.
 @preconcurrency import WhisperKit
+import Foundation
 import SpeakTypeCore
 
-/// On-device transcription via WhisperKit (CoreML / Neural Engine). The model is loaded
-/// lazily on first use — WhisperKit downloads it on first run, so launch isn't blocked.
-/// An `actor` serializes model load + inference; fail-open (empty string → the coordinator
-/// treats it as no-speech) so a model/inference error never crashes a dictation.
+/// On-device transcription via WhisperKit (CoreML / Neural Engine). Loads the model lazily
+/// on first use. When `modelFolder` is given (the model bundled into the app), it loads
+/// fully offline — no download. An `actor` serializes load + inference; fail-open (empty
+/// string → no-speech) so a model/inference error never crashes a dictation, and the error
+/// is logged so failures are visible.
 actor WhisperKitTranscriber: Transcribing {
-    private let model: String
+    private let modelFolder: String?
+    private let modelName: String
     private var pipe: WhisperKit?
 
-    init(model: String = "base.en") {
-        self.model = model
+    init(modelFolder: URL? = nil, modelName: String = "base.en") {
+        self.modelFolder = modelFolder?.path
+        self.modelName = modelName
     }
 
     func transcribe(_ samples: [Float]) async -> String {
@@ -21,13 +25,17 @@ actor WhisperKitTranscriber: Transcribing {
             let results: [TranscriptionResult] = try await whisper.transcribe(audioArray: samples)
             return results.map(\.text).joined(separator: " ")
         } catch {
+            FileHandle.standardError.write(Data("SpeakType: transcription failed: \(error)\n".utf8))
             return ""
         }
     }
 
     private func ready() async throws -> WhisperKit {
         if let pipe { return pipe }
-        let whisper = try await WhisperKit(WhisperKitConfig(model: model))
+        let config = modelFolder != nil
+            ? WhisperKitConfig(modelFolder: modelFolder)   // bundled → offline
+            : WhisperKitConfig(model: modelName)            // fallback → download
+        let whisper = try await WhisperKit(config)
         pipe = whisper
         return whisper
     }
