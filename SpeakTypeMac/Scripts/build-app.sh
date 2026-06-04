@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Assemble SpeakType.app from the SwiftPM executable.
+#
+# macOS grants microphone/Accessibility permissions to a *bundle* with a stable
+# signed identity, not a loose binary — so even for local dev we wrap the executable
+# in a .app and ad-hoc code-sign it. Usage: ./Scripts/build-app.sh [debug|release]
+set -euo pipefail
+
+cd "$(dirname "$0")/.."   # → SpeakTypeMac/
+CONFIG="${1:-debug}"
+
+echo "Building ($CONFIG)…"
+swift build -c "$CONFIG"
+
+BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
+APP="SpeakType.app"
+CONTENTS="$APP/Contents"
+
+rm -rf "$APP"
+mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
+cp "$BIN_DIR/SpeakTypeApp" "$CONTENTS/MacOS/SpeakType"
+cp "AppBundle/Info.plist" "$CONTENTS/Info.plist"
+
+# Ad-hoc sign so TCC remembers granted permissions across rebuilds.
+codesign --force --sign - "$APP"
+
+echo "Built $PWD/$APP"
+echo "Run it with:  open $APP   (or: open -a \"$PWD/$APP\")"

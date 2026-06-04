@@ -1,0 +1,8 @@
+# SwiftPM build artifacts
+.build/
+# Assembled app bundle (produced by Scripts/build-app.sh)
+SpeakType.app/
+# Xcode/SwiftPM local state
+.swiftpm/
+*.xcodeproj
+DerivedData/

@@ -6,6 +6,27 @@ Plan derived from `SpeakType-v1-spec.md` (the complete, decision-resolved spec).
 
 ---
 
+## Mac (Swift) — `feat/mac-app` branch
+
+_Native Swift macOS dictation app (a deliberate **fork** — Windows stays C#, they evolve independently). Spec: `docs/superpowers/specs/2026-06-04-speaktype-mac-design.md`. Lives in `SpeakTypeMac/` (SwiftPM). Decisions: SwiftUI `MenuBarExtra`, WhisperKit (Neural Engine), hold-Fn (🌐) push-to-talk, SwiftPM + `build-app.sh`, local-dev ad-hoc-signed arm64. Ports-and-adapters with a pure tested `DictationCoordinator`. Domain `Skill:` lines are `none` (the `dotnet-*` skills don't apply to Swift, per CLAUDE.md §6); TDD + verification still apply._
+
+### Next up (Mac)
+
+- [ ] **MAC-2 — Pure core.** `DictationCoordinator` (port of C# `DictationOrchestrator`: press→record, release→cycle, 300 ms tap guard, 60 s auto-stop, release/auto-stop race) + `TranscriptCleaner` + `Settings`, with fake ports + full unit tests. No system frameworks. Verify: coordinator state-transition tests green. Skill: test-driven-development.
+- [ ] **MAC-3 — Paste.** `MacPaste` adapter (`NSPasteboard` + `CGEvent` ⌘V) + clipboard-safe save→paste→restore sequence (sequence logic unit-tested against a fake pasteboard). Verify: unit tests green; manual paste into TextEdit. Skill: test-driven-development.
+- [ ] **MAC-4 — Fn hotkey.** `FnKeyMonitor` (global `flagsChanged` on `.function`; abort if another key is pressed while Fn held). Verify: manual — menu shows recording while Fn held, stops on release. Skill: none.
+- [ ] **MAC-5 — Audio.** `AVAudioCapture` (`AVAudioEngine`→16 kHz mono Float32 + RMS silence gate + mic permission). Verify: manual — mic prompt; speech → non-silent samples, silence gated. Skill: none.
+- [ ] **MAC-6 — Whisper + wiring.** Add WhisperKit dep; `WhisperKitTranscriber` + composition root wiring the coordinator end-to-end + menu-bar status. Verify: manual — hold Fn, speak, release → text in TextEdit. Skill: none.
+- [ ] **MAC-7 — Finalize permissions & docs.** `AXIsProcessTrusted` messaging, finalize Info.plist/entitlements, README/permissions doc; full manual end-to-end pass. Skill: verification-before-completion.
+
+### Done (Mac)
+
+- [x] **MAC-1 — Scaffold + bundle (2026-06-04).** Created the `SpeakTypeMac/` SwiftPM package: `SpeakTypeCore` library (`Ports.swift` — `AudioCapturing`/`HotkeyListening`/`Pasting`/`Transcribing` protocols + `CapturedAudio`/`PasteOutcome`/`DictationState` value types), `SpeakTypeApp` executable (`App.swift` — SwiftUI `MenuBarExtra` with a static mic icon + Quit), `Scripts/build-app.sh` (assembles + ad-hoc-signs `SpeakType.app` with `AppBundle/Info.plist`, `LSUIElement=true`), and `Tests/SpeakTypeCoreTests/PortsTests.swift` (4 Swift Testing tests on the value types). **Verified:** `swift build` clean; `swift test` 4/4 green; `build-app.sh` produces a `codesign --verify`-valid bundle with `LSUIElement=true`. **Manual check pending (user):** menu-bar icon visually appears on `open SpeakType.app`. **Notes:** WhisperKit dep deferred to MAC-6 to keep MAC-1 fast/offline; `Info.plist` already carries `NSMicrophoneUsageDescription` (used in MAC-5). Deployment target macOS 14.
+
+---
+
+## Windows (C#) — `main` line
+
 ## Next up
 
 _(Top item is what to work on now. Sized per CLAUDE.md §2a — split any brick that grows past ~150 LOC / 5 source files.)_
