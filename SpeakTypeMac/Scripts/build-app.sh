@@ -9,6 +9,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."   # → SpeakTypeMac/
 CONFIG="${1:-debug}"
 
+# Quit any running instance first — otherwise `open` just re-activates the old (now stale)
+# process instead of launching the freshly built one.
+pkill -f "SpeakType.app/Contents/MacOS/SpeakType" 2>/dev/null && echo "Quit running instance." || true
+
 echo "Building ($CONFIG)…"
 swift build -c "$CONFIG"
 
