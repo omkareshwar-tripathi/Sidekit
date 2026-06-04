@@ -31,6 +31,7 @@ final class NotesModel: ObservableObject {
     @discardableResult
     func newNote() -> Note { mutate { store.newNote() } }
     func append(_ text: String, to id: Note.ID) { mutate { store.append(text, to: id) } }
+    func setBody(_ body: String, for id: Note.ID) { mutate { store.setBody(body, to: id) } }
     func select(_ id: Note.ID) { mutate { store.select(id) } }
     func delete(_ id: Note.ID) { mutate { store.delete(id) } }
 

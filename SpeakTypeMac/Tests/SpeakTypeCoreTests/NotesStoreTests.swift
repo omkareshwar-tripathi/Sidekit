@@ -81,6 +81,25 @@ struct NotesStoreTests {
         #expect(store.notes.last?.id == second.id)
     }
 
+    // MARK: - setBody
+
+    @Test func setBodyReplacesBodyBumpsUpdatedAtAndReorders() {
+        let (store, _) = makeSUT()
+        let first = store.newNote()
+        _ = store.newNote() // second is now active + top
+        store.setBody("edited", to: first.id)
+        #expect(store.notes.first?.id == first.id)        // jumped to top by updatedAt
+        #expect(store.notes.first?.body == "edited")
+    }
+
+    @Test func setBodyToUnknownIdIsNoop() {
+        let (store, persistence) = makeSUT()
+        let before = persistence.saveCount
+        store.setBody("x", to: UUID())
+        #expect(store.notes.isEmpty)
+        #expect(persistence.saveCount == before)
+    }
+
     // MARK: - select / delete
 
     @Test func selectChangesActiveNote() {

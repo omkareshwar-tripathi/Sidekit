@@ -47,6 +47,15 @@ public final class NotesStore {
         reorderAndSave()
     }
 
+    /// Replace a note's whole body (editor edits), bump `updatedAt`, and re-sort newest-first.
+    /// No-op on an unknown id.
+    public func setBody(_ body: String, to id: Note.ID) {
+        guard let index = notes.firstIndex(where: { $0.id == id }) else { return }
+        notes[index].body = body
+        notes[index].updatedAt = now()
+        reorderAndSave()
+    }
+
     public func select(_ id: Note.ID) {
         guard notes.contains(where: { $0.id == id }) else { return }
         activeID = id

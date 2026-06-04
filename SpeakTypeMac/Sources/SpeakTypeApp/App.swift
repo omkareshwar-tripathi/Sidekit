@@ -18,7 +18,7 @@ struct SpeakTypeApp: App {
         // The main window stays closed until "Open SpeakType" is chosen; opening it flips the
         // app to a Dock-present `.regular` app, closing it returns to the menu-bar-only utility.
         Window("SpeakType", id: MainWindow.id) {
-            MainWindow()
+            MainWindow(notes: controller.notes)
                 .onAppear { AppController.setWindowMode(true) }
                 .onDisappear { AppController.setWindowMode(false) }
         }
