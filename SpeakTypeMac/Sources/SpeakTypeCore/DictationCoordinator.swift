@@ -90,6 +90,17 @@ public final class DictationCoordinator {
         await runCycle()
     }
 
+    /// Aborts an in-progress recording and returns to idle, discarding the audio (no
+    /// transcribe, no paste, no outcome). Used when the hold is cancelled mid-press (e.g.
+    /// Fn used as a modifier). No-op unless currently recording, so it never interrupts a
+    /// running cycle.
+    public func cancel() {
+        guard state == .recording else { return }
+        autoStop.cancel()
+        _ = audio.stop() // discard the audio
+        setState(.idle)
+    }
+
     private func runCycle() async {
         let captured = audio.stop()
         guard captured.hasSpeech else { return finish(.noSpeech) }

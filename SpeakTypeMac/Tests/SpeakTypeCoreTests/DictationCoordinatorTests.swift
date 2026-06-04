@@ -152,6 +152,27 @@ struct DictationCoordinatorTests {
         #expect(paste.pasted == ["Um, we should ship it. "]) // filler kept when removal is off
     }
 
+    @Test func cancelWhileRecordingDiscardsAndReturnsToIdle() {
+        let (sut, audio, _, _, _, timer) = makeSUT()
+        var completions: [DictationOutcome] = []
+        sut.onCompleted = { completions.append($0) }
+
+        sut.pressed()
+        sut.cancel()
+
+        #expect(sut.currentState == .idle)
+        #expect(audio.stopCount == 1)   // mic released, audio discarded
+        #expect(completions.isEmpty)    // no outcome for a cancel
+        #expect(timer.cancelCount == 1)
+    }
+
+    @Test func cancelWhenIdleIsNoop() {
+        let (sut, audio, _, _, _, _) = makeSUT()
+        sut.cancel()
+        #expect(audio.stopCount == 0)
+        #expect(sut.currentState == .idle)
+    }
+
     @Test func emitsStateSequenceForANormalCycle() async {
         let (sut, _, _, _, clock, _) = makeSUT()
         var states: [DictationState] = []

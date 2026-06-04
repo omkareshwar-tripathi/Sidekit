@@ -41,10 +41,12 @@ public protocol AudioCapturing: AnyObject {
 }
 
 /// Push-to-talk source. `onPressed` fires when the key goes down, `onReleased` when it
-/// comes back up.
+/// comes back up, and `onCancelled` when the hold is aborted (e.g. another key was pressed
+/// while Fn was held — Fn used as a modifier, not for dictation).
 public protocol HotkeyListening: AnyObject {
     var onPressed: (() -> Void)? { get set }
     var onReleased: (() -> Void)? { get set }
+    var onCancelled: (() -> Void)? { get set }
 }
 
 /// Inserts text into the focused application, or leaves it on the clipboard.
