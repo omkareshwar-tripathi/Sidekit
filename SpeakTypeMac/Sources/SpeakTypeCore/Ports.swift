@@ -52,7 +52,9 @@ public protocol Pasting: AnyObject {
     func paste(_ text: String) -> PasteOutcome
 }
 
-/// Turns 16 kHz mono samples into a transcript. Async because WhisperKit is async.
-public protocol Transcribing: AnyObject {
+/// Turns 16 kHz mono samples into a transcript. Async because WhisperKit is async, and
+/// `Sendable` because the coordinator calls it from the main actor but the work runs
+/// off-main (so it never blocks the UI).
+public protocol Transcribing: Sendable {
     func transcribe(_ samples: [Float]) async -> String
 }
