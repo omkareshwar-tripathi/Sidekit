@@ -10,18 +10,40 @@ struct SpeakTypeApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            Text(controller.statusText)
-            if !controller.accessibilityTrusted {
-                Divider()
-                Text("⚠︎ Grant Accessibility to paste & use Fn")
-                Button("Open Accessibility Settings…") { controller.openAccessibilitySettings() }
-            }
-            Divider()
-            Button("Quit SpeakType") { NSApplication.shared.terminate(nil) }
-                .keyboardShortcut("q")
+            MenuContent(controller: controller)
         } label: {
             Image(systemName: controller.iconName)
         }
+
+        // The main window stays closed until "Open SpeakType" is chosen; opening it flips the
+        // app to a Dock-present `.regular` app, closing it returns to the menu-bar-only utility.
+        Window("SpeakType", id: MainWindow.id) {
+            MainWindow()
+                .onAppear { AppController.setWindowMode(true) }
+                .onDisappear { AppController.setWindowMode(false) }
+        }
+        .windowResizability(.contentSize)
+    }
+}
+
+/// The menu-bar dropdown. Extracted so it can read `\.openWindow` from the environment to show
+/// the main window.
+private struct MenuContent: View {
+    @ObservedObject var controller: AppController
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Open SpeakType") { openWindow(id: MainWindow.id) }
+        Divider()
+        Text(controller.statusText)
+        if !controller.accessibilityTrusted {
+            Divider()
+            Text("⚠︎ Grant Accessibility to paste & use Fn")
+            Button("Open Accessibility Settings…") { controller.openAccessibilitySettings() }
+        }
+        Divider()
+        Button("Quit SpeakType") { NSApplication.shared.terminate(nil) }
+            .keyboardShortcut("q")
     }
 }
 
@@ -97,6 +119,14 @@ final class AppController: ObservableObject {
             case nil: return "SpeakType — hold Fn to dictate"
             }
         }
+    }
+
+    /// Switch activation policy (spec §7): `.regular` (Dock icon, ⌘-Tab, can take focus) while the
+    /// main window is open; `.accessory` (pure menu-bar background utility) when it closes. The
+    /// floating pill is a non-activating panel and never triggers this.
+    static func setWindowMode(_ open: Bool) {
+        NSApp.setActivationPolicy(open ? .regular : .accessory)
+        if open { NSApp.activate(ignoringOtherApps: true) }
     }
 
     func openAccessibilitySettings() {
