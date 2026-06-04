@@ -64,6 +64,13 @@ final class AppController: ObservableObject {
 
         // Prompt for the microphone up front so the first dictation isn't silently empty.
         AVCaptureDevice.requestAccess(for: .audio) { _ in }
+
+        // Ask macOS to add this app to Accessibility and prompt the user (needed for the ⌘V
+        // paste keystroke and Fn monitoring). Without the prompt option, an un-granted app
+        // never appears in the list to toggle. The key's value is the literal below — used
+        // directly to avoid Swift 6's concurrency check on the global CFString symbol.
+        accessibilityTrusted = AXIsProcessTrustedWithOptions(
+            ["AXTrustedCheckOptionPrompt": true] as CFDictionary)
     }
 
     var iconName: String {

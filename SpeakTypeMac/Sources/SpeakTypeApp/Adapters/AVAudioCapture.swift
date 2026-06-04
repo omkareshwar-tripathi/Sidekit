@@ -14,6 +14,7 @@ final class AVAudioCapture: AudioCapturing, @unchecked Sendable {
     private var samples: [Float] = []
     private var converter: AVAudioConverter?
     private var running = false
+    private var tapCallbacks = 0 // diagnostic: how many tap buffers arrived this cycle
 
     init() {
         targetFormat = AVAudioFormat(
@@ -25,11 +26,14 @@ final class AVAudioCapture: AudioCapturing, @unchecked Sendable {
     }
 
     func start() {
-        lock.lock(); samples.removeAll(); lock.unlock()
+        lock.lock(); samples.removeAll(); tapCallbacks = 0; lock.unlock()
 
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
         converter = AVAudioConverter(from: inputFormat, to: targetFormat)
+
+        let auth = AVCaptureDevice.authorizationStatus(for: .audio)
+        NSLog("SpeakType.mic: start authStatus=\(auth.rawValue) inputFormat=\(inputFormat.sampleRate)Hz ch=\(inputFormat.channelCount)")
 
         input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
             self?.append(buffer)
@@ -40,6 +44,7 @@ final class AVAudioCapture: AudioCapturing, @unchecked Sendable {
             running = true
         } catch {
             running = false
+            NSLog("SpeakType.mic: engine.start FAILED: \(error)")
         }
     }
 
@@ -49,12 +54,17 @@ final class AVAudioCapture: AudioCapturing, @unchecked Sendable {
             engine.inputNode.removeTap(onBus: 0)
             running = false
         }
-        lock.lock(); let captured = samples; samples.removeAll(); lock.unlock()
-        return CapturedAudio(samples: captured, hasSpeech: AudioMath.hasSpeech(captured))
+        lock.lock(); let captured = samples; samples.removeAll(); let taps = tapCallbacks; lock.unlock()
+        let speech = AudioMath.hasSpeech(captured)
+        var peak: Float = 0
+        for s in captured { peak = max(peak, abs(s)) }
+        NSLog("SpeakType.mic: stop taps=\(taps) samples=\(captured.count) peak=\(peak) hasSpeech=\(speech)")
+        return CapturedAudio(samples: captured, hasSpeech: speech)
     }
 
     private func append(_ buffer: AVAudioPCMBuffer) {
         guard let converter else { return }
+        lock.lock(); tapCallbacks += 1; lock.unlock()
         let ratio = targetFormat.sampleRate / buffer.format.sampleRate
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1
         guard let out = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else { return }

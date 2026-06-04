@@ -29,8 +29,17 @@ cp "$BIN_DIR/SpeakTypeApp" "$CONTENTS/MacOS/SpeakType"
 cp "AppBundle/Info.plist" "$CONTENTS/Info.plist"
 cp -R "Models" "$CONTENTS/Resources/Models"
 
-# Ad-hoc sign so TCC remembers granted permissions across rebuilds.
-codesign --force --sign - "$APP"
+# Sign with a STABLE self-signed identity so macOS TCC permissions (Accessibility,
+# Microphone) persist across rebuilds. Ad-hoc fallback if the identity isn't available.
+"$(dirname "$0")/make-signing-cert.sh"
+SIGN_ID="SpeakType Local Signing"
+if security find-certificate -c "$SIGN_ID" >/dev/null 2>&1; then
+  codesign --force --deep --sign "$SIGN_ID" "$APP"
+  echo "Signed with stable identity: $SIGN_ID"
+else
+  codesign --force --sign - "$APP"
+  echo "Signed ad-hoc (stable identity unavailable)."
+fi
 
 echo "Built $PWD/$APP"
 echo "Run it with:  open $APP   (or: open -a \"$PWD/$APP\")"
