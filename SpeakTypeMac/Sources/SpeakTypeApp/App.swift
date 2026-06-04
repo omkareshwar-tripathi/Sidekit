@@ -57,6 +57,7 @@ final class AppController: ObservableObject {
 
     private let coordinator: DictationCoordinator
     private let hotkey: FnKeyMonitor
+    private var pill: PillPanel?
 
     init() {
         let clipboard = MacClipboard()
@@ -94,6 +95,10 @@ final class AppController: ObservableObject {
         accessibilityTrusted = AXIsProcessTrustedWithOptions(
             ["AXTrustedCheckOptionPrompt": true] as CFDictionary)
         Diag.log("launch: AXIsProcessTrusted=\(AXIsProcessTrusted()) bundle=\(Bundle.main.bundleURL.path)")
+
+        // Show the always-present floating pill (binds to `self.state`). Created last, once all
+        // stored properties are initialized, so it can capture a fully-formed controller.
+        pill = PillPanel(controller: self)
     }
 
     var iconName: String {
