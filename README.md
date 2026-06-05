@@ -20,13 +20,13 @@ Artifacts are kept for 90 days. To build it yourself instead, see *Build a relea
 ## Run from source
 
 ```
-dotnet run --project SpeakType.App
+dotnet run --project windows/SpeakType.App
 ```
 
 ## Test
 
 ```
-dotnet test SpeakType.sln
+dotnet test windows/SpeakType.sln
 ```
 
 The cross-platform `SpeakType.Core` / `SpeakType.Tests` suites also run on macOS/Linux; the `SpeakType.App` UI layer (hotkey hook, audio, tray, clipboard) is **Windows-only**.
@@ -36,13 +36,13 @@ The cross-platform `SpeakType.Core` / `SpeakType.Tests` suites also run on macOS
 SpeakType ships as one **self-contained, single-file `win-x64` executable**: the .NET 8 runtime and the native Whisper libraries are bundled in, so it runs on a clean machine with nothing pre-installed. There is no installer in v1.
 
 ```
-dotnet publish SpeakType.App/SpeakType.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish windows/SpeakType.App/SpeakType.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
 The exe is written to:
 
 ```
-SpeakType.App/bin/Release/net8.0-windows/win-x64/publish/SpeakType.exe
+windows/SpeakType.App/bin/Release/net8.0-windows/win-x64/publish/SpeakType.exe
 ```
 
 Copy that single file anywhere and run it.
