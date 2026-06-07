@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpeakType Mac — Test Run</title>
+<style>
+  :root {
+    --accent: #6D5EFC; --accentAlt: #C44BFF;
+    --pass: #34C759; --fail: #FF3B30;
+    --bg: #14131A; --card: #1E1C26; --card2: #262430;
+    --line: rgba(255,255,255,0.10);
+    --text: #F2F1F6; --muted: #A8A6B4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 28px 20px 120px; }
+  header h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  header p { color: var(--muted); margin: 0 0 18px; }
+  .meta { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .meta label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .meta input {
+    background: var(--card); border: 1px solid var(--line); color: var(--text);
+    border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 13px; min-width: 160px;
+  }
+
+  /* sticky progress bar */
+  .progress {
+    position: sticky; top: 0; z-index: 5; backdrop-filter: blur(12px);
+    background: rgba(20,19,26,0.82); border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px 16px; margin-bottom: 22px; display: flex; align-items: center; gap: 14px;
+  }
+  .progress .count { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .bar { flex: 1; height: 8px; border-radius: 999px; background: var(--card2); overflow: hidden; }
+  .bar > span { display: block; height: 100%; width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accentAlt)); transition: width .25s ease; }
+  .tally { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .tally b.p { color: var(--pass); } .tally b.f { color: var(--fail); }
+
+  section { margin-bottom: 26px; }
+  section > h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+    margin: 0 0 10px; padding-left: 2px;
+  }
+  .item {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 10px; transition: border-color .2s, background .2s;
+  }
+  .item.pass { border-color: rgba(52,199,89,0.55); background: rgba(52,199,89,0.06); }
+  .item.fail { border-color: rgba(255,59,48,0.55); background: rgba(255,59,48,0.07); }
+  .item .desc { margin-bottom: 10px; }
+  .item .hint { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .choices { display: flex; gap: 8px; margin-bottom: 0; }
+  .choices button {
+    appearance: none; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--line); background: var(--card2); color: var(--muted);
+    border-radius: 8px; padding: 6px 14px; transition: all .15s;
+  }
+  .choices button:hover { color: var(--text); }
+  .item.pass .choices button.p { background: var(--pass); border-color: var(--pass); color: #052b10; }
+  .item.fail .choices button.f { background: var(--fail); border-color: var(--fail); color: #2b0503; }
+  .comment {
+    margin-top: 10px; width: 100%; resize: vertical; min-height: 0; height: 38px;
+    background: var(--card2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px;
+    display: none;
+  }
+  .item.fail .comment, .comment.has { display: block; }
+  .comment::placeholder { color: var(--muted); }
+
+  .toolbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    background: rgba(20,19,26,0.9); backdrop-filter: blur(14px); border-top: 1px solid var(--line);
+    padding: 12px 20px; display: flex; gap: 10px; justify-content: center; align-items: center;
+  }
+  .toolbar button {
+    appearance: none; cursor: pointer; font: inherit; font-weight: 600; font-size: 14px;
+    border: none; border-radius: 10px; padding: 10px 18px; color: #fff;
+    background: linear-gradient(90deg, var(--accent), var(--accentAlt));
+  }
+  .toolbar button.ghost { background: var(--card2); border: 1px solid var(--line); color: var(--text); }
+  .toolbar .saved { color: var(--muted); font-size: 12px; }
+
+  dialog {
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    border-radius: 14px; padding: 0; max-width: 680px; width: 92%;
+  }
+  dialog::backdrop { background: rgba(0,0,0,0.55); }
+  dialog .dlg { padding: 18px; }
+  dialog h3 { margin: 0 0 10px; }
+  dialog textarea {
+    width: 100%; height: 320px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px; font: 12px/1.45 ui-monospace, Menlo, monospace;
+  }
+  dialog .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>SpeakType Mac — Targeted Re-test</h1>
+    <p><b>Just this build's changes</b> — the fixes from this round plus the wiring they could disturb. The full 37-item plan (<code>TESTING.md</code>) is saved for one major pass before shipping. Click <b>Pass</b> or <b>Fail</b> for each check; a comment box opens automatically on Fail. Everything saves in this browser as you go. When done, hit <b>Export results</b> and paste the summary back to me.</p>
+  </header>
+
+  <div class="meta">
+    <div><label>Tester</label><input id="tester" placeholder="your name"></div>
+    <div><label>Date</label><input id="date" placeholder="YYYY-MM-DD"></div>
+    <div><label>Build</label><input id="build" placeholder="auto-filled from build-info.js (rebuild to refresh)"></div>
+  </div>
+
+  <div class="progress">
+    <span class="count" id="count">0 / 0</span>
+    <div class="bar"><span id="barFill"></span></div>
+    <span class="tally" id="tally"></span>
+  </div>
+
+  <div id="sections"></div>
+</div>
+
+<div class="toolbar">
+  <span class="saved" id="savedNote">Auto-saving locally</span>
+  <button class="ghost" id="resetBtn">Reset</button>
+  <button id="exportBtn">Export results</button>
+</div>
+
+<dialog id="exportDlg">
+  <div class="dlg">
+    <h3>Results — copy &amp; paste this back to me</h3>
+    <textarea id="exportText" readonly></textarea>
+    <div class="row">
+      <button class="ghost" id="copyBtn">Copy to clipboard</button>
+      <button id="closeDlg">Close</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Build identity, regenerated by build-app.sh on every build; sets window.SPEAKTYPE_BUILD.
+     Absent (e.g. fresh clone) → the Build field just stays manual. -->
+<script src="build-info.js"></script>
+<script>
+// Test plan — mirrors SpeakTypeMac/TESTING.md. Each item: { id, desc, hint? }
+// TARGETED re-test — only the two items that failed last round, now fixed. The full 37-item plan
+// lives in SpeakTypeMac/TESTING.md and is run as one major pass before shipping.
+const PLAN = [
+  { title: "Re-test (honest paste status)", items: [
+    { id: "3.1", desc: "Click into a REAL text field (e.g. TextEdit) → hold Fn, say \"hello world\", release → it pastes at the cursor, status \"Pasted ✓\". THEN click the desktop / a Finder window (no text field) and dictate → it must NOT say Pasted; the status/pill reads \"Copied to clipboard — ⌘V to paste\", and the text is on the clipboard + in History." },
+    { id: "3.8", desc: "After that no-field dictation, open History → the entry's outcome now reads \"Copied to clipboard\" (not \"Pasted\"), and its Copy button works." },
+  ]},
+  { title: "Re-test (note creation)", items: [
+    { id: "5.2", desc: "Delete ALL notes so the sidebar shows the empty state, then dictate while the SpeakType window is focused → a brand-new note is created and the speech lands in it. (You don't need to deselect — emptying the list is the 'no note exists' state.)" },
+  ]},
+];
+
+const KEY = "speaktype-mac-testrun-v3";
+const sectionsEl = document.getElementById("sections");
+let state = load();
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; }
+}
+function save() {
+  state.meta = {
+    tester: document.getElementById("tester").value,
+    date: document.getElementById("date").value,
+    build: document.getElementById("build").value,
+  };
+  localStorage.setItem(KEY, JSON.stringify(state));
+}
+
+function render() {
+  // restore meta
+  if (state.meta) {
+    document.getElementById("tester").value = state.meta.tester || "";
+    document.getElementById("date").value = state.meta.date || "";
+    document.getElementById("build").value = state.meta.build || "";
+  }
+  // Auto-fill the Build field from the build-stamped sidecar (build-info.js) when present, so the
+  // sheet always names the exact build you're testing. The stamped value wins on load (and is
+  // persisted for the export); rebuilding refreshes it. Still editable for a manual annotation.
+  const stampedBuild = (window.SPEAKTYPE_BUILD || "").trim();
+  if (stampedBuild) {
+    document.getElementById("build").value = stampedBuild;
+    state.meta = state.meta || {};
+    state.meta.build = stampedBuild;
+    localStorage.setItem(KEY, JSON.stringify(state));
+  }
+  sectionsEl.innerHTML = "";
+  for (const sec of PLAN) {
+    const s = document.createElement("section");
+    const h = document.createElement("h2");
+    h.textContent = sec.title;
+    s.appendChild(h);
+    for (const it of sec.items) {
+      s.appendChild(renderItem(it));
+    }
+    sectionsEl.appendChild(s);
+  }
+  updateProgress();
+}
+
+function renderItem(it) {
+  const cur = state[it.id] || {};
+  const wrap = document.createElement("div");
+  wrap.className = "item" + (cur.result ? " " + cur.result : "");
+  wrap.dataset.id = it.id;
+
+  const desc = document.createElement("div");
+  desc.className = "desc";
+  desc.innerHTML = "<b>" + it.id + "</b> &nbsp;" + escapeHtml(it.desc) +
+    (it.hint ? "<div class='hint'>" + escapeHtml(it.hint) + "</div>" : "");
+  wrap.appendChild(desc);
+
+  const choices = document.createElement("div");
+  choices.className = "choices";
+  const pass = mkBtn("Pass", "p"), fail = mkBtn("Fail", "f");
+  pass.onclick = () => setResult(it.id, "pass");
+  fail.onclick = () => setResult(it.id, "fail");
+  choices.appendChild(pass); choices.appendChild(fail);
+  wrap.appendChild(choices);
+
+  const comment = document.createElement("textarea");
+  comment.className = "comment" + (cur.comment ? " has" : "");
+  comment.placeholder = "Comment (what went wrong, or any note)…";
+  comment.value = cur.comment || "";
+  comment.oninput = () => { setComment(it.id, comment.value); };
+  wrap.appendChild(comment);
+
+  return wrap;
+}
+
+function mkBtn(label, cls) {
+  const b = document.createElement("button");
+  b.textContent = label; b.className = cls; return b;
+}
+
+function setResult(id, result) {
+  state[id] = state[id] || {};
+  // toggle off if clicking the same result again
+  state[id].result = state[id].result === result ? "" : result;
+  save();
+  const el = sectionsEl.querySelector('.item[data-id="' + id + '"]');
+  el.className = "item" + (state[id].result ? " " + state[id].result : "");
+  updateProgress();
+}
+function setComment(id, val) {
+  state[id] = state[id] || {};
+  state[id].comment = val;
+  save();
+}
+
+function updateProgress() {
+  let total = 0, done = 0, pass = 0, fail = 0;
+  for (const sec of PLAN) for (const it of sec.items) {
+    total++;
+    const r = (state[it.id] || {}).result;
+    if (r) { done++; if (r === "pass") pass++; else fail++; }
+  }
+  document.getElementById("count").textContent = done + " / " + total;
+  document.getElementById("barFill").style.width = total ? (done / total * 100) + "%" : "0";
+  document.getElementById("tally").innerHTML =
+    "<b class='p'>" + pass + " pass</b> · <b class='f'>" + fail + " fail</b> · " + (total - done) + " left";
+}
+
+function buildReport() {
+  const m = state.meta || {};
+  let out = "# SpeakType Mac — Test Run Results\n\n";
+  out += "- Tester: " + (m.tester || "—") + "\n";
+  out += "- Date: " + (m.date || "—") + "\n";
+  out += "- Build: " + (m.build || "—") + "\n\n";
+  let total = 0, pass = 0, fail = 0, untested = 0;
+  const fails = [];
+  for (const sec of PLAN) for (const it of sec.items) {
+    total++;
+    const c = state[it.id] || {};
+    if (c.result === "pass") pass++;
+    else if (c.result === "fail") { fail++; fails.push({ it, c }); }
+    else untested++;
+  }
+  out += "**" + pass + " passed · " + fail + " failed · " + untested + " untested** (of " + total + ")\n\n";
+  if (fails.length) {
+    out += "## Failures\n\n";
+    for (const f of fails) {
+      out += "- ❌ **" + f.it.id + "** — " + f.it.desc + "\n";
+      if (f.c.comment) out += "  - 💬 " + f.c.comment.replace(/\n/g, "\n    ") + "\n";
+    }
+    out += "\n";
+  }
+  // passes with comments worth surfacing
+  const noted = [];
+  for (const sec of PLAN) for (const it of sec.items) {
+    const c = state[it.id] || {};
+    if (c.result === "pass" && c.comment) noted.push({ it, c });
+  }
+  if (noted.length) {
+    out += "## Notes on passing items\n\n";
+    for (const n of noted) out += "- ✅ **" + n.it.id + "** — " + n.c.comment.replace(/\n/g, "\n    ") + "\n";
+    out += "\n";
+  }
+  out += "## Full checklist\n\n";
+  for (const sec of PLAN) {
+    out += "### " + sec.title + "\n";
+    for (const it of sec.items) {
+      const c = state[it.id] || {};
+      const mark = c.result === "pass" ? "✅" : c.result === "fail" ? "❌" : "⬜️";
+      out += "- " + mark + " " + it.id + " " + it.desc + (c.comment ? "  — 💬 " + c.comment.replace(/\n/g, " ") : "") + "\n";
+    }
+    out += "\n";
+  }
+  return out;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// wiring
+document.getElementById("tester").oninput = save;
+document.getElementById("date").oninput = save;
+document.getElementById("build").oninput = save;
+
+const dlg = document.getElementById("exportDlg");
+document.getElementById("exportBtn").onclick = () => {
+  document.getElementById("exportText").value = buildReport();
+  dlg.showModal();
+};
+document.getElementById("closeDlg").onclick = () => dlg.close();
+document.getElementById("copyBtn").onclick = async () => {
+  const ta = document.getElementById("exportText");
+  ta.select();
+  try { await navigator.clipboard.writeText(ta.value); document.getElementById("copyBtn").textContent = "Copied ✓"; }
+  catch { document.execCommand("copy"); document.getElementById("copyBtn").textContent = "Copied ✓"; }
+  setTimeout(() => document.getElementById("copyBtn").textContent = "Copy to clipboard", 1500);
+};
+document.getElementById("resetBtn").onclick = () => {
+  if (confirm("Clear all results and comments?")) { state = {}; localStorage.removeItem(KEY); render(); }
+};
+
+render();
+</script>
+</body>
+</html>
