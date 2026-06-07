@@ -41,5 +41,13 @@ else
   echo "Signed ad-hoc (stable identity unavailable)."
 fi
 
+# Stamp the build identity into a sidecar JS that the manual-test sheet (test-run.html) loads,
+# so its "Build" field fills itself with exactly the build you're testing. Regenerated each build.
+SHA="$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"
+if git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null; then DIRTY=""; else DIRTY="-dirty"; fi
+BUILD_ID="$CONFIG · $SHA$DIRTY · $(date -u +'%Y-%m-%d %H:%M UTC')"
+printf 'window.SPEAKTYPE_BUILD = "%s";\n' "$BUILD_ID" > build-info.js
+echo "Stamped build-info.js: $BUILD_ID"
+
 echo "Built $PWD/$APP"
 echo "Run it with:  open $APP   (or: open -a \"$PWD/$APP\")"
