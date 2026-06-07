@@ -8,9 +8,11 @@ struct MainWindow: View {
     static let id = "main"
 
     @ObservedObject var notes: NotesModel
+    let history: HistoryModel
     let settings: SettingsModel
 
     @State private var showSettings = false
+    @State private var showHistory = false
 
     var body: some View {
         NavigationSplitView {
@@ -22,7 +24,17 @@ struct MainWindow: View {
         }
         .animation(.easeInOut(duration: 0.2), value: notes.activeID)
         .frame(minWidth: 640, minHeight: 420)
+        // Toolbar lives on the split view (not the sidebar) so New note / History / Settings stay
+        // visible even when the sidebar is collapsed.
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { notes.newNote() } label: { Label("New note", systemImage: "square.and.pencil") }
+                Button { showHistory = true } label: { Label("History", systemImage: "clock.arrow.circlepath") }
+                Button { showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+            }
+        }
         .sheet(isPresented: $showSettings) { SettingsView(model: settings) }
+        .sheet(isPresented: $showHistory) { HistoryView(history: history) }
     }
 
     // MARK: - Sidebar
@@ -52,10 +64,6 @@ struct MainWindow: View {
             }
         }
         .navigationTitle("Notes")
-        .toolbar {
-            Button { notes.newNote() } label: { Label("New note", systemImage: "square.and.pencil") }
-            Button { showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
-        }
     }
 
     private var selection: Binding<Note.ID?> {

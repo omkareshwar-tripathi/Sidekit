@@ -59,30 +59,37 @@ final class SettingsModel: ObservableObject {
 /// The settings sheet shown from the window's ⚙︎ button.
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        Form {
-            Section("Dictation") {
-                Toggle("Remove filler words (um, uh, …)", isOn: $model.fillerRemoval)
-            }
-            Section("General") {
-                Toggle("Launch SpeakType at login", isOn: $model.launchAtLogin)
-            }
-            Section("Permissions") {
-                LabeledContent("Microphone") { badge(model.micAuthorized) }
-                LabeledContent("Accessibility") {
-                    HStack(spacing: DS.Space.sm) {
-                        badge(model.accessibilityTrusted)
-                        if !model.accessibilityTrusted {
-                            Button("Open Settings…") { model.openAccessibilitySettings() }
+        NavigationStack {
+            Form {
+                Section("Dictation") {
+                    Toggle("Remove filler words (um, uh, …)", isOn: $model.fillerRemoval)
+                }
+                Section("General") {
+                    Toggle("Launch SpeakType at login", isOn: $model.launchAtLogin)
+                }
+                Section("Permissions") {
+                    LabeledContent("Microphone") { badge(model.micAuthorized) }
+                    LabeledContent("Accessibility") {
+                        HStack(spacing: DS.Space.sm) {
+                            badge(model.accessibilityTrusted)
+                            if !model.accessibilityTrusted {
+                                Button("Open Settings…") { model.openAccessibilitySettings() }
+                            }
                         }
                     }
                 }
             }
+            .formStyle(.grouped)
+            .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+            .onAppear { model.refreshPermissions() }
         }
-        .formStyle(.grouped)
-        .frame(width: 400, height: 340)
-        .onAppear { model.refreshPermissions() }
+        .frame(width: 400, height: 380)
     }
 
     private func badge(_ ok: Bool) -> some View {

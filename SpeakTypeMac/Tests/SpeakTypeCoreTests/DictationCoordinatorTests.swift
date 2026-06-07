@@ -27,7 +27,7 @@ struct DictationCoordinatorTests {
         sut.pressed()
         #expect(sut.currentState == .recording)
         #expect(audio.startCount == 1)
-        #expect(timer.startedDelay == .seconds(60))
+        #expect(timer.startedDelay == .seconds(180))
     }
 
     @Test func pressedWhileBusyIsIgnored() {

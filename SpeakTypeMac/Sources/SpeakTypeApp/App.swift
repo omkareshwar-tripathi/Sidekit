@@ -18,7 +18,7 @@ struct SpeakTypeApp: App {
         // The main window stays closed until "Open SpeakType" is chosen; opening it flips the
         // app to a Dock-present `.regular` app, closing it returns to the menu-bar-only utility.
         Window("SpeakType", id: MainWindow.id) {
-            MainWindow(notes: controller.notes, settings: controller.settings)
+            MainWindow(notes: controller.notes, history: controller.history, settings: controller.settings)
                 .onAppear { AppController.setWindowMode(true) }
                 .onDisappear { AppController.setWindowMode(false) }
         }
@@ -60,6 +60,9 @@ final class AppController: ObservableObject {
     /// The scratchpad notes (observable wrapper over the pure store). Surfaced to the window and
     /// to the routing sink.
     let notes: NotesModel
+    /// The dictation trail (observable wrapper over the pure history store). Surfaced to the window
+    /// and recorded into by the history-recording sink.
+    let history: HistoryModel
     /// User settings (filler removal, launch-at-login, permission status). Drives the settings sheet.
     let settings: SettingsModel
 
@@ -73,12 +76,13 @@ final class AppController: ObservableObject {
         let audio = AVAudioCapture()
         let transcriber = WhisperKitTranscriber(modelFolder: Self.bundledModelFolder())
         let notes = NotesModel()
+        let history = HistoryModel()
 
         // Route the cleaned transcript: into the active note when SpeakType is the focused app
         // (creating one if the list is empty), otherwise paste at the cursor as before (spec §3).
         // The sink's `deliver` is invoked on the main actor by the coordinator, so the AppKit /
         // notes touches below are safe under `assumeIsolated`.
-        let sink = RoutingSink(
+        let routing = RoutingSink(
             isAppFocused: { MainActor.assumeIsolated { NSApp.isActive } },
             appendToNote: { text in
                 MainActor.assumeIsolated {
@@ -87,6 +91,12 @@ final class AppController: ObservableObject {
                 }
             },
             pasteSink: PasteSink(paste: paste))
+
+        // Log every delivered transcript to the dictation trail, then pass the routed outcome
+        // through unchanged. Like the routing closures, `record` runs on the main actor.
+        let sink = HistoryRecordingSink(inner: routing) { text, outcome in
+            MainActor.assumeIsolated { history.record(text, outcome) }
+        }
 
         let coordinator = DictationCoordinator(
             audio: audio,
@@ -99,6 +109,7 @@ final class AppController: ObservableObject {
         // Settings push the persisted filler-removal flag into the live coordinator.
         let settings = SettingsModel(applySettings: { [weak coordinator] s in coordinator?.settings = s })
         self.notes = notes
+        self.history = history
         self.settings = settings
         self.coordinator = coordinator
         self.hotkey = hotkey
@@ -106,6 +117,7 @@ final class AppController: ObservableObject {
         audio.onLevel = { [weak self] in self?.level = $0 }
         coordinator.onStateChanged = { [weak self] newState in
             self?.state = newState
+            if newState == .recording { self?.lastOutcome = nil } // clear stale "Pasted ✓" when a new hold starts (Brick B)
             if newState != .recording { self?.level = 0 } // settle the waveform once recording ends
         }
         coordinator.onCompleted = { [weak self] outcome in self?.lastOutcome = outcome }
@@ -151,7 +163,7 @@ final class AppController: ObservableObject {
             switch lastOutcome {
             case .pasted: return "Pasted ✓ — hold Fn to dictate"
             case .addedToNote: return "Added to note ✓ — hold Fn to dictate"
-            case .leftOnClipboard: return "Left on clipboard (paste manually)"
+            case .leftOnClipboard: return "Copied to clipboard — ⌘V to paste"
             case .noSpeech: return "No speech heard — hold Fn to dictate"
             case nil: return "SpeakType — hold Fn to dictate"
             }

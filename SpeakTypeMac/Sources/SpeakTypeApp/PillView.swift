@@ -22,7 +22,7 @@ enum PillState: Equatable {
             case .addedToNote:
                 self = .done(symbol: "checkmark.circle.fill", tint: DS.Palette.success, label: "Added to note")
             case .leftOnClipboard:
-                self = .done(symbol: "doc.on.clipboard", tint: DS.Palette.textSecondary, label: "On clipboard")
+                self = .done(symbol: "doc.on.clipboard", tint: DS.Palette.textSecondary, label: "Copied to clipboard")
             case .noSpeech:
                 self = .done(symbol: "mic.slash", tint: DS.Palette.textSecondary, label: "No speech")
             case nil:

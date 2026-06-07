@@ -21,8 +21,11 @@ final class MacClipboard: SystemClipboard {
 
     func sendPaste() -> Bool {
         let trusted = AXIsProcessTrusted()
-        Diag.log("paste: AXIsProcessTrusted=\(trusted)")
-        guard trusted else { return false } // no Accessibility → keystroke can't land
+        guard trusted else { Diag.log("paste: not trusted → leave on clipboard"); return false }
+        // Only synthesize ⌘V when an editable field is actually focused. macOS can't tell us whether
+        // a paste landed, so without this we'd report "Pasted" even when the keystroke goes nowhere.
+        // No editable target → return false so the caller leaves the text on the clipboard ("Copied…").
+        guard hasEditableFocus() else { Diag.log("paste: no editable focus → leave on clipboard"); return false }
         guard let source = CGEventSource(stateID: .combinedSessionState),
               let down = CGEvent(keyboardEventSource: source, virtualKey: Self.vKeyCode, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: Self.vKeyCode, keyDown: false)
@@ -33,5 +36,31 @@ final class MacClipboard: SystemClipboard {
         down.post(tap: .cgAnnotatedSessionEventTap)
         up.post(tap: .cgAnnotatedSessionEventTap)
         return true
+    }
+
+    /// True when the system-wide focused UI element looks editable — its `AXValue` is settable, or its
+    /// role is a known text role. Lets `sendPaste` avoid a no-op ⌘V into a non-text target (Finder,
+    /// desktop, a button), so the user gets an honest "Copied to clipboard" instead of a false "Pasted".
+    private func hasEditableFocus() -> Bool {
+        let system = AXUIElementCreateSystemWide()
+        var focused: AnyObject?
+        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+              let element = focused, CFGetTypeID(element) == AXUIElementGetTypeID()
+        else { return false }
+        let axElement = element as! AXUIElement
+
+        var settable: DarwinBoolean = false
+        if AXUIElementIsAttributeSettable(axElement, kAXValueAttribute as CFString, &settable) == .success,
+           settable.boolValue {
+            return true
+        }
+        var role: AnyObject?
+        if AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &role) == .success,
+           let roleStr = role as? String {
+            return roleStr == (kAXTextFieldRole as String)
+                || roleStr == (kAXTextAreaRole as String)
+                || roleStr == (kAXComboBoxRole as String)
+        }
+        return false
     }
 }

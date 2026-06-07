@@ -8,7 +8,7 @@ public enum DictationOutcome: Sendable, Equatable {
 
 /// The dictation state machine — a port of the C# `DictationOrchestrator`.
 ///
-/// Fn press → start capture + arm the 60 s auto-stop. Fn release (or auto-stop) → if the
+/// Fn press → start capture + arm the 180 s auto-stop. Fn release (or auto-stop) → if the
 /// hold was long enough, run capture → transcribe → clean → paste and report the outcome;
 /// a too-short hold is discarded as an accidental tap. A press that arrives while a cycle
 /// is in flight is ignored (the state guard).
@@ -22,7 +22,7 @@ public enum DictationOutcome: Sendable, Equatable {
 public final class DictationCoordinator {
     // Hold-duration guards (mirrors the C# values).
     private static let minHold: Duration = .milliseconds(300)
-    private static let maxHold: Duration = .seconds(60)
+    private static let maxHold: Duration = .seconds(180)
 
     private let audio: AudioCapturing
     private let transcriber: Transcribing
@@ -85,7 +85,7 @@ public final class DictationCoordinator {
         await runCycle()
     }
 
-    /// 60 s reached while still held — end the hold the same as a release.
+    /// 180 s reached while still held — end the hold the same as a release.
     public func autoStopFired() async {
         guard state == .recording else { return }
         setState(.transcribing)
