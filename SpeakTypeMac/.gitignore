@@ -9,3 +9,5 @@ Models/
 *.xcodeproj
 DerivedData/
 build-info.js
+# Intermediate iconset (regenerable via Scripts/make-icon.swift); only AppIcon.icns is committed
+AppBundle/AppIcon.iconset/

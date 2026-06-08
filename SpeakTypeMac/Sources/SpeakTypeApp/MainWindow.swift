@@ -35,6 +35,11 @@ struct MainWindow: View {
         }
         .sheet(isPresented: $showSettings) { SettingsView(model: settings) }
         .sheet(isPresented: $showHistory) { HistoryView(history: history) }
+        // Brand the window to match the icon/pill: dark frosted-glass surface with purple accents
+        // (selection, buttons, controls — and the sheets inherit the tint). Layout is unchanged so
+        // long notes stay readable (no gradient behind text).
+        .tint(DS.Palette.accent)
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - Sidebar
@@ -55,7 +60,10 @@ struct MainWindow: View {
         .overlay {
             if notes.notes.isEmpty {
                 ContentUnavailableView {
-                    Label("No notes yet", systemImage: "note.text")
+                    VStack(spacing: DS.Space.sm) {
+                        EqualizerMark(height: 44)
+                        Text("No notes yet")
+                    }
                 } description: {
                     Text("Dictate with Fn while this window is focused, or create a note to start.")
                 } actions: {
@@ -80,9 +88,14 @@ struct MainWindow: View {
                 .background(.ultraThinMaterial)
                 .padding(DS.Space.lg)
         } else {
-            ContentUnavailableView(
-                "No note selected", systemImage: "note.text",
-                description: Text("Create a note to start writing."))
+            ContentUnavailableView {
+                VStack(spacing: DS.Space.sm) {
+                    EqualizerMark(height: 44)
+                    Text("No note selected")
+                }
+            } description: {
+                Text("Create a note to start writing.")
+            }
         }
     }
 

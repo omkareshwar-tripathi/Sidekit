@@ -27,6 +27,8 @@ rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$BIN_DIR/SpeakTypeApp" "$CONTENTS/MacOS/SpeakType"
 cp "AppBundle/Info.plist" "$CONTENTS/Info.plist"
+cp "AppBundle/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
+cp "AppBundle/MenuBarIcon.pdf" "$CONTENTS/Resources/MenuBarIcon.pdf"
 cp -R "Models" "$CONTENTS/Resources/Models"
 
 # Sign with a STABLE self-signed identity so macOS TCC permissions (Accessibility,

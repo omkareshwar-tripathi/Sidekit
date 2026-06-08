@@ -2,17 +2,37 @@ import SwiftUI
 import AppKit
 import AVFoundation
 import ApplicationServices
+import ServiceManagement
 import SpeakTypeCore
+
+/// Posted when the app should bring its main window forward — on launch and whenever the user
+/// re-activates the app (clicks it in Launchpad / Finder / Dock). `MenuBarLabel` (always alive in
+/// the menu bar) listens and calls `openWindow`.
+extension Notification.Name {
+    static let openMainWindow = Notification.Name("SpeakTypeOpenMainWindow")
+}
+
+/// Bridges AppKit re-open events to the SwiftUI window. A menu-bar-only (`LSUIElement`) app doesn't
+/// auto-open its `Window` scene, so clicking the app icon while it's already running would otherwise
+/// do nothing visible — this re-opens (or focuses) the main window. (The first launch is handled by
+/// `MenuBarLabel.onAppear`, which is race-free.)
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        NotificationCenter.default.post(name: .openMainWindow, object: nil)
+        return true
+    }
+}
 
 @main
 struct SpeakTypeApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var controller = AppController()
 
     var body: some Scene {
         MenuBarExtra {
             MenuContent(controller: controller)
         } label: {
-            Image(systemName: controller.iconName)
+            MenuBarLabel(controller: controller)
         }
 
         // The main window stays closed until "Open SpeakType" is chosen; opening it flips the
@@ -23,6 +43,48 @@ struct SpeakTypeApp: App {
                 .onDisappear { AppController.setWindowMode(false) }
         }
         .windowResizability(.contentSize)
+    }
+}
+
+/// The menu-bar icon. Idle shows the static SpeakType equalizer; recording shows the **live**
+/// equalizer (bars driven by the mic level); the other active states keep their SF Symbols so
+/// status stays legible. Also the home for the `openMainWindow` listener — it's always alive in
+/// the menu bar, so it can open the window on launch / re-click via `\.openWindow`.
+private struct MenuBarLabel: View {
+    @ObservedObject var controller: AppController
+    @Environment(\.openWindow) private var openWindow
+    /// Guards the launch open so it happens exactly once (the label can re-appear when the app
+    /// flips activation policy as the window opens/closes).
+    @State private var openedAtLaunch = false
+
+    var body: some View {
+        icon
+            // Opening from `.onAppear` (rather than a launch notification) is race-free: the label
+            // — and its `openWindow` action — are guaranteed live by the time this runs.
+            .onAppear {
+                guard !openedAtLaunch else { return }
+                openedAtLaunch = true
+                // Skip the auto-open when launch-at-login is enabled: macOS may have started the
+                // app at login, and a quiet menu-bar utility shouldn't pop its window every login.
+                // A manual click while it's running still opens it (applicationShouldHandleReopen).
+                if SMAppService.mainApp.status != .enabled { showWindow() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .openMainWindow)) { _ in showWindow() }
+    }
+
+    private func showWindow() {
+        openWindow(id: MainWindow.id)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @ViewBuilder private var icon: some View {
+        if controller.state == .recording, let wave = controller.recordingMenuIcon {
+            Image(nsImage: wave)
+        } else if controller.state == .idle, let idle = controller.menuBarIcon {
+            Image(nsImage: idle)
+        } else {
+            Image(systemName: controller.iconName)
+        }
     }
 }
 
@@ -56,6 +118,11 @@ final class AppController: ObservableObject {
     @Published private(set) var accessibilityTrusted = AXIsProcessTrusted()
     /// Live 0…1 mic level during recording; drives the pill waveform. Resets to 0 when idle.
     @Published private(set) var level: Float = 0
+    /// The live menu-bar waveform image while recording (bars driven by `level`); nil otherwise,
+    /// so the label falls back to the static idle glyph / SF Symbols.
+    @Published private(set) var recordingMenuIcon: NSImage?
+    /// Advances each mic-level frame to animate the menu waveform's per-bar wobble.
+    private var wavePhase = 0.0
 
     /// The scratchpad notes (observable wrapper over the pure store). Surfaced to the window and
     /// to the routing sink.
@@ -65,6 +132,9 @@ final class AppController: ObservableObject {
     let history: HistoryModel
     /// User settings (filler removal, launch-at-login, permission status). Drives the settings sheet.
     let settings: SettingsModel
+    /// Custom menu-bar glyph (mic + waveform) shown in the idle state. nil when running un-bundled
+    /// (plain `swift run`) — the label then falls back to the "mic" SF Symbol.
+    let menuBarIcon: NSImage? = AppController.loadMenuBarIcon()
 
     private let coordinator: DictationCoordinator
     private let hotkey: FnKeyMonitor
@@ -114,11 +184,22 @@ final class AppController: ObservableObject {
         self.coordinator = coordinator
         self.hotkey = hotkey
 
-        audio.onLevel = { [weak self] in self?.level = $0 }
+        audio.onLevel = { [weak self] lvl in
+            guard let self else { return }
+            self.level = lvl
+            // Render the next live-waveform frame for the menu bar while recording.
+            if self.state == .recording {
+                self.wavePhase += 0.55
+                self.recordingMenuIcon = MenuBarWave.icon(level: CGFloat(lvl), phase: self.wavePhase)
+            }
+        }
         coordinator.onStateChanged = { [weak self] newState in
             self?.state = newState
             if newState == .recording { self?.lastOutcome = nil } // clear stale "Pasted ✓" when a new hold starts (Brick B)
-            if newState != .recording { self?.level = 0 } // settle the waveform once recording ends
+            if newState != .recording {
+                self?.level = 0              // settle the waveform once recording ends
+                self?.recordingMenuIcon = nil // menu glyph returns to the static idle equalizer
+            }
         }
         coordinator.onCompleted = { [weak self] outcome in self?.lastOutcome = outcome }
         // NSEvent monitor callbacks arrive on the main thread. press/cancel run
@@ -182,6 +263,16 @@ final class AppController: ObservableObject {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
         accessibilityTrusted = AXIsProcessTrusted()
+    }
+
+    /// Loads the bundled menu-bar template glyph (`Resources/MenuBarIcon.pdf`), sized for the menu
+    /// bar and marked as a template so macOS tints it for light/dark. nil if absent (un-bundled run).
+    static func loadMenuBarIcon() -> NSImage? {
+        guard let url = Bundle.main.url(forResource: "MenuBarIcon", withExtension: "pdf"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        image.size = NSSize(width: 20, height: 20)
+        image.isTemplate = true
+        return image
     }
 
     /// The model bundled into the app (`Resources/Models/openai_whisper-base.en`), or nil if

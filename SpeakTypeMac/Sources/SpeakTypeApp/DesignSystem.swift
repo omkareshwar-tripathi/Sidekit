@@ -60,3 +60,22 @@ extension View {
         modifier(GlassCard(cornerRadius: cornerRadius))
     }
 }
+
+/// The SpeakType brand mark — the 5-bar equalizer from the app icon, in the accent gradient.
+/// Used wherever the window wants to echo the icon (e.g. empty states).
+struct EqualizerMark: View {
+    var height: CGFloat = 56
+    // Bar heights echo the app icon's equalizer (make-icon.swift's [0.32,0.60,0.92,…] normalized).
+    private let shape: [CGFloat] = [0.35, 0.65, 1.0, 0.65, 0.35]
+
+    var body: some View {
+        HStack(spacing: height * 0.09) {
+            ForEach(shape.indices, id: \.self) { i in
+                Capsule()
+                    .fill(DS.accentGradient)
+                    .frame(width: height * 0.16, height: height * shape[i])
+            }
+        }
+        .frame(height: height)
+    }
+}
