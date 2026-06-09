@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 import SpeakTypeCore
 
 /// The Shelf surface's content: a glass card with a header, a thumbnail grid of staged items (or an
@@ -10,6 +12,9 @@ struct ShelfView: View {
     /// Dismiss the panel (the header × button).
     var onClose: () -> Void
 
+    /// Highlights the whole card while a drag hovers over it ("drop to shelve").
+    @State private var isDropTarget = false
+
     /// Two-column adaptive grid; tiles reflow if the panel is resized later.
     private let columns = [GridItem(.adaptive(minimum: ShelfTile.width), spacing: DS.Space.sm)]
 
@@ -20,19 +25,6 @@ struct ShelfView: View {
                     .font(DS.Typography.title)
                     .foregroundStyle(DS.Palette.textPrimary)
                 Spacer()
-                #if DEBUG
-                // TEMP (remove in SHELF-DROP): seed sample items so the grid is verifiable before
-                // drag-in exists. DEBUG-only — gone in release/notarized builds.
-                Button { model.seedSamples() } label: {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(DS.Palette.textSecondary)
-                        .frame(width: 18, height: 18)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Add sample items (temporary)")
-                #endif
                 Button { onClose() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
@@ -72,6 +64,55 @@ struct ShelfView: View {
         .padding(DS.Space.md)
         .frame(width: 280, height: 360)
         .glassCard()
+        .overlay(dropHighlight)
+        .onDrop(of: [.fileURL, .image, .text], isTargeted: $isDropTarget) { providers in
+            providers.forEach(load)
+            return true
+        }
+    }
+
+    /// Accent border drawn over the card while a drag hovers it.
+    @ViewBuilder private var dropHighlight: some View {
+        if isDropTarget {
+            RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                .strokeBorder(DS.Palette.accent, lineWidth: 2)
+                .allowsHitTesting(false)
+        }
+    }
+
+    /// Decode one dropped provider and stage it. Prefer a file URL (the primary citizen), then an
+    /// image, then text — so a file drag (which also exposes a name string) is shelved as the file.
+    /// Loading is async/off-main; hop back to the main actor before touching the model.
+    nonisolated private func load(_ provider: NSItemProvider) {
+        if provider.canLoadObject(ofClass: URL.self) {
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url else { return }
+                // A file URL is shelved as the file; a web/other URL (e.g. a dragged browser link)
+                // is shelved as a text snippet of the address rather than silently dropped.
+                deliver(url.isFileURL ? .file(url) : .text(url.absoluteString))
+            }
+        } else if provider.canLoadObject(ofClass: NSImage.self) {
+            _ = provider.loadObject(ofClass: NSImage.self) { object, _ in
+                guard let image = object as? NSImage, let data = pngData(from: image) else { return }
+                deliver(.image(data))
+            }
+        } else if provider.canLoadObject(ofClass: NSString.self) {
+            _ = provider.loadObject(ofClass: NSString.self) { object, _ in
+                guard let text = object as? String else { return }
+                deliver(.text(text))
+            }
+        }
+    }
+
+    nonisolated private func deliver(_ source: ShelfPayloadSource) {
+        Task { @MainActor in model.acceptDrop(source) }
+    }
+
+    /// PNG-encode a dropped `NSImage` for the payload store (NSImage has no direct `pngData`).
+    nonisolated private func pngData(from image: NSImage) -> Data? {
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        return rep.representation(using: .png, properties: [:])
     }
 }
 

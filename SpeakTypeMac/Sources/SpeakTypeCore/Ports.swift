@@ -95,18 +95,52 @@ public extension ShelfPersisting {
     func flush() {}
 }
 
+/// A thing dropped onto the shelf, to be copied into the store: a file/folder on disk, a text
+/// snippet, or image bytes. (AppKit's `NSItemProvider` decode happens in the UI; this is the pure
+/// hand-off.)
+public enum ShelfPayloadSource: Sendable {
+    case file(URL)
+    case text(String)
+    case image(Data)
+}
+
+/// Where a copied payload landed plus the metadata `ShelfStore` records for it. The payload store
+/// owns the byte copy and reports back the kind/name/size/location.
+public struct StoredPayload: Sendable, Equatable {
+    public let kind: ShelfItemKind
+    public let displayName: String
+    public let byteSize: Int64
+    public let storedRelativePath: String
+
+    public init(kind: ShelfItemKind, displayName: String, byteSize: Int64, storedRelativePath: String) {
+        self.kind = kind
+        self.displayName = displayName
+        self.byteSize = byteSize
+        self.storedRelativePath = storedRelativePath
+    }
+}
+
+public enum ShelfPayloadStoreError: Error { case unsupported }
+
 /// Owns the on-disk payload bytes for shelved items (a copy under the app container). The index
-/// (`ShelfPersisting`) holds metadata; this holds the actual files. `ShelfStore` calls `delete(_:)`
-/// whenever items leave (per-item remove, clear-all, or expiry) so bytes never outlive their index
-/// entry. The copy-in path arrives with drag-in. Deletion is best-effort.
+/// (`ShelfPersisting`) holds metadata; this holds the actual files. `store(_:)` copies a dropped
+/// source in (drag-in); `delete(_:)` removes bytes whenever items leave (per-item remove, clear-all,
+/// or expiry) so bytes never outlive their index entry. Deletion is best-effort.
 public protocol ShelfPayloadStore: Sendable {
+    /// Copy a dropped source's bytes into a fresh per-item folder and return where they landed.
+    /// Throws if the copy fails — the caller then records nothing.
+    func store(_ source: ShelfPayloadSource) throws -> StoredPayload
     /// Delete the stored bytes for these items. Best-effort — a missing payload is not an error.
     func delete(_ items: [ShelfItem])
 }
 
 /// A payload store that does nothing — the default where payloads aren't wired (and for index-only
-/// tests). Keeps `ShelfStore` constructible without a filesystem.
+/// tests). Keeps `ShelfStore` constructible without a filesystem; `store(_:)` is unsupported (a noop
+/// store can't hold bytes), so a drop against it stages nothing.
 public struct NoopShelfPayloadStore: ShelfPayloadStore {
     public init() {}
+    public func store(_ source: ShelfPayloadSource) throws -> StoredPayload {
+        throw ShelfPayloadStoreError.unsupported
+    }
     public func delete(_ items: [ShelfItem]) {}
 }

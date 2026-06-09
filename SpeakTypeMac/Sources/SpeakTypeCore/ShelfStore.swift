@@ -37,6 +37,15 @@ public final class ShelfStore {
         return item
     }
 
+    /// Copy a dropped source's bytes into the payload store, then stage the resulting item on top.
+    /// Throws (recording nothing) if the copy fails — a bad drop never leaves a dangling index entry.
+    @discardableResult
+    public func add(from source: ShelfPayloadSource) throws -> ShelfItem {
+        let payload = try payloads.store(source)
+        return add(kind: payload.kind, displayName: payload.displayName,
+                   byteSize: payload.byteSize, storedRelativePath: payload.storedRelativePath)
+    }
+
     /// Remove an item by id, persist, and delete its payload bytes. No-op on an unknown id.
     public func remove(_ id: ShelfItem.ID) {
         guard let removed = items.first(where: { $0.id == id }) else { return }
