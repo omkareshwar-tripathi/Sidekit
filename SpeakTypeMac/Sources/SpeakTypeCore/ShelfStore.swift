@@ -13,11 +13,13 @@ public final class ShelfStore {
     public var retention: ShelfRetentionPolicy
 
     private let persistence: ShelfPersisting
+    private let payloads: ShelfPayloadStore
     private let now: () -> Date
 
-    public init(persistence: ShelfPersisting, retention: ShelfRetentionPolicy = .default,
-                now: @escaping () -> Date = { Date() }) {
+    public init(persistence: ShelfPersisting, payloads: ShelfPayloadStore = NoopShelfPayloadStore(),
+                retention: ShelfRetentionPolicy = .default, now: @escaping () -> Date = { Date() }) {
         self.persistence = persistence
+        self.payloads = payloads
         self.retention = retention
         self.now = now
         self.items = persistence.load().sorted { $0.addedAt > $1.addedAt }
@@ -35,17 +37,20 @@ public final class ShelfStore {
         return item
     }
 
-    /// Remove an item by id and persist. No-op (no save) on an unknown id.
+    /// Remove an item by id, persist, and delete its payload bytes. No-op on an unknown id.
     public func remove(_ id: ShelfItem.ID) {
-        guard items.contains(where: { $0.id == id }) else { return }
+        guard let removed = items.first(where: { $0.id == id }) else { return }
         items.removeAll { $0.id == id }
         persistence.save(items)
+        payloads.delete([removed])
     }
 
-    /// Empty the shelf and persist.
+    /// Empty the shelf, persist, and delete every item's payload bytes.
     public func clearAll() {
+        let removed = items
         items.removeAll()
         persistence.save(items)
+        payloads.delete(removed)
     }
 
     /// Drop items older than the retention TTL (age strictly greater than `ttl` at `now`), persist
@@ -59,6 +64,7 @@ public final class ShelfStore {
         let expiredIDs = Set(expired.map(\.id))
         items.removeAll { expiredIDs.contains($0.id) }
         persistence.save(items)
+        payloads.delete(expired)
         return expired
     }
 

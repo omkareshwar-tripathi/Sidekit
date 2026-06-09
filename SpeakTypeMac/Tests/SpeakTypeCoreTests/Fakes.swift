@@ -72,3 +72,9 @@ final class FakeShelfPersistence: ShelfPersisting, @unchecked Sendable {
     func load() -> [ShelfItem] { stored }
     func save(_ items: [ShelfItem]) { saveCount += 1; lastSaved = items; stored = items }
 }
+
+/// Records which items' payload bytes the store asked to delete.
+final class FakeShelfPayloadStore: ShelfPayloadStore, @unchecked Sendable {
+    private(set) var deleted: [ShelfItem] = []
+    func delete(_ items: [ShelfItem]) { deleted.append(contentsOf: items) }
+}

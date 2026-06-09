@@ -12,6 +12,14 @@ struct ShelfStoreTests {
         return (store, persistence)
     }
 
+    private func makeSUTWithPayloads(seed: [ShelfItem] = [],
+                                     retention: ShelfRetentionPolicy = .default) -> (ShelfStore, FakeShelfPayloadStore) {
+        let payloads = FakeShelfPayloadStore()
+        let store = ShelfStore(persistence: FakeShelfPersistence(seed), payloads: payloads,
+                               retention: retention, now: FakeDates().next)
+        return (store, payloads)
+    }
+
     private func item(_ name: String, at seconds: TimeInterval) -> ShelfItem {
         ShelfItem(kind: .file, displayName: name, byteSize: 1,
                   addedAt: Date(timeIntervalSinceReferenceDate: seconds), storedRelativePath: name)
@@ -138,5 +146,37 @@ struct ShelfStoreTests {
         let removed = store.pruneExpired(now: Date(timeIntervalSinceReferenceDate: 100)) // age == 100, not > 100
         #expect(removed.isEmpty)
         #expect(store.items.map(\.displayName) == ["edge"])
+    }
+
+    // MARK: - payload deletion (bytes never outlive their index entry)
+
+    @Test func removeDeletesTheItemsPayload() {
+        let (store, payloads) = makeSUTWithPayloads()
+        let a = add(store, "a")
+        add(store, "b")
+        store.remove(a.id)
+        #expect(payloads.deleted.map(\.id) == [a.id]) // only a's bytes deleted
+    }
+
+    @Test func removeUnknownIdDeletesNoPayload() {
+        let (store, payloads) = makeSUTWithPayloads()
+        add(store, "a")
+        store.remove(UUID())
+        #expect(payloads.deleted.isEmpty)
+    }
+
+    @Test func clearAllDeletesEveryPayload() {
+        let (store, payloads) = makeSUTWithPayloads()
+        let a = add(store, "a")
+        let b = add(store, "b")
+        store.clearAll()
+        #expect(Set(payloads.deleted.map(\.id)) == Set([a.id, b.id]))
+    }
+
+    @Test func pruneExpiredDeletesOnlyTheExpiredPayloads() {
+        let (store, payloads) = makeSUTWithPayloads(seed: [item("old", at: 0), item("fresh", at: 50)],
+                                                    retention: ttl100)
+        store.pruneExpired(now: Date(timeIntervalSinceReferenceDate: 101))
+        #expect(payloads.deleted.map(\.displayName) == ["old"])
     }
 }

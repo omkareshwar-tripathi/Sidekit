@@ -94,3 +94,19 @@ public extension ShelfPersisting {
     /// Default: nothing is buffered, so there's nothing to flush. A debouncing adapter overrides.
     func flush() {}
 }
+
+/// Owns the on-disk payload bytes for shelved items (a copy under the app container). The index
+/// (`ShelfPersisting`) holds metadata; this holds the actual files. `ShelfStore` calls `delete(_:)`
+/// whenever items leave (per-item remove, clear-all, or expiry) so bytes never outlive their index
+/// entry. The copy-in path arrives with drag-in. Deletion is best-effort.
+public protocol ShelfPayloadStore: Sendable {
+    /// Delete the stored bytes for these items. Best-effort — a missing payload is not an error.
+    func delete(_ items: [ShelfItem])
+}
+
+/// A payload store that does nothing — the default where payloads aren't wired (and for index-only
+/// tests). Keeps `ShelfStore` constructible without a filesystem.
+public struct NoopShelfPayloadStore: ShelfPayloadStore {
+    public init() {}
+    public func delete(_ items: [ShelfItem]) {}
+}

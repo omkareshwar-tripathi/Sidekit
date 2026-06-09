@@ -13,9 +13,10 @@ final class ShelfModel: ObservableObject {
         store.pruneExpired(now: Date()) // drop anything that expired while the app was closed
     }
 
-    /// Production store backed by the JSON index file (`shelf.json`).
+    /// Production store backed by the JSON index file (`shelf.json`) + the filesystem payload store
+    /// (deletes an item's bytes when it's removed / cleared / expires).
     convenience init() {
-        self.init(store: ShelfStore(persistence: JSONShelfStore()))
+        self.init(store: ShelfStore(persistence: JSONShelfStore(), payloads: FileSystemShelfPayloadStore()))
     }
 
     var items: [ShelfItem] { store.items }
