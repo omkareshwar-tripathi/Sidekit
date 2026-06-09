@@ -119,6 +119,9 @@ struct ShelfView: View {
             Diag.log("shelf: -> branch=file (file-url)")
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
                 guard let url, url.isFileURL else { return }
+                // A tile dragged out and released back onto the shelf would otherwise re-copy itself
+                // as a brand-new item — ignore drops whose file is already one of our payloads.
+                if model.isStored(url) { Diag.log("shelf: ignored self-drop (already shelved)"); return }
                 model.ingest(.file(url))
             }
             return
@@ -168,7 +171,8 @@ struct ShelfView: View {
 }
 
 /// One staged item as a grid tile: a QuickLook thumbnail of its stored file (kind glyph as the
-/// fallback) with a name beneath, and a hover-revealed × to remove it.
+/// fallback) with a name beneath, and a hover-revealed × to remove it. Dragging the tile copies its
+/// file out to any app/folder (the item stays — reuse-safe).
 private struct ShelfTile: View {
     static let width: CGFloat = 76
     static let height: CGFloat = 64
@@ -242,6 +246,35 @@ private struct ShelfTile: View {
             thumbnail = await thumbnailer.thumbnail(
                 for: fileURL, scale: displayScale,
                 size: CGSize(width: Self.width, height: Self.height))
+        }
+        .onDrag(dragProvider)
+    }
+
+    /// A provider that copies the item's stored file OUT to any app/folder. Registers a **file
+    /// representation** (so a folder copies recursively too, unlike `NSItemProvider(contentsOf:)`) with
+    /// no `.openInPlace`, so macOS hands the receiver a copy and the shelf's own bytes are never moved
+    /// (reuse-safe, spec §4). Also vends the file URL so a stray drop back onto the shelf is recognized
+    /// as a self-drop (see `load`). Empty provider when the bytes are gone — the drag carries nothing.
+    private func dragProvider() -> NSItemProvider {
+        guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else { return NSItemProvider() }
+        let type = (try? fileURL.resourceValues(forKeys: [.contentTypeKey]).contentType) ?? .data
+        let provider = NSItemProvider()
+        provider.registerFileRepresentation(forTypeIdentifier: type.identifier,
+                                            fileOptions: [], visibility: .all) { completion in
+            completion(fileURL, false, nil)
+            return nil
+        }
+        provider.registerObject(fileURL as NSURL, visibility: .all)
+        provider.suggestedName = dragName(fileURL, type)
+        return provider
+    }
+
+    /// Files/folders keep their real on-disk name; text/image snippets (stored as `snippet.txt` /
+    /// `image.png`) take the tile's label so several don't all land as "snippet.txt".
+    private func dragName(_ fileURL: URL, _ type: UTType) -> String {
+        switch item.kind {
+        case .file, .folder: return fileURL.lastPathComponent
+        case .text, .image:  return type.preferredFilenameExtension.map { "\(item.displayName).\($0)" } ?? item.displayName
         }
     }
 

@@ -33,6 +33,11 @@ final class ShelfModel: ObservableObject {
     /// The on-disk URL of an item's copied bytes (nil if the store holds none) — drives tile thumbnails.
     func fileURL(for item: ShelfItem) -> URL? { payloadStore.url(for: item) }
 
+    /// Whether `url` is already one of our stored payloads — lets a drop ignore a tile dragged out and
+    /// released back onto the shelf. `nonisolated` so the off-main drop callback can call it (the
+    /// payload store is `Sendable` and the check is a pure path comparison).
+    nonisolated func isStored(_ url: URL) -> Bool { payloadStore.contains(url) }
+
     func remove(_ id: ShelfItem.ID) { objectWillChange.send(); store.remove(id) }
     func clearAll() { objectWillChange.send(); store.clearAll() }
 

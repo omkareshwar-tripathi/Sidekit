@@ -62,6 +62,12 @@ final class FileSystemShelfPayloadStore: ShelfPayloadStore, @unchecked Sendable 
         root.appendingPathComponent(item.storedRelativePath)
     }
 
+    /// True when `url` lives inside the store root — i.e. it's one of our own copied payloads. The
+    /// trailing slash stops a sibling like `…/ShelfOther` from matching `…/Shelf`.
+    func contains(_ url: URL) -> Bool {
+        url.standardizedFileURL.path.hasPrefix(root.standardizedFileURL.path + "/")
+    }
+
     func delete(_ items: [ShelfItem]) {
         for item in items {
             let folder = root.appendingPathComponent(itemFolder(for: item), isDirectory: true)

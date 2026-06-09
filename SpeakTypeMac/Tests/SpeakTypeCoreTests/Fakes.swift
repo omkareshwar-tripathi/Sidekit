@@ -81,5 +81,6 @@ final class FakeShelfPayloadStore: ShelfPayloadStore, @unchecked Sendable {
         StoredPayload(kind: .file, displayName: "dropped", byteSize: 0, storedRelativePath: "uuid/dropped")
     }
     func url(for item: ShelfItem) -> URL? { nil }
+    func contains(_ url: URL) -> Bool { false }
     func delete(_ items: [ShelfItem]) { deleted.append(contentsOf: items) }
 }

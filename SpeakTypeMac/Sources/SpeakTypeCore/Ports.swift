@@ -133,6 +133,9 @@ public protocol ShelfPayloadStore: Sendable {
     /// The on-disk location of an item's stored bytes (drives tile QuickLook thumbnails), or nil when
     /// this store holds no bytes (the noop store) so callers fall back to a placeholder.
     func url(for item: ShelfItem) -> URL?
+    /// Whether `url` points inside this store's payload area — lets a drop ignore a drag-out that was
+    /// released back onto the shelf (a self-drop) instead of re-copying it. False for byte-less stores.
+    func contains(_ url: URL) -> Bool
     /// Delete the stored bytes for these items. Best-effort — a missing payload is not an error.
     func delete(_ items: [ShelfItem])
 }
@@ -146,5 +149,6 @@ public struct NoopShelfPayloadStore: ShelfPayloadStore {
         throw ShelfPayloadStoreError.unsupported
     }
     public func url(for item: ShelfItem) -> URL? { nil }
+    public func contains(_ url: URL) -> Bool { false }
     public func delete(_ items: [ShelfItem]) {}
 }
