@@ -57,13 +57,17 @@ struct ShelfView: View {
                         ForEach(model.items) { item in
                             ShelfTile(item: item,
                                       fileURL: model.fileURL(for: item),
-                                      thumbnailer: thumbnailer) { model.remove(item.id) }
+                                      thumbnailer: thumbnailer,
+                                      onRemove: { model.remove(item.id) },
+                                      onCopy: { model.copyToClipboard(item) },
+                                      onReveal: { model.revealInFinder(item) })
                         }
                     }
                     .padding(.vertical, DS.Space.xs)
                 }
                 ShelfFooter(count: model.items.count,
                             totalBytes: model.totalByteSize,
+                            onSaveAll: saveAll,
                             onClearAll: { model.clearAll() })
             }
         }
@@ -83,6 +87,21 @@ struct ShelfView: View {
             RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
                 .strokeBorder(DS.Palette.accent, lineWidth: 2)
                 .allowsHitTesting(false)
+        }
+    }
+
+    /// Footer "Save all to…": pick a folder, then copy every item's bytes into it. The shelf is a
+    /// non-activating panel, so activate first or the open panel can open behind it.
+    private func saveAll() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.prompt = "Save All"
+        panel.message = "Choose a folder to save every shelf item into."
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        if panel.runModal() == .OK, let directory = panel.url {
+            model.saveAll(to: directory)
         }
     }
 
@@ -187,6 +206,8 @@ private struct ShelfTile: View {
     let fileURL: URL?
     let thumbnailer: ShelfThumbnailer
     let onRemove: () -> Void
+    let onCopy: () -> Void
+    let onReveal: () -> Void
     @Environment(\.displayScale) private var displayScale
     @State private var hovering = false
     @State private var thumbnail: NSImage?
@@ -222,13 +243,30 @@ private struct ShelfTile: View {
                         }
                     }
                 if hovering {
-                    Button { onRemove() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 15))
-                            .foregroundStyle(.white, .black.opacity(0.55))
+                    HStack(spacing: 2) {
+                        Menu {
+                            Button("Copy", systemImage: "doc.on.doc", action: onCopy)
+                            if item.kind == .file || item.kind == .folder {
+                                Button("Reveal in Finder", systemImage: "magnifyingglass", action: onReveal)
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle.fill")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white, .black.opacity(0.55))
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .frame(width: 16)
+                        .help("Item actions")
+
+                        Button { onRemove() } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white, .black.opacity(0.55))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Remove")
                     }
-                    .buttonStyle(.plain)
-                    .help("Remove")
                     .offset(x: -3, y: 3) // inset just inside the corner so the grid never clips it
                 }
             }
@@ -265,17 +303,8 @@ private struct ShelfTile: View {
             return nil
         }
         provider.registerObject(fileURL as NSURL, visibility: .all)
-        provider.suggestedName = dragName(fileURL, type)
+        provider.suggestedName = shelfExportName(for: item, at: fileURL)
         return provider
-    }
-
-    /// Files/folders keep their real on-disk name; text/image snippets (stored as `snippet.txt` /
-    /// `image.png`) take the tile's label so several don't all land as "snippet.txt".
-    private func dragName(_ fileURL: URL, _ type: UTType) -> String {
-        switch item.kind {
-        case .file, .folder: return fileURL.lastPathComponent
-        case .text, .image:  return type.preferredFilenameExtension.map { "\(item.displayName).\($0)" } ?? item.displayName
-        }
     }
 
     private var icon: String {
@@ -292,14 +321,19 @@ private struct ShelfTile: View {
 private struct ShelfFooter: View {
     let count: Int
     let totalBytes: Int64
+    let onSaveAll: () -> Void
     let onClearAll: () -> Void
 
     var body: some View {
-        HStack {
+        HStack(spacing: DS.Space.sm) {
             Text("\(count) \(count == 1 ? "item" : "items") · \(sizeText)")
                 .font(DS.Typography.caption)
                 .foregroundStyle(DS.Palette.textSecondary)
             Spacer()
+            Button("Save all to…") { onSaveAll() }
+                .buttonStyle(.plain)
+                .font(DS.Typography.caption)
+                .foregroundStyle(DS.Palette.textSecondary)
             Button("Clear all") { onClearAll() }
                 .buttonStyle(.plain)
                 .font(DS.Typography.caption)

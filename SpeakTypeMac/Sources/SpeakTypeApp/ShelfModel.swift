@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import SpeakTypeCore
 
 /// `@MainActor ObservableObject` wrapper over the pure Core `ShelfStore` — keeps Core
@@ -41,6 +42,65 @@ final class ShelfModel: ObservableObject {
     func remove(_ id: ShelfItem.ID) { objectWillChange.send(); store.remove(id) }
     func clearAll() { objectWillChange.send(); store.clearAll() }
 
+    /// Put the item's content on the system clipboard: the text for a snippet, the image for an image,
+    /// the file URL for a file/folder (so ⌘V pastes the file itself). Builds the content *before*
+    /// clearing the clipboard and no-ops on missing/unreadable bytes — so Copy never wipes the
+    /// clipboard without putting something back.
+    func copyToClipboard(_ item: ShelfItem) {
+        guard let url = fileURL(for: item), FileManager.default.fileExists(atPath: url.path) else { return }
+        let pasteboard = NSPasteboard.general
+        switch item.kind {
+        case .text:
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+        case .image:
+            guard let image = NSImage(contentsOf: url) else { return }
+            pasteboard.clearContents()
+            pasteboard.writeObjects([image])
+        case .file, .folder:
+            pasteboard.clearContents()
+            pasteboard.writeObjects([url as NSURL])
+        }
+    }
+
+    /// Reveal the item's stored file in Finder (used for file/folder items). No-op if bytes are missing.
+    func revealInFinder(_ item: ShelfItem) {
+        guard let url = fileURL(for: item), FileManager.default.fileExists(atPath: url.path) else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    /// Copy every staged item's bytes into `directory`, disambiguating name collisions ("snippet.txt",
+    /// "snippet 2.txt", …). Best-effort: a failed copy is logged and skipped. Returns the count written.
+    @discardableResult
+    func saveAll(to directory: URL) -> Int {
+        var written = 0
+        for item in store.items {
+            guard let source = fileURL(for: item) else { continue }
+            let dest = uniqueDestination(in: directory, named: shelfExportName(for: item, at: source))
+            do { try FileManager.default.copyItem(at: source, to: dest); written += 1 }
+            catch { Diag.log("shelf: save-all failed for \(item.displayName) (\(error))") }
+        }
+        return written
+    }
+
+    /// A destination URL in `directory` for `name` that doesn't clobber an existing file — inserts
+    /// " 2", " 3", … before the extension until the path is free (sequential copies see each other on disk).
+    private func uniqueDestination(in directory: URL, named name: String) -> URL {
+        let manager = FileManager.default
+        var candidate = directory.appendingPathComponent(name)
+        guard manager.fileExists(atPath: candidate.path) else { return candidate }
+        let base = (name as NSString).deletingPathExtension
+        let ext = (name as NSString).pathExtension
+        var n = 2
+        repeat {
+            let next = ext.isEmpty ? "\(base) \(n)" : "\(base) \(n).\(ext)"
+            candidate = directory.appendingPathComponent(next)
+            n += 1
+        } while manager.fileExists(atPath: candidate.path)
+        return candidate
+    }
+
     /// Stage a dropped source (file/folder/text/image): copy its bytes via the payload store, then
     /// record the item. **`nonisolated`** so it can run inside an `NSItemProvider` load callback — a
     /// dropped file's `loadFileRepresentation` temp URL is only valid there, so the copy must happen
@@ -60,4 +120,18 @@ final class ShelfModel: ObservableObject {
 
     /// Expire stale items (called on app activation / periodically by the panel owner).
     func prune() { objectWillChange.send(); store.pruneExpired(now: Date()) }
+}
+
+/// The filename to export an item under: its real on-disk name for a file/folder, or the tile's label
+/// + the stored extension for a text/image snippet (whose bytes live under the generic `snippet.txt` /
+/// `image.png`), so several don't all land as "snippet.txt". Shared by drag-out (`ShelfTile`) and
+/// Save-all (`ShelfModel.saveAll`) so the two export paths name files the same way.
+func shelfExportName(for item: ShelfItem, at url: URL) -> String {
+    switch item.kind {
+    case .file, .folder:
+        return url.lastPathComponent
+    case .text, .image:
+        let ext = url.pathExtension
+        return ext.isEmpty ? item.displayName : "\(item.displayName).\(ext)"
+    }
 }
