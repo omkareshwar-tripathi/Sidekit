@@ -4,9 +4,9 @@ import UniformTypeIdentifiers
 import SpeakTypeCore
 
 /// The Shelf surface's content: a glass card with a header, a thumbnail grid of staged items (or an
-/// empty state), and a footer (item count + store size + Clear all). Tiles show a kind glyph for now;
-/// real QuickLook thumbnails / content previews and drag-in/out + Save-all arrive with the dropped
-/// bytes in SHELF-DROP. The Mirror strip is a separate brick (MIRROR-*).
+/// empty state), and a footer (item count + store size + Clear all). Tiles show a QuickLook thumbnail
+/// of each item's stored file (kind glyph as the fallback); drag-out + Save-all + per-item ⋯ are still
+/// later bricks. The Mirror strip is a separate brick (MIRROR-*).
 struct ShelfView: View {
     @ObservedObject var model: ShelfModel
     /// Dismiss the panel (the header × button).
@@ -14,6 +14,10 @@ struct ShelfView: View {
 
     /// Highlights the whole card while a drag hovers over it ("drop to shelve").
     @State private var isDropTarget = false
+
+    /// Generates + caches QuickLook thumbnails for the tiles; one per panel, lives with the view.
+    /// `@State` (not `@StateObject`) — we don't observe it; tiles get their image via their own state.
+    @State private var thumbnailer = ShelfThumbnailer()
 
     /// Two-column adaptive grid; tiles reflow if the panel is resized later.
     private let columns = [GridItem(.adaptive(minimum: ShelfTile.width), spacing: DS.Space.sm)]
@@ -51,7 +55,9 @@ struct ShelfView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, alignment: .leading, spacing: DS.Space.md) {
                         ForEach(model.items) { item in
-                            ShelfTile(item: item) { model.remove(item.id) }
+                            ShelfTile(item: item,
+                                      fileURL: model.fileURL(for: item),
+                                      thumbnailer: thumbnailer) { model.remove(item.id) }
                         }
                     }
                     .padding(.vertical, DS.Space.xs)
@@ -161,18 +167,31 @@ struct ShelfView: View {
     }
 }
 
-/// One staged item as a grid tile: a thumbnail area (kind glyph for now — real QuickLook/preview in
-/// SHELF-DROP) with a name beneath, and a hover-revealed × to remove it.
+/// One staged item as a grid tile: a QuickLook thumbnail of its stored file (kind glyph as the
+/// fallback) with a name beneath, and a hover-revealed × to remove it.
 private struct ShelfTile: View {
     static let width: CGFloat = 76
     static let height: CGFloat = 64
     /// Reserves two caption lines so wrapped names don't make grid rows uneven (headroom for the
     /// rounded caption face).
     static let nameHeight: CGFloat = 32
+    /// Inset of the thumbnail inside the tile's rounded face, so the preview doesn't touch the border.
+    static let thumbInset: CGFloat = 4
 
     let item: ShelfItem
+    /// On-disk location of the item's bytes (nil if the store holds none) — the thumbnail source.
+    let fileURL: URL?
+    let thumbnailer: ShelfThumbnailer
     let onRemove: () -> Void
+    @Environment(\.displayScale) private var displayScale
     @State private var hovering = false
+    @State private var thumbnail: NSImage?
+
+    /// The image to show: the loaded one, else a synchronous peek at the cache (so a recycled tile with
+    /// a warm thumbnail renders it on the first frame instead of flashing the glyph). Nil → kind glyph.
+    private var shownThumbnail: NSImage? {
+        thumbnail ?? fileURL.flatMap { thumbnailer.cached(for: $0, scale: displayScale) }
+    }
 
     var body: some View {
         VStack(spacing: DS.Space.xs) {
@@ -183,10 +202,21 @@ private struct ShelfTile: View {
                         RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
                             .stroke(DS.Palette.hairline, lineWidth: 1))
                     .frame(width: Self.width, height: Self.height)
-                    .overlay(
-                        Image(systemName: icon)
-                            .font(.system(size: 22, weight: .regular))
-                            .foregroundStyle(DS.Palette.textSecondary))
+                    .overlay {
+                        if let thumbnail = shownThumbnail {
+                            Image(nsImage: thumbnail)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: Self.width - Self.thumbInset * 2,
+                                       height: Self.height - Self.thumbInset * 2)
+                                .clipShape(RoundedRectangle(cornerRadius: DS.Radius.card - Self.thumbInset / 2,
+                                                            style: .continuous))
+                        } else {
+                            Image(systemName: icon)
+                                .font(.system(size: 22, weight: .regular))
+                                .foregroundStyle(DS.Palette.textSecondary)
+                        }
+                    }
                 if hovering {
                     Button { onRemove() } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -207,6 +237,12 @@ private struct ShelfTile: View {
                 .frame(width: Self.width, height: Self.nameHeight, alignment: .top)
         }
         .onHover { hovering = $0 }
+        .task(id: "\(item.id)@\(displayScale)") {
+            guard let fileURL else { return }
+            thumbnail = await thumbnailer.thumbnail(
+                for: fileURL, scale: displayScale,
+                size: CGSize(width: Self.width, height: Self.height))
+        }
     }
 
     private var icon: String {

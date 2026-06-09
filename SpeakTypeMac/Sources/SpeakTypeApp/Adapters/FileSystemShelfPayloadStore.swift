@@ -55,6 +55,13 @@ final class FileSystemShelfPayloadStore: ShelfPayloadStore, @unchecked Sendable 
         }
     }
 
+    /// The on-disk location of a stored item's bytes — the store root joined with its relative path
+    /// (drives tile QuickLook thumbnails). Not existence-checked: QuickLook simply yields no thumbnail
+    /// if the bytes are gone, and the tile keeps its kind glyph.
+    func url(for item: ShelfItem) -> URL? {
+        root.appendingPathComponent(item.storedRelativePath)
+    }
+
     func delete(_ items: [ShelfItem]) {
         for item in items {
             let folder = root.appendingPathComponent(itemFolder(for: item), isDirectory: true)

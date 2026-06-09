@@ -30,6 +30,9 @@ final class ShelfModel: ObservableObject {
     /// Sum of every staged item's byte size — drives the footer's store-size readout.
     var totalByteSize: Int64 { store.items.reduce(0) { $0 + $1.byteSize } }
 
+    /// The on-disk URL of an item's copied bytes (nil if the store holds none) — drives tile thumbnails.
+    func fileURL(for item: ShelfItem) -> URL? { payloadStore.url(for: item) }
+
     func remove(_ id: ShelfItem.ID) { objectWillChange.send(); store.remove(id) }
     func clearAll() { objectWillChange.send(); store.clearAll() }
 
