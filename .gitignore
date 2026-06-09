@@ -43,3 +43,6 @@ logs/
 # Python bytecode (export tooling)
 __pycache__/
 *.pyc
+
+# Local model/whisper eval scratch (multi-GB, never commit)
+/lab/
