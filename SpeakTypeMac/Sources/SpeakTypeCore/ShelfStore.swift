@@ -37,13 +37,13 @@ public final class ShelfStore {
         return item
     }
 
-    /// Copy a dropped source's bytes into the payload store, then stage the resulting item on top.
-    /// Throws (recording nothing) if the copy fails — a bad drop never leaves a dangling index entry.
+    /// Record an already-copied payload as a staged item on top (the App layer copies the bytes off
+    /// the main actor — a dropped file's temp representation is only valid inside its load callback —
+    /// then hands the resulting metadata here). Mirrors `add(kind:...)`, named for the drop path.
     @discardableResult
-    public func add(from source: ShelfPayloadSource) throws -> ShelfItem {
-        let payload = try payloads.store(source)
-        return add(kind: payload.kind, displayName: payload.displayName,
-                   byteSize: payload.byteSize, storedRelativePath: payload.storedRelativePath)
+    public func record(_ payload: StoredPayload) -> ShelfItem {
+        add(kind: payload.kind, displayName: payload.displayName,
+            byteSize: payload.byteSize, storedRelativePath: payload.storedRelativePath)
     }
 
     /// Remove an item by id, persist, and delete its payload bytes. No-op on an unknown id.

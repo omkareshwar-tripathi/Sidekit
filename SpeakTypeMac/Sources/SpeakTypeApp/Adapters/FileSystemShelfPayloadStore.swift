@@ -25,9 +25,9 @@ final class FileSystemShelfPayloadStore: ShelfPayloadStore, @unchecked Sendable 
     /// Copy a dropped source into a fresh `<uuid>/` folder under the store root and report back its
     /// metadata. The folder name (the `<uuid>`) is the first path component of `storedRelativePath`,
     /// matching what `delete(_:)` removes — so the bytes are always reachable and cleanable.
-    /// TODO(SHELF-POLISH): the copy + size walk run on the main actor (called from `@MainActor`
-    /// `ShelfModel.acceptDrop`) — fine for small drops, but a large folder would freeze the UI. Move
-    /// off the main actor with progress per spec §7 risk 2.
+    /// The copy + size walk run **off** the main actor (`ShelfModel.ingest` is `nonisolated` and
+    /// calls this inside the drop callback), so a big folder doesn't freeze the UI.
+    /// TODO(SHELF-POLISH): show copy progress / allow cancel for large folders (spec §7 risk 2).
     func store(_ source: ShelfPayloadSource) throws -> StoredPayload {
         let id = UUID().uuidString
         let folder = root.appendingPathComponent(id, isDirectory: true)

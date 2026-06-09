@@ -63,26 +63,17 @@ struct ShelfStoreTests {
         #expect(store.items.last?.id == a.id)
     }
 
-    // MARK: - add(from:) — copy-in then stage
+    // MARK: - record — stage an already-copied payload
 
-    @Test func addFromCopiesViaPayloadStoreAndStagesReturnedMetadata() throws {
-        let (store, payloads) = makeSUTWithPayloads()
-        payloads.nextStored = StoredPayload(kind: .image, displayName: "Shot.png", byteSize: 99,
-                                            storedRelativePath: "abc/Shot.png")
-        let item = try store.add(from: .text("hi"))
-        #expect(payloads.storedSources.count == 1) // copied in exactly once
+    @Test func recordStagesPayloadMetadataOnTop() {
+        let (store, _) = makeSUT()
+        let item = store.record(StoredPayload(kind: .image, displayName: "Shot.png", byteSize: 99,
+                                              storedRelativePath: "abc/Shot.png"))
         #expect(item.kind == .image)
         #expect(item.displayName == "Shot.png")
         #expect(item.byteSize == 99)
         #expect(item.storedRelativePath == "abc/Shot.png")
         #expect(store.items.first?.id == item.id) // staged on top
-    }
-
-    @Test func addFromDoesNotStageWhenTheCopyFails() {
-        let (store, payloads) = makeSUTWithPayloads()
-        payloads.storeError = ShelfPayloadStoreError.unsupported
-        #expect(throws: (any Error).self) { try store.add(from: .file(URL(fileURLWithPath: "/tmp/x"))) }
-        #expect(store.items.isEmpty)
     }
 
     // MARK: - remove

@@ -73,18 +73,12 @@ final class FakeShelfPersistence: ShelfPersisting, @unchecked Sendable {
     func save(_ items: [ShelfItem]) { saveCount += 1; lastSaved = items; stored = items }
 }
 
-/// Records which sources the store was asked to copy in and which items' bytes it deleted.
-/// `nextStored` is the canned copy-in result; set `storeError` to simulate a failed copy.
+/// Records which items' payload bytes the store was asked to delete. `store(_:)` is required by the
+/// protocol but unused by these tests — drag-in copy-in is exercised at the App layer (`ShelfModel`).
 final class FakeShelfPayloadStore: ShelfPayloadStore, @unchecked Sendable {
     private(set) var deleted: [ShelfItem] = []
-    private(set) var storedSources: [ShelfPayloadSource] = []
-    var nextStored = StoredPayload(kind: .file, displayName: "dropped", byteSize: 7,
-                                   storedRelativePath: "uuid/dropped")
-    var storeError: Error?
     func store(_ source: ShelfPayloadSource) throws -> StoredPayload {
-        if let storeError { throw storeError }
-        storedSources.append(source)
-        return nextStored
+        StoredPayload(kind: .file, displayName: "dropped", byteSize: 0, storedRelativePath: "uuid/dropped")
     }
     func delete(_ items: [ShelfItem]) { deleted.append(contentsOf: items) }
 }

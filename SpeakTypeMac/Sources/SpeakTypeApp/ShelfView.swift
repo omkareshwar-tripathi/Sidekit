@@ -65,8 +65,8 @@ struct ShelfView: View {
         .frame(width: 280, height: 360)
         .glassCard()
         .overlay(dropHighlight)
-        .onDrop(of: [.fileURL, .image, .text], isTargeted: $isDropTarget) { providers in
-            providers.forEach(load)
+        .onDrop(of: [.fileURL, .image, .text], isTargeted: $isDropTarget) { [model] providers in
+            providers.forEach { load($0, into: model) }
             return true
         }
     }
@@ -80,32 +80,77 @@ struct ShelfView: View {
         }
     }
 
-    /// Decode one dropped provider and stage it. Prefer a file URL (the primary citizen), then an
-    /// image, then text — so a file drag (which also exposes a name string) is shelved as the file.
-    /// Loading is async/off-main; hop back to the main actor before touching the model.
-    nonisolated private func load(_ provider: NSItemProvider) {
-        if provider.canLoadObject(ofClass: URL.self) {
+    /// Decode one dropped provider and stage it. Routing is decided from the provider's *registered
+    /// types*, not `suggestedName` (which is `nil` for Finder drags). Branch order:
+    ///   1. **File / folder on disk.** If it has a `public.file-url` (Finder files & folders), copy
+    ///      the real on-disk item (correct filename, recursive for folders). Else, if a registered
+    ///      *content* type is a genuine file's bytes — non-URL, non-image, and within the text family
+    ///      only **source code** (`.sh`/`.py`/`.swift`) — materialize it via `loadFileRepresentation`.
+    ///      This is the crux: Finder vends a text-conforming file (e.g. `public.shell-script`) typed
+    ///      as its content UTI with **no** `public.file-url`, so a naive text check wrongly grabs the
+    ///      bytes as a snippet; routing by `.sourceCode` shelves it as the file. A rich/plain-text
+    ///      *selection* (`.rtf`/`.html`/plain-text — not source code) deliberately falls through to 4.
+    ///   2. A raw **image** with no file (e.g. dragged from a webpage).
+    ///   3. A **web/other URL** (dragged browser link) → shelved as a text snippet of the address.
+    ///   4. A raw **text** selection.
+    ///
+    /// `loadFileRepresentation`'s temp URL and a dragged file-url are both only safe to read inside
+    /// the callback, so `ingest` copies the bytes synchronously there (off the main actor).
+    nonisolated private func load(_ provider: NSItemProvider, into model: ShelfModel) {
+        let ids = provider.registeredTypeIdentifiers
+        let hasFileURL = provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+        // A registered type whose bytes are a real file to copy: content, but not a URL, not a raw
+        // image, and — within the text family — only source code (so editor selections stay snippets).
+        let contentTypeID = ids.first { id in
+            guard let t = UTType(id), t.conforms(to: .content),
+                  !t.conforms(to: .url), !t.conforms(to: .image) else { return false }
+            return t.conforms(to: .text) ? t.conforms(to: .sourceCode) : true
+        }
+        Diag.log("shelf: drop types=\(ids) name=\(provider.suggestedName ?? "nil") hasFileURL=\(hasFileURL) content=\(contentTypeID ?? "nil")")
+
+        // 1. File / folder on disk.
+        if hasFileURL {
+            Diag.log("shelf: -> branch=file (file-url)")
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url else { return }
-                // A file URL is shelved as the file; a web/other URL (e.g. a dragged browser link)
-                // is shelved as a text snippet of the address rather than silently dropped.
-                deliver(url.isFileURL ? .file(url) : .text(url.absoluteString))
+                guard let url, url.isFileURL else { return }
+                model.ingest(.file(url))
             }
-        } else if provider.canLoadObject(ofClass: NSImage.self) {
+            return
+        }
+        if let contentTypeID {
+            Diag.log("shelf: -> branch=file (content \(contentTypeID))")
+            _ = provider.loadFileRepresentation(forTypeIdentifier: contentTypeID) { url, _ in
+                guard let url else { return }
+                model.ingest(.file(url))
+            }
+            return
+        }
+        // 2. Raw image (no file).
+        if provider.canLoadObject(ofClass: NSImage.self) {
+            Diag.log("shelf: -> branch=image")
             _ = provider.loadObject(ofClass: NSImage.self) { object, _ in
                 guard let image = object as? NSImage, let data = pngData(from: image) else { return }
-                deliver(.image(data))
+                model.ingest(.image(data))
             }
-        } else if provider.canLoadObject(ofClass: NSString.self) {
+            return
+        }
+        // 3. Web / other URL (browser link) → text of the address.
+        if provider.canLoadObject(ofClass: URL.self) {
+            Diag.log("shelf: -> branch=weburl")
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url else { return }
+                model.ingest(.text(url.absoluteString))
+            }
+            return
+        }
+        // 4. Raw text selection (plain, or rich/markup selections that fell through branch 1).
+        if provider.canLoadObject(ofClass: NSString.self) {
+            Diag.log("shelf: -> branch=text")
             _ = provider.loadObject(ofClass: NSString.self) { object, _ in
                 guard let text = object as? String else { return }
-                deliver(.text(text))
+                model.ingest(.text(text))
             }
         }
-    }
-
-    nonisolated private func deliver(_ source: ShelfPayloadSource) {
-        Task { @MainActor in model.acceptDrop(source) }
     }
 
     /// PNG-encode a dropped `NSImage` for the payload store (NSImage has no direct `pngData`).
@@ -121,6 +166,9 @@ struct ShelfView: View {
 private struct ShelfTile: View {
     static let width: CGFloat = 76
     static let height: CGFloat = 64
+    /// Reserves two caption lines so wrapped names don't make grid rows uneven (headroom for the
+    /// rounded caption face).
+    static let nameHeight: CGFloat = 32
 
     let item: ShelfItem
     let onRemove: () -> Void
@@ -153,9 +201,10 @@ private struct ShelfTile: View {
             Text(item.displayName)
                 .font(DS.Typography.caption)
                 .foregroundStyle(DS.Palette.textPrimary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(width: Self.width)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .truncationMode(.tail)
+                .frame(width: Self.width, height: Self.nameHeight, alignment: .top)
         }
         .onHover { hovering = $0 }
     }
