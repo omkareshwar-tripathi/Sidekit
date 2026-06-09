@@ -81,3 +81,16 @@ public extension NotesPersisting {
     /// Default: nothing is buffered, so there's nothing to flush. A debouncing adapter overrides.
     func flush() {}
 }
+
+/// Loads and saves the Shelf's item index (metadata only — the payload bytes are a separate
+/// adapter concern). The store calls `load()` once at init and `save(_:)` after every mutation.
+public protocol ShelfPersisting: Sendable {
+    func load() -> [ShelfItem]
+    func save(_ items: [ShelfItem])
+    func flush()
+}
+
+public extension ShelfPersisting {
+    /// Default: nothing is buffered, so there's nothing to flush. A debouncing adapter overrides.
+    func flush() {}
+}

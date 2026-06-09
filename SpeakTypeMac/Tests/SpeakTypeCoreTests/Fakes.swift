@@ -62,3 +62,13 @@ final class FakeDates {
     private var seconds: TimeInterval = 0
     func next() -> Date { seconds += 1; return Date(timeIntervalSinceReferenceDate: seconds) }
 }
+
+/// In-memory ShelfPersisting: seeds the store on load and records what it saved.
+final class FakeShelfPersistence: ShelfPersisting, @unchecked Sendable {
+    var stored: [ShelfItem]
+    private(set) var saveCount = 0
+    private(set) var lastSaved: [ShelfItem] = []
+    init(_ initial: [ShelfItem] = []) { stored = initial }
+    func load() -> [ShelfItem] { stored }
+    func save(_ items: [ShelfItem]) { saveCount += 1; lastSaved = items; stored = items }
+}

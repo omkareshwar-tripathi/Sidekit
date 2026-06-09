@@ -132,6 +132,8 @@ final class AppController: ObservableObject {
     let history: HistoryModel
     /// User settings (filler removal, launch-at-login, permission status). Drives the settings sheet.
     let settings: SettingsModel
+    /// The Shelf (observable wrapper over the pure store). Surfaced to the summoned `ShelfPanel`.
+    let shelf: ShelfModel
     /// Custom menu-bar glyph (mic + waveform) shown in the idle state. nil when running un-bundled
     /// (plain `swift run`) — the label then falls back to the "mic" SF Symbol.
     let menuBarIcon: NSImage? = AppController.loadMenuBarIcon()
@@ -139,6 +141,8 @@ final class AppController: ObservableObject {
     private let coordinator: DictationCoordinator
     private let hotkey: FnKeyMonitor
     private var pill: PillPanel?
+    private var shelfPanel: ShelfPanel?
+    private var shelfStatusItem: ShelfStatusItem?
 
     init() {
         let clipboard = MacClipboard()
@@ -147,6 +151,7 @@ final class AppController: ObservableObject {
         let transcriber = WhisperKitTranscriber(modelFolder: Self.bundledModelFolder())
         let notes = NotesModel()
         let history = HistoryModel()
+        let shelf = ShelfModel()
 
         // Route the cleaned transcript: into the active note when SpeakType is the focused app
         // (creating one if the list is empty), otherwise paste at the cursor as before (spec §3).
@@ -181,6 +186,7 @@ final class AppController: ObservableObject {
         self.notes = notes
         self.history = history
         self.settings = settings
+        self.shelf = shelf
         self.coordinator = coordinator
         self.hotkey = hotkey
 
@@ -224,6 +230,12 @@ final class AppController: ObservableObject {
         // Show the always-present floating pill (binds to `self.state`). Created last, once all
         // stored properties are initialized, so it can capture a fully-formed controller.
         pill = PillPanel(controller: self)
+        // The Shelf panel starts hidden; a dedicated menu-bar icon click toggles it.
+        shelfPanel = ShelfPanel(
+            model: shelf,
+            onClose: { [weak self] in self?.shelfPanel?.hide() })
+        shelfStatusItem = ShelfStatusItem(
+            onClick: { [weak self] in self?.shelfPanel?.toggle() })
     }
 
     var iconName: String {
