@@ -23,6 +23,10 @@ struct ShelfView: View {
     /// multi-item drag-out that consumes the selection is the follow-up brick (SHELF-DRAG-OUT-MULTI-B).
     @State private var selection: Set<UUID> = []
 
+    /// Live items currently in the multi-select set. Filtering `model.items` excludes any stale id left
+    /// in `selection` by an expiry/prune (so the drag handle never offers a ghost item).
+    private var selectedItems: [ShelfItem] { model.items.filter { selection.contains($0.id) } }
+
     /// Two-column adaptive grid; tiles reflow if the panel is resized later.
     private let columns = [GridItem(.adaptive(minimum: ShelfTile.width), spacing: DS.Space.sm)]
 
@@ -71,6 +75,11 @@ struct ShelfView: View {
                     }
                     .padding(.vertical, DS.Space.xs)
                 }
+                if !selectedItems.isEmpty {
+                    ShelfDragHandle(count: selectedItems.count,
+                                    files: { dragFiles(for: selectedItems) },
+                                    onSessionActive: { model.isDraggingOut = $0 })
+                }
                 ShelfFooter(count: model.items.count,
                             totalBytes: model.totalByteSize,
                             onSaveAll: saveAll,
@@ -82,6 +91,7 @@ struct ShelfView: View {
         .glassCard()
         .overlay(dropHighlight)
         .onDrop(of: [.fileURL, .image, .text], isTargeted: $isDropTarget) { [model] providers in
+            guard !model.isDraggingOut else { return false } // ignore our own items dragged out + dropped back
             providers.forEach { load($0, into: model) }
             return true
         }
@@ -114,6 +124,35 @@ struct ShelfView: View {
     /// Toggle a tile's membership in the multi-select set (tap a tile to select / deselect it).
     private func toggleSelection(_ id: UUID) {
         if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+    }
+
+    /// Resolve selected items to draggable files (on-disk source + export name + UTI), skipping any
+    /// whose bytes are missing. Caller passes live `selectedItems`, so stale selection ids are gone.
+    /// Disambiguates duplicate export names within the drag (e.g. several "Image.png") so same-named
+    /// snippets don't collide/overwrite on drop.
+    private func dragFiles(for items: [ShelfItem]) -> [ShelfDragFile] {
+        var usedNames = Set<String>()
+        return items.compactMap { item -> ShelfDragFile? in
+            guard let url = model.fileURL(for: item),
+                  FileManager.default.fileExists(atPath: url.path) else { return nil }
+            let type = (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType) ?? .data
+            let name = uniqueExportName(shelfExportName(for: item, at: url), taken: &usedNames)
+            return ShelfDragFile(url: url, name: name, type: type)
+        }
+    }
+
+    /// A copy of `name` not already in `taken` — inserts " 2", " 3", … before the extension on a clash
+    /// (mirrors `ShelfModel.uniqueDestination`'s naming, but for a name set rather than the filesystem).
+    private func uniqueExportName(_ name: String, taken: inout Set<String>) -> String {
+        if taken.insert(name).inserted { return name }
+        let base = (name as NSString).deletingPathExtension
+        let ext = (name as NSString).pathExtension
+        var n = 2
+        while true {
+            let candidate = ext.isEmpty ? "\(base) \(n)" : "\(base) \(n).\(ext)"
+            if taken.insert(candidate).inserted { return candidate }
+            n += 1
+        }
     }
 
     /// Decode one dropped provider and stage it. Routing is decided from the provider's *registered
@@ -347,6 +386,33 @@ private struct ShelfTile: View {
         case .text:   return "text.alignleft"
         case .image:  return "photo"
         }
+    }
+}
+
+/// Shown above the footer when ≥1 tile is selected: a "Drag N out" chip whose surface is an
+/// `NSDraggingSession` source (see `ShelfDragSource`) — drag it into any app/folder to copy every
+/// selected item out at once. Sits in the footer, not over the grid, so it never occludes tile hover.
+private struct ShelfDragHandle: View {
+    let count: Int
+    let files: () -> [ShelfDragFile]
+    let onSessionActive: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: DS.Space.xs) {
+            Image(systemName: "square.and.arrow.up.on.square")
+            Text("Drag \(count) out")
+        }
+        .font(DS.Typography.caption)
+        .foregroundStyle(DS.Palette.textPrimary)
+        .padding(.vertical, DS.Space.xs)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                .fill(DS.Palette.accent.opacity(0.18))
+                .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                    .strokeBorder(DS.Palette.accent.opacity(0.5), lineWidth: 1)))
+        .overlay(ShelfDragSource(files: files, onSessionActive: onSessionActive))
+        .help("Drag the \(count) selected item\(count == 1 ? "" : "s") out to any app or folder")
     }
 }
 

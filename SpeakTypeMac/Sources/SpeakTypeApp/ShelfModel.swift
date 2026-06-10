@@ -28,6 +28,10 @@ final class ShelfModel: ObservableObject {
 
     var items: [ShelfItem] { store.items }
     var isEmpty: Bool { store.items.isEmpty }
+    /// True while a drag-out session from this panel is in flight — lets the panel's `.onDrop` ignore a
+    /// self-drop of our own items back onto it (a file-promise drop isn't a `public.file-url`, so the
+    /// `isStored` guard in `ShelfView.load` wouldn't catch it). Set by the footer drag handle.
+    var isDraggingOut = false
     /// Sum of every staged item's byte size — drives the footer's store-size readout.
     var totalByteSize: Int64 { store.items.reduce(0) { $0 + $1.byteSize } }
 
@@ -131,7 +135,14 @@ func shelfExportName(for item: ShelfItem, at url: URL) -> String {
     case .file, .folder:
         return url.lastPathComponent
     case .text, .image:
+        // Sanitize: a snippet's displayName is its first line, which often holds "/" or ":" (a URL,
+        // path, date, fraction). Those are path separators on disk, so an unsanitized name makes the
+        // export copy land in a nonexistent subdir and fail. Fall back if it sanitizes to empty.
+        let cleaned = item.displayName
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        let base = cleaned.isEmpty ? "snippet" : cleaned
         let ext = url.pathExtension
-        return ext.isEmpty ? item.displayName : "\(item.displayName).\(ext)"
+        return ext.isEmpty ? base : "\(base).\(ext)"
     }
 }
