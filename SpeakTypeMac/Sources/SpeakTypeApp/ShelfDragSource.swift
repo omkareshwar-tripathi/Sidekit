@@ -69,17 +69,14 @@ struct ShelfDragSource: NSViewRepresentable {
         func draggingSession(_ session: NSDraggingSession,
                              sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .copy }
 
-        func draggingSession(_ session: NSDraggingSession, willBeginAt screenPoint: NSPoint) {
-            // Arm the self-drop guard only once the session is confirmed to begin — pairs with
-            // `endedAt`, so the flag can never stick true if `beginDraggingSession` declines to start.
-            onSessionActive(true)
-        }
-
         func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint,
                              operation: NSDragOperation) {
-            // Defer clearing past the current event: a drop back onto our own panel fires the panel's
-            // `.onDrop` in the same cycle, which must still see the guard set so it ignores the self-drop.
-            DispatchQueue.main.async { self.onSessionActive(false) }
+            // Clear a beat AFTER the drop is handled: a drop back onto our own panel fires the panel's
+            // `.onDrop` around this same moment, and it must still see the guard set so it ignores the
+            // self-drop. A brief delay covers an `.onDrop` that lands just after `endedAt`, without
+            // leaving the panel deaf to real drops for more than a flash. (The guard is *armed*
+            // synchronously in `mouseDragged`, not here — `willBeginAt` proved unreliable.)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.onSessionActive(false) }
         }
     }
 
@@ -104,6 +101,10 @@ struct ShelfDragSource: NSViewRepresentable {
 
             let files = coordinator.files()
             guard !files.isEmpty else { return }
+            // Arm the self-drop guard synchronously, before the session starts — reliably set before any
+            // drop can occur. (`willBeginAt` proved unreliable; reaching `beginDraggingSession` always
+            // yields an `endedAt`, so this can't stick true.)
+            coordinator.onSessionActive(true)
 
             let iconSize = NSSize(width: 48, height: 48)
             let items: [NSDraggingItem] = files.enumerated().map { index, file in

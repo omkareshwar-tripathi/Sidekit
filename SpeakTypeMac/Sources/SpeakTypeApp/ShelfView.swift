@@ -91,7 +91,10 @@ struct ShelfView: View {
         .glassCard()
         .overlay(dropHighlight)
         .onDrop(of: [.fileURL, .image, .text], isTargeted: $isDropTarget) { [model] providers in
-            guard !model.isDraggingOut else { return false } // ignore our own items dragged out + dropped back
+            guard !model.isDraggingOut else {
+                Diag.log("shelf: ignored self-drop (dragging out)") // our own items dragged out + dropped back
+                return false
+            }
             providers.forEach { load($0, into: model) }
             return true
         }
