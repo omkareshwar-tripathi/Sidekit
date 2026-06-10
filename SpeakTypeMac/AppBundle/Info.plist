@@ -26,5 +26,7 @@
 	<!-- Shown in the microphone permission prompt (wired up in MAC-5). -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SpeakType transcribes your speech on-device to type for you.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Sidekit shows a live self-view mirror; video is never recorded or saved.</string>
 </dict>
 </plist>

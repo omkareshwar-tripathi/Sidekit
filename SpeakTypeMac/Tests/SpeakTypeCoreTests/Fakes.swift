@@ -84,3 +84,24 @@ final class FakeShelfPayloadStore: ShelfPayloadStore, @unchecked Sendable {
     func contains(_ url: URL) -> Bool { false }
     func delete(_ items: [ShelfItem]) { deleted.append(contentsOf: items) }
 }
+
+/// Records camera control calls so Mirror lifecycle tests can stand in for the real
+/// AVFoundation adapter. `start` runs the camera and remembers the requested device;
+/// `stop` turns it off; counts track each call; `devices` is the configurable list.
+final class FakeCamera: CameraPort {
+    private(set) var isRunning = false
+    var devices: [CameraDevice] = []
+    private(set) var startCount = 0
+    private(set) var stopCount = 0
+    private(set) var lastStartedDeviceID: String?
+    func availableDevices() -> [CameraDevice] { devices }
+    func start(deviceID: String?) {
+        startCount += 1
+        lastStartedDeviceID = deviceID
+        isRunning = true
+    }
+    func stop() {
+        stopCount += 1
+        isRunning = false
+    }
+}
