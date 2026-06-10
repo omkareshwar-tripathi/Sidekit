@@ -28,6 +28,9 @@ final class ShelfModel: ObservableObject {
 
     var items: [ShelfItem] { store.items }
     var isEmpty: Bool { store.items.isEmpty }
+    /// How many dropped items are still having their bytes copied in (a large folder takes a while —
+    /// spec §7 risk 2). Drives the panel's "Copying…" row so a slow drop isn't dead silence.
+    private(set) var copyingCount = 0
     /// Sum of every staged item's byte size — drives the footer's store-size readout.
     var totalByteSize: Int64 { store.items.reduce(0) { $0 + $1.byteSize } }
 
@@ -107,6 +110,16 @@ final class ShelfModel: ObservableObject {
     /// synchronously off the main actor; only the model mutation hops back to main. A failed copy is
     /// logged and skipped, so one bad item never aborts the rest of a multi-item drop.
     nonisolated func ingest(_ source: ShelfPayloadSource) {
+        Task { @MainActor in
+            objectWillChange.send()
+            copyingCount += 1
+        }
+        defer {
+            Task { @MainActor in
+                objectWillChange.send()
+                copyingCount -= 1
+            }
+        }
         do {
             let payload = try payloadStore.store(source)
             Task { @MainActor in

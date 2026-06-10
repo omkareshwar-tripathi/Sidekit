@@ -57,6 +57,7 @@ struct ShelfView: View {
                         .font(DS.Typography.body)
                         .foregroundStyle(DS.Palette.textSecondary)
                         .multilineTextAlignment(.center)
+                    copyingRow
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -79,6 +80,7 @@ struct ShelfView: View {
                     ShelfDragHandle(count: selectedItems.count,
                                     files: { dragFiles(for: selectedItems) })
                 }
+                copyingRow
                 ShelfFooter(count: model.items.count,
                             totalBytes: model.totalByteSize,
                             onSaveAll: saveAll,
@@ -89,15 +91,51 @@ struct ShelfView: View {
         .frame(width: 280, height: 360)
         .glassCard()
         .overlay(dropHighlight)
-        .onDrop(of: [.fileURL, .image, .text], isTargeted: $isDropTarget) { [model] providers in
-            // A drag that started on one of our own tiles / the drag-out chip, released back onto the
-            // panel — ignore it or every dragged item would re-ingest as a duplicate.
+        .onDrop(of: [.fileURL, .image, .text],
+                delegate: ShelfDropDelegate(model: model, isDropTarget: $isDropTarget,
+                                            load: { load($0, into: $1) }))
+    }
+
+    /// The panel's drop handling. A `DropDelegate` (not the closure `.onDrop`) so a **self-originated
+    /// drag is rejected in `validateDrop`** — then macOS never reports it as targeted and the "drop to
+    /// shelve" highlight doesn't light up while one of our own tiles/chips is dragged over the panel
+    /// (and `performDrop` is never called, which is also what prevents the self-drop duplicate).
+    private struct ShelfDropDelegate: DropDelegate {
+        let model: ShelfModel
+        @Binding var isDropTarget: Bool
+        let load: (NSItemProvider, ShelfModel) -> Void
+
+        func validateDrop(info: DropInfo) -> Bool {
             if ShelfDragMarker.isOnDragPasteboard {
-                Diag.log("shelf: ignored self-drop (shelf marker on drag pasteboard)")
+                Diag.log("shelf: ignored self-drag (shelf marker on drag pasteboard)")
                 return false
             }
-            providers.forEach { load($0, into: model) }
             return true
+        }
+
+        func dropEntered(info: DropInfo) { isDropTarget = true }
+        func dropExited(info: DropInfo) { isDropTarget = false }
+
+        func performDrop(info: DropInfo) -> Bool {
+            isDropTarget = false
+            let providers = info.itemProviders(for: [.fileURL, .image, .text])
+            guard !providers.isEmpty else { return false }
+            providers.forEach { load($0, model) }
+            return true
+        }
+    }
+
+    /// Shown while dropped bytes are still copying in (a large folder takes a while — spec §7
+    /// risk 2), so a slow drop reads as work-in-progress instead of dead silence.
+    @ViewBuilder private var copyingRow: some View {
+        if model.copyingCount > 0 {
+            HStack(spacing: DS.Space.xs) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(model.copyingCount == 1 ? "Copying…" : "Copying \(model.copyingCount) items…")
+                    .font(DS.Typography.caption)
+                    .foregroundStyle(DS.Palette.textSecondary)
+            }
         }
     }
 
@@ -211,7 +249,13 @@ struct ShelfView: View {
         if provider.canLoadObject(ofClass: NSImage.self) {
             Diag.log("shelf: -> branch=image")
             _ = provider.loadObject(ofClass: NSImage.self) { object, _ in
-                guard let image = object as? NSImage, let data = pngData(from: image) else { return }
+                guard let image = object as? NSImage else { return }
+                guard let data = pngData(from: image) else {
+                    // A vector/PDF-backed NSImage has no bitmap rep to PNG-encode — drop it loudly,
+                    // not silently (SHELF-DROP-EDGES a).
+                    Diag.log("shelf: image drop has no encodable bitmap representation — skipped")
+                    return
+                }
                 model.ingest(.image(data))
             }
             return
