@@ -17,6 +17,10 @@ final class MirrorModel: ObservableObject {
     @Published private(set) var devices: [CameraDevice] = []
     /// nil = system default camera; a non-nil id selects a specific discovered device.
     @Published var selectedDeviceID: String?
+    /// Manual "edge light" — a bright-white inset frame that acts as a fill light in dim rooms. A
+    /// session preference (no frame sampling — privacy-clean): it carries across small/expanded/full
+    /// screen while the Mirror stays open and resets to off on `dismiss()` (fresh each open).
+    @Published private(set) var edgeLightOn = false
 
     /// Held concretely (not as `CameraPort`) so the view can read `previewLayer`; controlled
     /// through the `CameraPort` surface for start/stop.
@@ -57,9 +61,15 @@ final class MirrorModel: ObservableObject {
         // System Settings then reopening recovers without an app restart (the MIRROR-LIFECYCLE
         // deactivate-dismiss fires when the user opens System Settings).
         permissionDenied = false
+        edgeLightOn = false   // edge light is fresh each open (spec decision #5)
         state = state.dismissed()
         syncCamera()
         syncOverlay()
+    }
+
+    /// Flip the manual edge light on/off (the ☀ toggle, in both the windowed strip and the overlay).
+    func toggleEdgeLight() {
+        edgeLightOn.toggle()
     }
 
     /// Toggle the full-display overlay: an open windowed preview goes full screen, the overlay exits
@@ -102,7 +112,7 @@ final class MirrorModel: ObservableObject {
         if state == .fullScreen {
             let overlay = overlay ?? MirrorOverlayPanel()
             self.overlay = overlay
-            overlay.show(previewLayer: camera.makePreviewLayer()) { [weak self] in
+            overlay.show(previewLayer: camera.makePreviewLayer(), model: self) { [weak self] in
                 self?.toggleFullScreen()
             }
         } else {

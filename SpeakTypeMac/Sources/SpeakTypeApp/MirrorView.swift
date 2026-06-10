@@ -113,11 +113,34 @@ struct MirrorView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
                     .strokeBorder(DS.Palette.hairline, lineWidth: 1))
+            .overlay { edgeLightFrame }
             .contentShape(Rectangle())
             .onTapGesture { model.tap() }
             .overlay(alignment: .topTrailing) { collapseControl }
             .overlay(alignment: .topLeading) { sourcePicker }
             .overlay(alignment: .bottomTrailing) { fullScreenControl }
+            .overlay(alignment: .bottomLeading) { edgeLightControl }
+    }
+
+    /// The thin bright-white inset fill-light frame on the windowed preview when the edge light is on
+    /// (the overlay draws a much thicker one). Non-hit-testing so it never blocks the tap-to-resize.
+    @ViewBuilder private var edgeLightFrame: some View {
+        if model.edgeLightOn {
+            RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                .strokeBorder(.white, lineWidth: 6)
+                .allowsHitTesting(false)
+        }
+    }
+
+    /// The ☀ edge-light toggle (bottom-leading, opposite the full-screen control).
+    private var edgeLightControl: some View {
+        Button { model.toggleEdgeLight() } label: {
+            Image(systemName: model.edgeLightOn ? "sun.max.fill" : "sun.max")
+                .foregroundStyle(.white, .black.opacity(0.55))
+        }
+        .buttonStyle(.plain)
+        .padding(DS.Space.xs)
+        .help("Edge light")
     }
 
     private var collapseControl: some View {

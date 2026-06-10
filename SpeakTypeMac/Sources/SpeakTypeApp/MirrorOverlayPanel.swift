@@ -31,14 +31,15 @@ final class MirrorOverlayPanel {
         panel.hidesOnDeactivate = false
     }
 
-    /// Show the overlay on the Mirror's screen, hosting a fresh mirrored preview layer.
-    func show(previewLayer: AVCaptureVideoPreviewLayer, onExit: @escaping () -> Void) {
+    /// Show the overlay on the Mirror's screen, hosting a fresh mirrored preview layer. `model` is
+    /// observed for the live edge-light state (the ☀ toggle + frame); `onExit` leaves full screen.
+    func show(previewLayer: AVCaptureVideoPreviewLayer, model: MirrorModel, onExit: @escaping () -> Void) {
         self.onExit = onExit
         let frame = (NSScreen.main ?? NSScreen.screens.first)?.frame ?? panel.frame
         panel.setFrame(frame, display: false)
 
         let hosting = NSHostingView(rootView:
-            MirrorOverlayView(previewLayer: previewLayer, onExit: onExit))
+            MirrorOverlayView(previewLayer: previewLayer, model: model, onExit: onExit))
         hosting.frame = NSRect(origin: .zero, size: frame.size)
         panel.contentView = hosting
 
@@ -117,13 +118,13 @@ final class MirrorOverlayPanel {
 }
 
 /// The full-screen overlay's content: the mirrored preview filling the screen, a transparent
-/// click-catcher layered on top that exits on a tap anywhere, and the ✕ control above *that*. Built
+/// click-catcher layered on top that exits on a tap anywhere, then the controls above *that*. Built
 /// with `.overlay` chaining (not ZStack sibling order) so each control is structurally guaranteed to
-/// win its own taps over the full-bleed catcher — and so the ☀ edge-light toggle (MIRROR-EDGELIGHT)
-/// can be added as another top overlay without the catcher swallowing it (spec risk #2). The ☀ toggle
-/// + bright frame land in MIRROR-EDGELIGHT.
+/// win its own taps over the full-bleed catcher — in particular the ☀ toggle, which must NOT exit
+/// (spec risk #2). When the edge light is on, a thick bright-white frame hugs the screen as fill light.
 private struct MirrorOverlayView: View {
     let previewLayer: AVCaptureVideoPreviewLayer
+    @ObservedObject var model: MirrorModel
     let onExit: () -> Void
 
     var body: some View {
@@ -135,6 +136,15 @@ private struct MirrorOverlayView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { onExit() }
             }
+            // Thick bright-white fill-light frame, hugging the screen edges, when the edge light is on.
+            .overlay {
+                if model.edgeLightOn {
+                    Rectangle()
+                        .strokeBorder(.white, lineWidth: 28)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+            }
             .overlay(alignment: .topTrailing) {
                 Button { onExit() } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -144,6 +154,16 @@ private struct MirrorOverlayView: View {
                 .buttonStyle(.plain)
                 .padding(DS.Space.lg)
                 .help("Exit full screen")
+            }
+            .overlay(alignment: .bottomTrailing) {
+                Button { model.toggleEdgeLight() } label: {
+                    Image(systemName: model.edgeLightOn ? "sun.max.fill" : "sun.max")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white, .black.opacity(0.55))
+                }
+                .buttonStyle(.plain)
+                .padding(DS.Space.lg)
+                .help("Edge light")
             }
     }
 }
