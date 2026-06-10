@@ -77,8 +77,7 @@ struct ShelfView: View {
                 }
                 if !selectedItems.isEmpty {
                     ShelfDragHandle(count: selectedItems.count,
-                                    files: { dragFiles(for: selectedItems) },
-                                    onSessionActive: { model.isDraggingOut = $0 })
+                                    files: { dragFiles(for: selectedItems) })
                 }
                 ShelfFooter(count: model.items.count,
                             totalBytes: model.totalByteSize,
@@ -91,17 +90,10 @@ struct ShelfView: View {
         .glassCard()
         .overlay(dropHighlight)
         .onDrop(of: [.fileURL, .image, .text], isTargeted: $isDropTarget) { [model] providers in
-            let dragTypes = NSPasteboard(name: .drag).pasteboardItems?
-                .flatMap { $0.types.map(\.rawValue) } ?? []
-            Diag.log("shelf: onDrop perform entered isDraggingOut=\(model.isDraggingOut) providers=\(providers.count) dragTypes=\(dragTypes)")
             // A drag that started on one of our own tiles / the drag-out chip, released back onto the
             // panel — ignore it or every dragged item would re-ingest as a duplicate.
             if ShelfDragMarker.isOnDragPasteboard {
                 Diag.log("shelf: ignored self-drop (shelf marker on drag pasteboard)")
-                return false
-            }
-            guard !model.isDraggingOut else {
-                Diag.log("shelf: ignored self-drop (dragging out)") // our own items dragged out + dropped back
                 return false
             }
             providers.forEach { load($0, into: model) }
@@ -395,7 +387,6 @@ private struct ShelfTile: View {
             return nil
         }
         provider.suggestedName = shelfExportName(for: item, at: fileURL)
-        Diag.log("shelf: tile drag start \(item.displayName)")
         return provider
     }
 
@@ -415,7 +406,6 @@ private struct ShelfTile: View {
 private struct ShelfDragHandle: View {
     let count: Int
     let files: () -> [ShelfDragFile]
-    let onSessionActive: (Bool) -> Void
 
     var body: some View {
         HStack(spacing: DS.Space.xs) {
@@ -431,7 +421,7 @@ private struct ShelfDragHandle: View {
                 .fill(DS.Palette.accent.opacity(0.18))
                 .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
                     .strokeBorder(DS.Palette.accent.opacity(0.5), lineWidth: 1)))
-        .overlay(ShelfDragSource(files: files, onSessionActive: onSessionActive))
+        .overlay(ShelfDragSource(files: files))
         .help("Drag the \(count) selected item\(count == 1 ? "" : "s") out to any app or folder")
     }
 }

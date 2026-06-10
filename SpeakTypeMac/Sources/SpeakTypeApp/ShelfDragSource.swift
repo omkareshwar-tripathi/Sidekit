@@ -56,9 +56,6 @@ struct ShelfDragSource: NSViewRepresentable {
     /// Files to drag, resolved at drag-start so it reflects the current selection; already filtered to
     /// live, on-disk items by the caller.
     let files: () -> [ShelfDragFile]
-    /// True while our drag session is in flight — lets the panel's `.onDrop` ignore a self-drop of our
-    /// own items back onto it (a file-promise drop isn't caught by the file-URL `isStored` guard).
-    let onSessionActive: (Bool) -> Void
 
     func makeNSView(context: Context) -> NSView {
         let view = DragSourceView()
@@ -68,22 +65,19 @@ struct ShelfDragSource: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.files = files
-        context.coordinator.onSessionActive = onSessionActive
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(files: files, onSessionActive: onSessionActive) }
+    func makeCoordinator() -> Coordinator { Coordinator(files: files) }
 
-    /// The NSDraggingSource for a handle's drag session. Vends the file-promise providers and reports
-    /// when the session is in flight (for the panel's self-drop guard). AppKit retains the source for
-    /// the whole session, so it outlives a handle that SwiftUI tears down mid-drag; the *promise* work
-    /// is on a process-lifetime delegate (below) because the receiver may pull the file even later.
+    /// The NSDraggingSource for a handle's drag session. Vends the file-promise providers. AppKit
+    /// retains the source for the whole session, so it outlives a handle that SwiftUI tears down
+    /// mid-drag; the *promise* work is on a process-lifetime delegate (below) because the receiver
+    /// may pull the file even later.
     final class Coordinator: NSObject, NSDraggingSource {
         var files: () -> [ShelfDragFile]
-        var onSessionActive: (Bool) -> Void
 
-        init(files: @escaping () -> [ShelfDragFile], onSessionActive: @escaping (Bool) -> Void) {
+        init(files: @escaping () -> [ShelfDragFile]) {
             self.files = files
-            self.onSessionActive = onSessionActive
         }
 
         /// A promise provider carrying its source `file` in `userInfo`. The delegate is the shared,
@@ -99,20 +93,6 @@ struct ShelfDragSource: NSViewRepresentable {
         // MARK: NSDraggingSource — copy-only, so a same-volume drop never MOVES our stored bytes.
         func draggingSession(_ session: NSDraggingSession,
                              sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .copy }
-
-        func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint,
-                             operation: NSDragOperation) {
-            // Clear a beat AFTER the drop is handled: a drop back onto our own panel fires the panel's
-            // `.onDrop` around this same moment, and it must still see the guard set so it ignores the
-            // self-drop. A brief delay covers an `.onDrop` that lands just after `endedAt`, without
-            // leaving the panel deaf to real drops for more than a flash. (The guard is *armed*
-            // synchronously in `mouseDragged`, not here — `willBeginAt` proved unreliable.)
-            Diag.log("shelf: drag-out ENDED op=\(operation.rawValue); clearing in 0.25s")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                self.onSessionActive(false)
-                Diag.log("shelf: drag-out flag CLEARED")
-            }
-        }
     }
 
     /// The transparent hit target. On a mouse-drag past a small threshold it builds one dragging item
@@ -136,11 +116,6 @@ struct ShelfDragSource: NSViewRepresentable {
 
             let files = coordinator.files()
             guard !files.isEmpty else { return }
-            // Arm the self-drop guard synchronously, before the session starts — reliably set before any
-            // drop can occur. (`willBeginAt` proved unreliable; reaching `beginDraggingSession` always
-            // yields an `endedAt`, so this can't stick true.)
-            coordinator.onSessionActive(true)
-            Diag.log("shelf: drag-out ARMED isDraggingOut=true files=\(files.count)")
 
             let iconSize = NSSize(width: 48, height: 48)
             let items: [NSDraggingItem] = files.enumerated().map { index, file in

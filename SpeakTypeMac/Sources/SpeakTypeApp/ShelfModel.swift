@@ -28,10 +28,6 @@ final class ShelfModel: ObservableObject {
 
     var items: [ShelfItem] { store.items }
     var isEmpty: Bool { store.items.isEmpty }
-    /// True while a drag-out session from this panel is in flight — lets the panel's `.onDrop` ignore a
-    /// self-drop of our own items back onto it (a file-promise drop isn't a `public.file-url`, so the
-    /// `isStored` guard in `ShelfView.load` wouldn't catch it). Set by the footer drag handle.
-    var isDraggingOut = false
     /// Sum of every staged item's byte size — drives the footer's store-size readout.
     var totalByteSize: Int64 { store.items.reduce(0) { $0 + $1.byteSize } }
 
