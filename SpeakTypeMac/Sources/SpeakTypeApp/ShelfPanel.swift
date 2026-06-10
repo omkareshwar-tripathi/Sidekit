@@ -11,6 +11,16 @@ final class ShelfPanel {
     private let panel: NSPanel
     private static let frameKey = "shelf.panel.frame"
 
+    /// The Mirror strip's model, owned here (not in `ShelfView`) so the panel can collapse it and stop
+    /// the camera on hide and on app-deactivate, and reset it to collapsed on each summon (no size
+    /// memory — spec decision #6). The model enforces "camera runs iff not collapsed".
+    private let mirror = MirrorModel()
+
+    /// Token for the app-deactivate observer that releases the camera; removed in `deinit`. Marked
+    /// `nonisolated(unsafe)` only so the `deinit` may read it to deregister — `removeObserver(_:)` is
+    /// thread-safe and the token is set once in `init`, so the read is race-free.
+    private nonisolated(unsafe) var deactivateObserver: NSObjectProtocol?
+
     init(model: ShelfModel,
          onClose: @escaping () -> Void) {
         // Canvas slightly larger than the 280×360 card so its soft glass shadow never clips; the
@@ -23,7 +33,7 @@ final class ShelfPanel {
             defer: false)
 
         let hosting = NSHostingView(rootView:
-            ShelfView(model: model, onClose: onClose))
+            ShelfView(model: model, mirror: mirror, onClose: onClose))
         hosting.frame = canvas
         panel.contentView = hosting
         panel.isFloatingPanel = true
@@ -35,6 +45,23 @@ final class ShelfPanel {
         panel.hidesOnDeactivate = false
         // Dragged via the header's `WindowDragHandle`, not `isMovableByWindowBackground` (which
         // SwiftUI hit-testing swallows). Starts hidden — summoned via `toggle()`.
+
+        // When the app loses focus, release the camera (spec decision #1). The block is `@Sendable`;
+        // it runs on the main queue, so hop to the main actor to touch the main-actor model.
+        deactivateObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.mirror.dismiss() }
+            }
+    }
+
+    deinit {
+        // `removeObserver(_:)` is thread-safe and the token is a plain captured value, so this is safe
+        // from a `@MainActor` class's deinit; we do NOT touch `mirror` (main-actor state) here.
+        if let deactivateObserver {
+            NotificationCenter.default.removeObserver(deactivateObserver)
+        }
     }
 
     var isVisible: Bool { panel.isVisible }
@@ -48,6 +75,7 @@ final class ShelfPanel {
     func toggle() { panel.isVisible ? hide() : show() }
 
     func show() {
+        mirror.dismiss() // always reappear collapsed — no size memory (spec decision #6)
         autoSummoned = false
         restoreFrameOrReposition()
         orderFrontAnimated()
@@ -57,6 +85,7 @@ final class ShelfPanel {
     /// cursor** so the drag can continue straight onto the card. No-op if already visible.
     func showForDrag() {
         guard !panel.isVisible else { return }
+        mirror.dismiss() // always reappear collapsed — no size memory (spec decision #6)
         autoSummoned = true
         place(near: NSEvent.mouseLocation)
         orderFrontAnimated()
@@ -97,6 +126,7 @@ final class ShelfPanel {
 
     func hide() {
         guard panel.isVisible else { return }
+        mirror.dismiss() // stop the camera when the panel actually hides
         if !autoSummoned { saveFrame() } // a cursor-side frame isn't the user's chosen position
         if reduceMotion {
             panel.orderOut(nil)

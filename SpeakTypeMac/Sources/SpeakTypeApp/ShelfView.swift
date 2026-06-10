@@ -9,11 +9,13 @@ import SpeakTypeCore
 /// later bricks. The Mirror strip (collapsed by default) now rides just under the header (MIRROR-*).
 struct ShelfView: View {
     @ObservedObject var model: ShelfModel
+
+    /// The live-self-view strip at the top of the panel. Owned by `ShelfPanel` (not the view) so the
+    /// panel can collapse it / stop the camera on hide and app-deactivate; injected here.
+    @ObservedObject var mirror: MirrorModel
+
     /// Dismiss the panel (the header × button).
     var onClose: () -> Void
-
-    /// The live-self-view strip at the top of the panel; owns its own camera + state.
-    @StateObject private var mirror = MirrorModel()
 
     /// Highlights the whole card while a drag hovers over it ("drop to shelve").
     @State private var isDropTarget = false
@@ -123,7 +125,37 @@ struct ShelfView: View {
 
         func performDrop(info: DropInfo) -> Bool {
             isDropTarget = false
+            let dragPB = NSPasteboard(name: .drag)
+
+            // 1. Files/folders: read straight from the raw drag pasteboard, which — unlike the
+            //    reconstructed NSItemProvider — never loses the file-url. SwiftUI's .onDrop can vend a
+            //    dragged file as content bytes only (a PNG as public.png with no file-url, observed),
+            //    which strips the real filename and makes drag-out rename the file. The pasteboard
+            //    file-urls keep the original name + folder structure; each file is ingested once.
+            let dragURLs = (dragPB.readObjects(
+                forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+            let freshFiles = dragURLs.filter { !model.isStored($0) }
+            if !freshFiles.isEmpty {
+                Diag.log("shelf: -> branch=files (pasteboard, n=\(freshFiles.count))")
+                freshFiles.forEach { model.ingest(.file($0)) }
+                return true
+            }
+
             let providers = info.itemProviders(for: [.fileURL, .image, .text])
+            // 2. A raw image selection (dragged from a web page) — decode the bitmap via the provider.
+            if let imageProvider = providers.first(where: { $0.canLoadObject(ofClass: NSImage.self) }) {
+                load(imageProvider, model)
+                return true
+            }
+            // 3. A text/link selection — the drag pasteboard's plain string is reliable, unlike
+            //    NSString-from-provider, which silently no-ops for some text UTIs (plain-text and
+            //    markdown both observed dropping nothing).
+            if let text = dragPB.string(forType: .string), !text.isEmpty {
+                Diag.log("shelf: -> branch=text (pasteboard)")
+                model.ingest(.text(text))
+                return true
+            }
+            // 4. File promises / exotic providers the pasteboard didn't expose — per-provider fallback.
             guard !providers.isEmpty else { return false }
             providers.forEach { load($0, model) }
             return true
