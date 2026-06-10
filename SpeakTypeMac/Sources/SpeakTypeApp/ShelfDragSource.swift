@@ -10,6 +10,37 @@ struct ShelfDragFile {
     let type: UTType
 }
 
+/// Marks a drag session as originating from the shelf itself, so the panel's `.onDrop` can ignore a
+/// self-drop. Both drag-out paths stamp it onto the drag pasteboard — the tile's `.onDrag` provider as
+/// an extra data representation, the chip's promise providers via `ShelfFilePromiseProvider` — and the
+/// drop guard checks the **raw drag pasteboard** for it. That's the reliable place to look: the
+/// reconstructed `NSItemProvider` handed to `.onDrop` loses secondary representations (a self-dropped
+/// tile arrives without its `public.file-url`, defeating the `isStored` check), but the pasteboard
+/// itself keeps every declared type.
+enum ShelfDragMarker {
+    static let typeID = "com.speaktype.shelf-drag"
+    static let pasteboardType = NSPasteboard.PasteboardType(typeID)
+    static let data = Data("1".utf8)
+
+    /// True if the drag session currently being dropped originated from the shelf.
+    static var isOnDragPasteboard: Bool {
+        NSPasteboard(name: .drag).pasteboardItems?.contains { $0.types.contains(pasteboardType) } ?? false
+    }
+}
+
+/// The chip's promise provider, extended to also declare the shelf-drag marker (see `ShelfDragMarker`).
+final class ShelfFilePromiseProvider: NSFilePromiseProvider {
+    override func writableTypes(for pasteboard: NSPasteboard) -> [NSPasteboard.PasteboardType] {
+        super.writableTypes(for: pasteboard) + [ShelfDragMarker.pasteboardType]
+    }
+
+    override func pasteboardPropertyList(forType type: NSPasteboard.PasteboardType) -> Any? {
+        type == ShelfDragMarker.pasteboardType
+            ? ShelfDragMarker.data
+            : super.pasteboardPropertyList(forType: type)
+    }
+}
+
 /// A transparent AppKit overlay that begins a **multi-item file drag** when the user drags it.
 ///
 /// SwiftUI's `.onDrag` vends only ONE provider per drag, so to drag several selected shelf items at
@@ -59,8 +90,8 @@ struct ShelfDragSource: NSViewRepresentable {
         /// process-lifetime `ShelfFilePromiseDelegate` (not `self`) so the promise can still be written
         /// after this Coordinator — tied to the transient drag handle — is gone.
         func makeProvider(for file: ShelfDragFile) -> NSFilePromiseProvider {
-            let provider = NSFilePromiseProvider(fileType: file.type.identifier,
-                                                 delegate: ShelfFilePromiseDelegate.shared)
+            let provider = ShelfFilePromiseProvider(fileType: file.type.identifier,
+                                                    delegate: ShelfFilePromiseDelegate.shared)
             provider.userInfo = file
             return provider
         }

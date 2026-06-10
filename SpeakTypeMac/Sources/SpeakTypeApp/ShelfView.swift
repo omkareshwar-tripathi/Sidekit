@@ -91,7 +91,15 @@ struct ShelfView: View {
         .glassCard()
         .overlay(dropHighlight)
         .onDrop(of: [.fileURL, .image, .text], isTargeted: $isDropTarget) { [model] providers in
-            Diag.log("shelf: onDrop perform entered isDraggingOut=\(model.isDraggingOut) providers=\(providers.count)")
+            let dragTypes = NSPasteboard(name: .drag).pasteboardItems?
+                .flatMap { $0.types.map(\.rawValue) } ?? []
+            Diag.log("shelf: onDrop perform entered isDraggingOut=\(model.isDraggingOut) providers=\(providers.count) dragTypes=\(dragTypes)")
+            // A drag that started on one of our own tiles / the drag-out chip, released back onto the
+            // panel — ignore it or every dragged item would re-ingest as a duplicate.
+            if ShelfDragMarker.isOnDragPasteboard {
+                Diag.log("shelf: ignored self-drop (shelf marker on drag pasteboard)")
+                return false
+            }
             guard !model.isDraggingOut else {
                 Diag.log("shelf: ignored self-drop (dragging out)") // our own items dragged out + dropped back
                 return false
@@ -379,7 +387,15 @@ private struct ShelfTile: View {
             return nil
         }
         provider.registerObject(fileURL as NSURL, visibility: .all)
+        // Stamp the drag as shelf-originated so the panel ignores a self-drop (see ShelfDragMarker —
+        // the file-url registration above is lost in pasteboard transit, so it can't serve as the guard).
+        provider.registerDataRepresentation(forTypeIdentifier: ShelfDragMarker.typeID,
+                                            visibility: .all) { completion in
+            completion(ShelfDragMarker.data, nil)
+            return nil
+        }
         provider.suggestedName = shelfExportName(for: item, at: fileURL)
+        Diag.log("shelf: tile drag start \(item.displayName)")
         return provider
     }
 
