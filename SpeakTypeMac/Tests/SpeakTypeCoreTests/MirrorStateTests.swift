@@ -17,6 +17,10 @@ struct MirrorStateTests {
         #expect(MirrorState.expanded.cameraShouldRun == true)
     }
 
+    @Test func cameraIsOnWhenFullScreen() {
+        #expect(MirrorState.fullScreen.cameraShouldRun == true)
+    }
+
     // MARK: - tapped() — open from button, then toggle small ⇄ expanded, never collapse
 
     @Test func tappedFromCollapsedOpensSmall() {
@@ -29,6 +33,25 @@ struct MirrorStateTests {
 
     @Test func tappedFromExpandedShrinksToSmall() {
         #expect(MirrorState.expanded.tapped() == .small)
+    }
+
+    @Test func tappedFromFullScreenReturnsToExpanded() {
+        #expect(MirrorState.fullScreen.tapped() == .expanded)
+    }
+
+    // MARK: - toggledFullScreen() — enter full screen from any open/closed state, exit back to expanded
+
+    @Test(arguments: [MirrorState.collapsed, .small, .expanded])
+    func toggledFullScreenEntersFullScreen(from state: MirrorState) {
+        #expect(state.toggledFullScreen() == .fullScreen)
+    }
+
+    @Test func toggledFullScreenFromFullScreenReturnsToExpanded() {
+        #expect(MirrorState.fullScreen.toggledFullScreen() == .expanded)
+    }
+
+    @Test func toggledFullScreenRoundTrips() {
+        #expect(MirrorState.expanded.toggledFullScreen().toggledFullScreen() == .expanded)
     }
 
     // MARK: - dismissed() — every exit path funnels to collapsed (idempotent)
@@ -45,9 +68,13 @@ struct MirrorStateTests {
         #expect(MirrorState.expanded.dismissed() == .collapsed)
     }
 
+    @Test func dismissedFromFullScreenCollapses() {
+        #expect(MirrorState.fullScreen.dismissed() == .collapsed)
+    }
+
     // MARK: - invariant: dismissing always turns the camera off, from any state
 
-    @Test(arguments: [MirrorState.collapsed, .small, .expanded])
+    @Test(arguments: [MirrorState.collapsed, .small, .expanded, .fullScreen])
     func dismissedAlwaysStopsCamera(from state: MirrorState) {
         #expect(state.dismissed().cameraShouldRun == false)
     }
