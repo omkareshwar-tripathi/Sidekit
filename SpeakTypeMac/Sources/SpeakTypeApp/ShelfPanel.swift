@@ -39,11 +39,44 @@ final class ShelfPanel {
 
     var isVisible: Bool { panel.isVisible }
 
+    /// True while the current placement came from a drag auto-summon — that frame is transient (at
+    /// the cursor, wherever the drag happened to be) and must not overwrite the user's remembered
+    /// position when the panel hides.
+    private var autoSummoned = false
+
     /// Show if hidden, hide if visible.
     func toggle() { panel.isVisible ? hide() : show() }
 
     func show() {
+        autoSummoned = false
         restoreFrameOrReposition()
+        orderFrontAnimated()
+    }
+
+    /// Auto-summon for an in-flight system file drag (spec decisions #4/#6): appear **near the
+    /// cursor** so the drag can continue straight onto the card. No-op if already visible.
+    func showForDrag() {
+        guard !panel.isVisible else { return }
+        autoSummoned = true
+        place(near: NSEvent.mouseLocation)
+        orderFrontAnimated()
+    }
+
+    /// The system drag ended. An auto-summoned panel slips away again unless the cursor is over it —
+    /// i.e. the drop landed here or the user is engaging it (spec §2: "dismisses shortly after the
+    /// drag ends if nothing was dropped").
+    func dragEnded() {
+        guard autoSummoned, panel.isVisible else { return }
+        if panel.frame.contains(NSEvent.mouseLocation) {
+            // The drop landed here / the user engaged it — it's theirs now; a later drag ending
+            // elsewhere must not yank it away mid-use.
+            autoSummoned = false
+        } else {
+            hide()
+        }
+    }
+
+    private func orderFrontAnimated() {
         let settled = panel.frame
         if reduceMotion {
             panel.alphaValue = 1
@@ -64,7 +97,7 @@ final class ShelfPanel {
 
     func hide() {
         guard panel.isVisible else { return }
-        saveFrame() // frame is settled here (show animation has completed)
+        if !autoSummoned { saveFrame() } // a cursor-side frame isn't the user's chosen position
         if reduceMotion {
             panel.orderOut(nil)
             return
@@ -105,5 +138,17 @@ final class ShelfPanel {
         let area = screen.visibleFrame
         let size = panel.frame.size
         panel.setFrameOrigin(NSPoint(x: area.maxX - size.width - 24, y: area.maxY - size.height - 24))
+    }
+
+    /// Place the panel below-right of `point` (the cursor), clamped onto that point's screen, so a
+    /// drag in flight continues naturally onto the card.
+    private func place(near point: NSPoint) {
+        let size = panel.frame.size
+        let screen = NSScreen.screens.first(where: { $0.frame.contains(point) }) ?? NSScreen.main
+        guard let area = screen?.visibleFrame else { return }
+        var origin = NSPoint(x: point.x + 16, y: point.y - size.height - 16)
+        origin.x = max(area.minX, min(origin.x, area.maxX - size.width))
+        origin.y = max(area.minY, min(origin.y, area.maxY - size.height))
+        panel.setFrameOrigin(origin)
     }
 }

@@ -143,6 +143,7 @@ final class AppController: ObservableObject {
     private var pill: PillPanel?
     private var shelfPanel: ShelfPanel?
     private var shelfStatusItem: ShelfStatusItem?
+    private var shelfDragMonitor: ShelfDragStartMonitor?
 
     init() {
         let clipboard = MacClipboard()
@@ -236,6 +237,18 @@ final class AppController: ObservableObject {
             onClose: { [weak self] in self?.shelfPanel?.hide() })
         shelfStatusItem = ShelfStatusItem(
             onClick: { [weak self] in self?.shelfPanel?.toggle() })
+        // Auto-summon the Shelf at the cursor when a file drag starts anywhere on the system, and
+        // let it slip away when the drag ends elsewhere (spec decision #4). Monitor callbacks arrive
+        // on the main thread (same pattern as the hotkey above).
+        let shelfDragMonitor = ShelfDragStartMonitor()
+        shelfDragMonitor.onFileDragStart = { [weak self] in
+            MainActor.assumeIsolated { self?.shelfPanel?.showForDrag() }
+        }
+        shelfDragMonitor.onDragEnd = { [weak self] in
+            MainActor.assumeIsolated { self?.shelfPanel?.dragEnded() }
+        }
+        shelfDragMonitor.start()
+        self.shelfDragMonitor = shelfDragMonitor
     }
 
     var iconName: String {
