@@ -76,7 +76,11 @@ struct ShelfDragSource: NSViewRepresentable {
             // self-drop. A brief delay covers an `.onDrop` that lands just after `endedAt`, without
             // leaving the panel deaf to real drops for more than a flash. (The guard is *armed*
             // synchronously in `mouseDragged`, not here — `willBeginAt` proved unreliable.)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.onSessionActive(false) }
+            Diag.log("shelf: drag-out ENDED op=\(operation.rawValue); clearing in 0.25s")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                self.onSessionActive(false)
+                Diag.log("shelf: drag-out flag CLEARED")
+            }
         }
     }
 
@@ -105,6 +109,7 @@ struct ShelfDragSource: NSViewRepresentable {
             // drop can occur. (`willBeginAt` proved unreliable; reaching `beginDraggingSession` always
             // yields an `endedAt`, so this can't stick true.)
             coordinator.onSessionActive(true)
+            Diag.log("shelf: drag-out ARMED isDraggingOut=true files=\(files.count)")
 
             let iconSize = NSSize(width: 48, height: 48)
             let items: [NSDraggingItem] = files.enumerated().map { index, file in
