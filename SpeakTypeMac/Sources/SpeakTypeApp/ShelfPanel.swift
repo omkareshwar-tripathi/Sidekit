@@ -4,12 +4,12 @@ import SwiftUI
 /// The Shelf's floating window: a borderless, **non-activating** (so dropping/clicking never steals
 /// focus from the app you're working in), always-on-top panel present on every Space (spec §2.5).
 /// Unlike `PillPanel` it is **interactive** (receives clicks/drops) and **summoned** — it starts
-/// hidden and is shown via `toggle()`, returning to its remembered position. It's dragged by its
-/// header (`WindowDragHandle`), closed by its × button, and fades+rises in/out (Reduce-Motion aware).
+/// hidden and is shown via `toggle()` at a **fixed top-center** spot (user decision 2026-06-11: the
+/// Shelf must not wander to the cursor or a remembered position). It's dragged by its header
+/// (`WindowDragHandle`), closed by its × button, and fades+rises in/out (Reduce-Motion aware).
 @MainActor
 final class ShelfPanel {
     private let panel: NSPanel
-    private static let frameKey = "shelf.panel.frame"
 
     /// The Mirror strip's model, owned here (not in `ShelfView`) so the panel can collapse it and stop
     /// the camera on hide and on app-deactivate, and reset it to collapsed on each summon (no size
@@ -66,9 +66,9 @@ final class ShelfPanel {
 
     var isVisible: Bool { panel.isVisible }
 
-    /// True while the current placement came from a drag auto-summon — that frame is transient (at
-    /// the cursor, wherever the drag happened to be) and must not overwrite the user's remembered
-    /// position when the panel hides.
+    /// True while the current placement came from a drag auto-summon — marks the panel as transient so
+    /// `dragEnded()` slips it away again if the drop didn't land on it. (It no longer affects placement:
+    /// every show pins to the same top-center home.)
     private var autoSummoned = false
 
     /// Show if hidden, hide if visible.
@@ -77,17 +77,17 @@ final class ShelfPanel {
     func show() {
         mirror.dismiss() // always reappear collapsed — no size memory (spec decision #6)
         autoSummoned = false
-        restoreFrameOrReposition()
+        repositionTopCenter()
         orderFrontAnimated()
     }
 
-    /// Auto-summon for an in-flight system file drag (spec decisions #4/#6): appear **near the
-    /// cursor** so the drag can continue straight onto the card. No-op if already visible.
+    /// Auto-summon for an in-flight system file drag (spec decisions #4/#6): appear at the fixed
+    /// top-center home so the drag can continue onto the card. No-op if already visible.
     func showForDrag() {
         guard !panel.isVisible else { return }
         mirror.dismiss() // always reappear collapsed — no size memory (spec decision #6)
         autoSummoned = true
-        place(near: NSEvent.mouseLocation)
+        repositionTopCenter()
         orderFrontAnimated()
     }
 
@@ -127,7 +127,6 @@ final class ShelfPanel {
     func hide() {
         guard panel.isVisible else { return }
         mirror.dismiss() // stop the camera when the panel actually hides
-        if !autoSummoned { saveFrame() } // a cursor-side frame isn't the user's chosen position
         if reduceMotion {
             panel.orderOut(nil)
             return
@@ -150,35 +149,14 @@ final class ShelfPanel {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
-    /// Restore the user's last position, or place at the top-right of the main screen on first use.
-    private func restoreFrameOrReposition() {
-        if let saved = UserDefaults.standard.string(forKey: Self.frameKey) {
-            panel.setFrame(NSRectFromString(saved), display: false)
-        } else {
-            reposition()
-        }
-    }
-
-    private func saveFrame() {
-        UserDefaults.standard.set(NSStringFromRect(panel.frame), forKey: Self.frameKey)
-    }
-
-    private func reposition() {
+    /// Pin the panel to the top-center of the main screen — its single fixed home. Every show (menu
+    /// toggle or drag auto-summon) lands here, so the Shelf never wanders to the cursor or a
+    /// remembered spot (user decision 2026-06-11). 12pt below the menu bar.
+    private func repositionTopCenter() {
         guard let screen = NSScreen.main else { return }
         let area = screen.visibleFrame
         let size = panel.frame.size
-        panel.setFrameOrigin(NSPoint(x: area.maxX - size.width - 24, y: area.maxY - size.height - 24))
-    }
-
-    /// Place the panel below-right of `point` (the cursor), clamped onto that point's screen, so a
-    /// drag in flight continues naturally onto the card.
-    private func place(near point: NSPoint) {
-        let size = panel.frame.size
-        let screen = NSScreen.screens.first(where: { $0.frame.contains(point) }) ?? NSScreen.main
-        guard let area = screen?.visibleFrame else { return }
-        var origin = NSPoint(x: point.x + 16, y: point.y - size.height - 16)
-        origin.x = max(area.minX, min(origin.x, area.maxX - size.width))
-        origin.y = max(area.minY, min(origin.y, area.maxY - size.height))
-        panel.setFrameOrigin(origin)
+        panel.setFrameOrigin(NSPoint(x: area.midX - size.width / 2,
+                                     y: area.maxY - size.height - 12))
     }
 }
