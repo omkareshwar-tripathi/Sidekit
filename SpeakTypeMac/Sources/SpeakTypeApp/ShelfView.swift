@@ -6,11 +6,14 @@ import SpeakTypeCore
 /// The Shelf surface's content: a glass card with a header, a thumbnail grid of staged items (or an
 /// empty state), and a footer (item count + store size + Clear all). Tiles show a QuickLook thumbnail
 /// of each item's stored file (kind glyph as the fallback); drag-out + Save-all + per-item ⋯ are still
-/// later bricks. The Mirror strip is a separate brick (MIRROR-*).
+/// later bricks. The Mirror strip (collapsed by default) now rides just under the header (MIRROR-*).
 struct ShelfView: View {
     @ObservedObject var model: ShelfModel
     /// Dismiss the panel (the header × button).
     var onClose: () -> Void
+
+    /// The live-self-view strip at the top of the panel; owns its own camera + state.
+    @StateObject private var mirror = MirrorModel()
 
     /// Highlights the whole card while a drag hovers over it ("drop to shelve").
     @State private var isDropTarget = false
@@ -49,6 +52,8 @@ struct ShelfView: View {
             }
             // The header doubles as the window's drag region (a borderless panel has no title bar).
             .background(WindowDragHandle())
+
+            MirrorView(model: mirror)
 
             if model.isEmpty {
                 VStack(spacing: DS.Space.sm) {
