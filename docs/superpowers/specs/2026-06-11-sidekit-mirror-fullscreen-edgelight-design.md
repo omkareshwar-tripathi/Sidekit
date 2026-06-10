@@ -22,7 +22,7 @@ ring light. Both are one click, and both tear down the moment the Mirror collaps
 
 | # | Decision | Resolution |
 |---|---|---|
-| 1 | **What "full screen" means** | A **borderless full-display overlay** — a non-activating, always-on-top window sized to the active screen, over the current Space (NOT native macOS fullscreen / a separate Space, NOT a resizable window). Exit via a visible **✕** *and* **click-anywhere**. |
+| 1 | **What "full screen" means** | A **borderless full-display overlay** — a non-activating, always-on-top window sized to the active screen, over the current Space (NOT native macOS fullscreen / a separate Space, NOT a resizable window). Exit via a visible **✕**, **click-anywhere**, *or* **Esc**. |
 | 2 | **Full-screen entry/exit** | A **toggle** in the windowed preview's controls enters full screen; ✕ / click exits. Exiting always returns to **`.expanded`** (deterministic — no size memory, consistent with v1 decision #6). |
 | 3 | **Edge light trigger** | **Manual toggle only** (a ☀ button). **No frame sampling / no auto-detect** — this preserves the Mirror's "frames are displayed, never read/captured/saved" posture. "For dim areas" describes its purpose, not an auto-trigger. |
 | 4 | **Edge light look** | A **solid bright-white inset frame** around the preview: thin in the windowed preview, a **thick screen-hugging frame** in the full-screen overlay (where it does real work as fill light). |
@@ -45,9 +45,9 @@ ring light. Both are one click, and both tear down the moment the Mirror collaps
 - **From small/expanded** — tapping the **full-screen toggle** (`arrow.up.left.and.arrow.down.right`)
   enters `fullScreen`: a borderless overlay fades up covering the active screen with the mirrored
   self-view; the Shelf panel's strip shows a compact "Mirror is full screen" placeholder.
-- **In full screen** — a visible **✕** (top-right) and **click anywhere** on the overlay exit back to
-  `.expanded` (overlay fades out, the windowed preview returns). The ☀ edge-light toggle is also
-  shown in the overlay.
+- **In full screen** — a visible **✕** (top-right), **click anywhere** on the overlay, or pressing
+  **Esc** exits back to `.expanded` (overlay fades out, the windowed preview returns). The ☀ edge-light
+  toggle is also shown in the overlay.
 - **Edge light** — the ☀ (`sun.max` / filled when on) toggle flips `edgeLightOn`. When on, a solid
   bright-white inset frame draws around the preview (thin windowed, thick in the overlay). Independent
   of size — toggling size keeps it on; collapsing turns it off.
@@ -108,9 +108,11 @@ app-deactivate. The only new wiring is showing/hiding the overlay panel as `stat
    overlay removes/releases it on hide.
 2. **Click-to-exit vs. control clicks.** The overlay's click-anywhere exit must not swallow taps on the
    ✕ / ☀ controls. Mitigation: controls are buttons on top; the click-catcher sits behind them.
-3. **Non-activating panel + keyboard.** A non-activating overlay may not receive key events, so **Esc
-   is not relied on** — exit is ✕ + click (decision #1). Note for a later polish: a global Esc monitor
-   could be added if users expect it.
+3. **Non-activating panel + keyboard.** A non-activating overlay may not receive key events through the
+   normal responder chain, so **Esc-to-exit uses a global+local `NSEvent` key monitor** (the same
+   pattern as `FnKeyMonitor`/`ShelfDragStartMonitor`), installed only while the overlay is shown and
+   torn down on exit. Exit is therefore **✕ + click + Esc** (decision #1). The monitor must be scoped to
+   the overlay's lifetime so it never swallows Esc elsewhere.
 4. **Overlay covering the menu bar / which screen.** Target the screen the Mirror is on (fall back to
    `NSScreen.main`); size to `screen.frame` and set a window level above normal panels. Acceptable to
    cover the menu bar while in full screen (it's a deliberate full-display mirror).
@@ -122,8 +124,9 @@ app-deactivate. The only new wiring is showing/hiding the overlay panel as `stat
 1. **MIRROR-FS-CORE** — `MirrorState.fullScreen` + `toggledFullScreen()` + `tapped()`/`dismissed()`
    coverage + invariant/round-trip tests (pure, TDD, local `swift test`).
 2. **MIRROR-FS-UI** — `MirrorOverlayPanel` + `AVFoundationCamera.makePreviewLayer()` + the full-screen
-   toggle/exit (✕ + click) + overlay show/hide bound to state + the windowed "full screen" placeholder.
-   App glue → `swift build` clean + manual Mac (green light, mirrored, exit paths).
+   toggle/exit (✕ + click + Esc via a scoped key monitor) + overlay show/hide bound to state + the
+   windowed "full screen" placeholder. App glue → `swift build` clean + manual Mac (green light,
+   mirrored, exit paths).
 3. **MIRROR-EDGELIGHT** — `MirrorModel.edgeLightOn` (reset on `dismiss()`) + the bright-white frame in
    the windowed preview and the overlay + the ☀ toggle. App glue → `swift build` clean + manual Mac.
 
