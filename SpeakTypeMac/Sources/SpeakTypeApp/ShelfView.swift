@@ -19,6 +19,10 @@ struct ShelfView: View {
     /// `@State` (not `@StateObject`) — we don't observe it; tiles get their image via their own state.
     @State private var thumbnailer = ShelfThumbnailer()
 
+    /// IDs of tiles the user has tap-selected. Drives each tile's accent ring + check badge; the
+    /// multi-item drag-out that consumes the selection is the follow-up brick (SHELF-DRAG-OUT-MULTI-B).
+    @State private var selection: Set<UUID> = []
+
     /// Two-column adaptive grid; tiles reflow if the panel is resized later.
     private let columns = [GridItem(.adaptive(minimum: ShelfTile.width), spacing: DS.Space.sm)]
 
@@ -58,7 +62,9 @@ struct ShelfView: View {
                             ShelfTile(item: item,
                                       fileURL: model.fileURL(for: item),
                                       thumbnailer: thumbnailer,
-                                      onRemove: { model.remove(item.id) },
+                                      isSelected: selection.contains(item.id),
+                                      onToggleSelect: { toggleSelection(item.id) },
+                                      onRemove: { selection.remove(item.id); model.remove(item.id) },
                                       onCopy: { model.copyToClipboard(item) },
                                       onReveal: { model.revealInFinder(item) })
                         }
@@ -68,7 +74,7 @@ struct ShelfView: View {
                 ShelfFooter(count: model.items.count,
                             totalBytes: model.totalByteSize,
                             onSaveAll: saveAll,
-                            onClearAll: { model.clearAll() })
+                            onClearAll: { selection.removeAll(); model.clearAll() })
             }
         }
         .padding(DS.Space.md)
@@ -103,6 +109,11 @@ struct ShelfView: View {
         if panel.runModal() == .OK, let directory = panel.url {
             model.saveAll(to: directory)
         }
+    }
+
+    /// Toggle a tile's membership in the multi-select set (tap a tile to select / deselect it).
+    private func toggleSelection(_ id: UUID) {
+        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
     }
 
     /// Decode one dropped provider and stage it. Routing is decided from the provider's *registered
@@ -205,6 +216,9 @@ private struct ShelfTile: View {
     /// On-disk location of the item's bytes (nil if the store holds none) — the thumbnail source.
     let fileURL: URL?
     let thumbnailer: ShelfThumbnailer
+    /// Whether this tile is in the multi-select set — draws the accent ring + corner check badge.
+    let isSelected: Bool
+    let onToggleSelect: () -> Void
     let onRemove: () -> Void
     let onCopy: () -> Void
     let onReveal: () -> Void
@@ -240,6 +254,20 @@ private struct ShelfTile: View {
                             Image(systemName: icon)
                                 .font(.system(size: 22, weight: .regular))
                                 .foregroundStyle(DS.Palette.textSecondary)
+                        }
+                    }
+                    .overlay {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                                .strokeBorder(DS.Palette.accent, lineWidth: 2)
+                        }
+                    }
+                    .overlay(alignment: .topLeading) {
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white, DS.Palette.accent)
+                                .padding(3)
                         }
                     }
                 if hovering {
@@ -278,7 +306,12 @@ private struct ShelfTile: View {
                 .truncationMode(.tail)
                 .frame(width: Self.width, height: Self.nameHeight, alignment: .top)
         }
+        // Make the whole tile footprint (incl. the gap + empty caption area) the select/drag hit
+        // target, not just the rendered glyphs — same idiom as the header × (otherwise short-name
+        // tiles have dead zones the tap never reaches). Child ⋯/× buttons still consume their own taps.
+        .contentShape(Rectangle())
         .onHover { hovering = $0 }
+        .onTapGesture { onToggleSelect() }
         .task(id: "\(item.id)@\(displayScale)") {
             guard let fileURL else { return }
             thumbnail = await thumbnailer.thumbnail(
