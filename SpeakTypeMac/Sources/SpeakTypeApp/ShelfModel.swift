@@ -120,6 +120,13 @@ final class ShelfModel: ObservableObject {
 
     /// Expire stale items (called on app activation / periodically by the panel owner).
     func prune() { objectWillChange.send(); store.pruneExpired(now: Date()) }
+
+    /// Apply a new retention TTL (nil = never expire) and prune immediately, so shortening the
+    /// window in Settings takes effect right away rather than at the next scheduled prune.
+    func setRetentionTTL(_ ttl: Duration?) {
+        store.retention = ShelfRetentionPolicy(ttl: ttl)
+        prune()
+    }
 }
 
 /// The filename to export an item under: its real on-disk name for a file/folder, or the tile's label

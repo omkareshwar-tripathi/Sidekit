@@ -64,10 +64,12 @@ public final class ShelfStore {
 
     /// Drop items older than the retention TTL (age strictly greater than `ttl` at `now`), persist
     /// if anything changed, and return the removed items so the caller can delete their payloads.
-    /// Returns `[]` (and does not persist) when nothing has expired.
+    /// Returns `[]` (and does not persist) when nothing has expired — or when the policy is
+    /// "never expire" (`ttl == nil`).
     @discardableResult
     public func pruneExpired(now: Date) -> [ShelfItem] {
-        let ttlSeconds = Double(retention.ttl.components.seconds)
+        guard let ttl = retention.ttl else { return [] }
+        let ttlSeconds = Double(ttl.components.seconds)
         let expired = items.filter { now.timeIntervalSince($0.addedAt) > ttlSeconds }
         guard !expired.isEmpty else { return [] }
         let expiredIDs = Set(expired.map(\.id))

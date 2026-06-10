@@ -154,6 +154,16 @@ struct ShelfStoreTests {
         #expect(store.items.map(\.displayName) == ["fresh"])
     }
 
+    @Test func pruneExpiredWithNeverTTLRemovesNothing() {
+        let (store, persistence) = makeSUT(seed: [item("ancient", at: 0)],
+                                           retention: ShelfRetentionPolicy(ttl: nil)) // "Never expire"
+        let before = persistence.saveCount
+        let removed = store.pruneExpired(now: Date(timeIntervalSinceReferenceDate: 1_000_000_000))
+        #expect(removed.isEmpty)
+        #expect(store.items.map(\.displayName) == ["ancient"])
+        #expect(persistence.saveCount == before)
+    }
+
     @Test func pruneExpiredIsExclusiveAtExactlyTTL() {
         let (store, _) = makeSUT(seed: [item("edge", at: 0)], retention: ttl100)
         let removed = store.pruneExpired(now: Date(timeIntervalSinceReferenceDate: 100)) // age == 100, not > 100

@@ -38,7 +38,8 @@ struct SpeakTypeApp: App {
         // The main window stays closed until "Open SpeakType" is chosen; opening it flips the
         // app to a Dock-present `.regular` app, closing it returns to the menu-bar-only utility.
         Window("SpeakType", id: MainWindow.id) {
-            MainWindow(notes: controller.notes, history: controller.history, settings: controller.settings)
+            MainWindow(notes: controller.notes, history: controller.history,
+                       settings: controller.settings, shelf: controller.shelf)
                 .onAppear { AppController.setWindowMode(true) }
                 .onDisappear { AppController.setWindowMode(false) }
         }
@@ -144,6 +145,8 @@ final class AppController: ObservableObject {
     private var shelfPanel: ShelfPanel?
     private var shelfStatusItem: ShelfStatusItem?
     private var shelfDragMonitor: ShelfDragStartMonitor?
+    /// Hourly expiry sweep (spec §4) — lives as long as the controller (the whole app).
+    private var shelfPruneTask: Task<Void, Never>?
 
     init() {
         let clipboard = MacClipboard()
@@ -182,8 +185,11 @@ final class AppController: ObservableObject {
             autoStop: SystemAutoStopTimer()
         )
         let hotkey = FnKeyMonitor()
-        // Settings push the persisted filler-removal flag into the live coordinator.
-        let settings = SettingsModel(applySettings: { [weak coordinator] s in coordinator?.settings = s })
+        // Settings push the persisted filler-removal flag into the live coordinator, and the
+        // persisted shelf TTL into the live shelf store (both seeded at init with saved values).
+        let settings = SettingsModel(
+            applySettings: { [weak coordinator] s in coordinator?.settings = s },
+            applyShelfTTL: { ttl in shelf.setRetentionTTL(ttl) })
         self.notes = notes
         self.history = history
         self.settings = settings
@@ -236,19 +242,34 @@ final class AppController: ObservableObject {
             model: shelf,
             onClose: { [weak self] in self?.shelfPanel?.hide() })
         shelfStatusItem = ShelfStatusItem(
-            onClick: { [weak self] in self?.shelfPanel?.toggle() })
+            onClick: { [weak self] in
+                self?.shelf.prune() // expired items must never appear on summon
+                self?.shelfPanel?.toggle()
+            })
         // Auto-summon the Shelf at the cursor when a file drag starts anywhere on the system, and
         // let it slip away when the drag ends elsewhere (spec decision #4). Monitor callbacks arrive
         // on the main thread (same pattern as the hotkey above).
         let shelfDragMonitor = ShelfDragStartMonitor()
         shelfDragMonitor.onFileDragStart = { [weak self] in
-            MainActor.assumeIsolated { self?.shelfPanel?.showForDrag() }
+            MainActor.assumeIsolated {
+                self?.shelf.prune()
+                self?.shelfPanel?.showForDrag()
+            }
         }
         shelfDragMonitor.onDragEnd = { [weak self] in
             MainActor.assumeIsolated { self?.shelfPanel?.dragEnded() }
         }
         shelfDragMonitor.start()
         self.shelfDragMonitor = shelfDragMonitor
+        // Spec §4: expiry also runs on a periodic timer, so the TTL holds (and the payload bytes are
+        // actually deleted) even while the app idles in the menu bar for days. The Task inherits the
+        // main actor, so the hourly prune touches the model safely.
+        shelfPruneTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3600))
+                self?.shelf.prune()
+            }
+        }
     }
 
     var iconName: String {

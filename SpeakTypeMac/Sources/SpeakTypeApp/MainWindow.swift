@@ -10,6 +10,8 @@ struct MainWindow: View {
     @ObservedObject var notes: NotesModel
     let history: HistoryModel
     let settings: SettingsModel
+    /// Passed through to the settings sheet (shelf TTL + store-size readout).
+    let shelf: ShelfModel
 
     @State private var showSettings = false
     @State private var showHistory = false
@@ -33,7 +35,7 @@ struct MainWindow: View {
                 Button { showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
             }
         }
-        .sheet(isPresented: $showSettings) { SettingsView(model: settings) }
+        .sheet(isPresented: $showSettings) { SettingsView(model: settings, shelf: shelf) }
         .sheet(isPresented: $showHistory) { HistoryView(history: history) }
         // Brand the window to match the icon/pill: dark frosted-glass surface with purple accents
         // (selection, buttons, controls — and the sheets inherit the tint). Layout is unchanged so

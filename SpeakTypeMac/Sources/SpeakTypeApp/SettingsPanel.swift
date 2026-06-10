@@ -20,19 +20,36 @@ final class SettingsModel: ObservableObject {
     }
     @Published private(set) var micAuthorized: Bool
     @Published private(set) var accessibilityTrusted: Bool
+    /// Shelf retention in seconds; **0 = never expire** (spec §4: 1 day / 2 days / 1 week / never,
+    /// default 2 days). Persisted; pushed into the live shelf store, which prunes immediately so a
+    /// shortened window takes effect right away.
+    @Published var shelfTTLSeconds: Int {
+        didSet {
+            UserDefaults.standard.set(shelfTTLSeconds, forKey: Self.shelfTTLKey)
+            applyShelfTTL(shelfTTLSeconds == 0 ? nil : .seconds(shelfTTLSeconds))
+        }
+    }
 
     private static let fillerKey = "FillerRemoval"
+    private static let shelfTTLKey = "ShelfTTL"
     /// Pushes a new `Settings` to the live coordinator.
     private let applySettings: @MainActor (SpeakTypeCore.Settings) -> Void
+    /// Pushes a new retention TTL (nil = never expire) to the live shelf store.
+    private let applyShelfTTL: @MainActor (Duration?) -> Void
 
-    init(applySettings: @escaping @MainActor (SpeakTypeCore.Settings) -> Void) {
+    init(applySettings: @escaping @MainActor (SpeakTypeCore.Settings) -> Void,
+         applyShelfTTL: @escaping @MainActor (Duration?) -> Void) {
         self.applySettings = applySettings
+        self.applyShelfTTL = applyShelfTTL
         let filler = UserDefaults.standard.object(forKey: Self.fillerKey) as? Bool ?? true
         self.fillerRemoval = filler // init assignment → didSet does not fire
+        let ttl = UserDefaults.standard.object(forKey: Self.shelfTTLKey) as? Int ?? 48 * 3600
+        self.shelfTTLSeconds = ttl
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
         self.micAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         self.accessibilityTrusted = AXIsProcessTrusted()
         applySettings(SpeakTypeCore.Settings(fillerRemoval: filler)) // seed the coordinator with the saved value
+        applyShelfTTL(ttl == 0 ? nil : .seconds(ttl))                // seed the shelf store likewise
     }
 
     /// Re-read the OS permission state (the user may have changed it in System Settings).
@@ -59,6 +76,8 @@ final class SettingsModel: ObservableObject {
 /// The settings sheet shown from the window's ⚙︎ button.
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    /// The live shelf — drives the store-size readout and Clear all (observed so the size updates).
+    @ObservedObject var shelf: ShelfModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -69,6 +88,22 @@ struct SettingsView: View {
                 }
                 Section("General") {
                     Toggle("Launch SpeakType at login", isOn: $model.launchAtLogin)
+                }
+                Section("Shelf") {
+                    Picker("Keep items for", selection: $model.shelfTTLSeconds) {
+                        Text("1 day").tag(24 * 3600)
+                        Text("2 days").tag(48 * 3600)
+                        Text("1 week").tag(7 * 24 * 3600)
+                        Text("Never expire").tag(0)
+                    }
+                    LabeledContent("On disk") {
+                        HStack(spacing: DS.Space.sm) {
+                            Text(shelfSizeText)
+                            if !shelf.isEmpty {
+                                Button("Clear all") { shelf.clearAll() }
+                            }
+                        }
+                    }
                 }
                 Section("Permissions") {
                     LabeledContent("Microphone") { badge(model.micAuthorized) }
@@ -89,7 +124,13 @@ struct SettingsView: View {
             }
             .onAppear { model.refreshPermissions() }
         }
-        .frame(width: 400, height: 380)
+        .frame(width: 400, height: 460)
+    }
+
+    private var shelfSizeText: String {
+        let size = ByteCountFormatter.string(fromByteCount: shelf.totalByteSize, countStyle: .file)
+        let count = shelf.items.count
+        return "\(count) \(count == 1 ? "item" : "items") · \(size)"
     }
 
     private func badge(_ ok: Bool) -> some View {
