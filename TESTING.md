@@ -9,6 +9,8 @@ Two layers:
 
 > **Status:** stub. Items are written against intended v1 behavior; check them off as each brick lands. An item for unbuilt behavior stays unchecked.
 
+> **Shelf drag-tests (Mac): never drag repo files.** Use the disposable samples in `~/SpeakType-TestFiles/` (sample.txt / sample.sh / sample.png / sample-folder). A fumbled Finder drag of a repo file/folder silently *moves* it (this is how `windows/SpeakType.App` kept vanishing from the worktree — see the BRICKS.md note; a hook now auto-restores it).
+
 ---
 
 ## Automated tests (summary — authoritative copy is the test project)
