@@ -49,6 +49,10 @@ final class MirrorModel: ObservableObject {
 
     /// Collapse the Mirror back to its button (camera off).
     func dismiss() {
+        // Clear any stale denial so re-opening re-queries authorization fresh — granting access in
+        // System Settings then reopening recovers without an app restart (the MIRROR-LIFECYCLE
+        // deactivate-dismiss fires when the user opens System Settings).
+        permissionDenied = false
         state = state.dismissed()
         syncCamera()
     }

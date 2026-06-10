@@ -9,16 +9,24 @@ import SpeakTypeCore
 /// camera exists. If permission is denied, a compact inline prompt links to System Settings.
 struct MirrorView: View {
     @ObservedObject var model: MirrorModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        content
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: model.state)
+    }
+
+    @ViewBuilder private var content: some View {
         if model.permissionDenied {
             permissionPrompt
-        } else {
-            switch model.state {
-            case .collapsed: collapsedButton
-            case .small:     preview(height: 72)
-            case .expanded:  preview(height: 150)
+        } else if model.state.cameraShouldRun {
+            if model.devices.isEmpty {
+                emptyPrompt
+            } else {
+                preview(height: model.state == .expanded ? 150 : 72)
             }
+        } else {
+            collapsedButton
         }
     }
 
@@ -40,6 +48,22 @@ struct MirrorView: View {
             .font(DS.Typography.caption)
             .foregroundStyle(DS.Palette.accent)
         }
+        .glassStrip()
+    }
+
+    /// Shown when the Mirror is open but no camera was discovered: a compact notice with a
+    /// collapse control so the user can back out instead of staring at a black preview.
+    private var emptyPrompt: some View {
+        HStack(spacing: DS.Space.xs) {
+            Image(systemName: "video.slash")
+                .foregroundStyle(DS.Palette.textSecondary)
+            Text("No camera found")
+                .font(DS.Typography.caption)
+                .foregroundStyle(DS.Palette.textSecondary)
+            Spacer()
+            collapseControl
+        }
+        .glassStrip()
     }
 
     /// The collapsed affordance: a slim row that opens the Mirror (camera off until tapped).
@@ -55,6 +79,7 @@ struct MirrorView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .glassStrip()
     }
 
     /// The live preview at the given height: tap toggles small⇄expanded, with overlaid collapse
@@ -64,6 +89,9 @@ struct MirrorView: View {
             .frame(maxWidth: .infinity)
             .frame(height: height)
             .clipShape(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                    .strokeBorder(DS.Palette.hairline, lineWidth: 1))
             .contentShape(Rectangle())
             .onTapGesture { model.tap() }
             .overlay(alignment: .topTrailing) { collapseControl }
@@ -97,6 +125,17 @@ struct MirrorView: View {
             .padding(DS.Space.xs)
             .help("Camera source")
         }
+    }
+}
+
+private extension View {
+    /// Subtle rounded glass surface so the collapsed button and prompts read as one slim strip,
+    /// matching the tiles' surface (white 6% fill + hairline border).
+    func glassStrip() -> some View {
+        let shape = RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+        return padding(DS.Space.sm)
+            .background(shape.fill(Color.white.opacity(0.06)))
+            .overlay(shape.strokeBorder(DS.Palette.hairline, lineWidth: 1))
     }
 }
 
