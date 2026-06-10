@@ -19,6 +19,8 @@ struct MirrorView: View {
     @ViewBuilder private var content: some View {
         if model.permissionDenied {
             permissionPrompt
+        } else if model.state == .fullScreen {
+            fullScreenPlaceholder
         } else if model.state.cameraShouldRun {
             if model.devices.isEmpty {
                 emptyPrompt
@@ -28,6 +30,25 @@ struct MirrorView: View {
         } else {
             collapsedButton
         }
+    }
+
+    /// Shown in the windowed strip while the self-view is up on the full-display overlay: a compact
+    /// row that names the state and offers a tap back to the windowed (`.expanded`) preview.
+    private var fullScreenPlaceholder: some View {
+        Button { model.toggleFullScreen() } label: {
+            HStack(spacing: DS.Space.xs) {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                Text("Mirror is full screen")
+                Spacer()
+                Text("Exit")
+                    .foregroundStyle(DS.Palette.accent)
+            }
+            .font(DS.Typography.caption)
+            .foregroundStyle(DS.Palette.textSecondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .glassStrip()
     }
 
     /// Inline "camera blocked" notice with a jump to the Camera privacy pane.
@@ -96,6 +117,7 @@ struct MirrorView: View {
             .onTapGesture { model.tap() }
             .overlay(alignment: .topTrailing) { collapseControl }
             .overlay(alignment: .topLeading) { sourcePicker }
+            .overlay(alignment: .bottomTrailing) { fullScreenControl }
     }
 
     private var collapseControl: some View {
@@ -106,6 +128,18 @@ struct MirrorView: View {
         .buttonStyle(.plain)
         .padding(DS.Space.xs)
         .help("Collapse Mirror")
+    }
+
+    /// Blows the self-view up to a full-display overlay (spec decision #2). Bottom-trailing so it
+    /// doesn't collide with the × (top-trailing) or the source picker (top-leading).
+    private var fullScreenControl: some View {
+        Button { model.toggleFullScreen() } label: {
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .foregroundStyle(.white, .black.opacity(0.55))
+        }
+        .buttonStyle(.plain)
+        .padding(DS.Space.xs)
+        .help("Full screen")
     }
 
     @ViewBuilder private var sourcePicker: some View {
@@ -141,7 +175,8 @@ private extension View {
 
 /// Hosts the camera's `AVCaptureVideoPreviewLayer` in a layer-backed `NSView`, keeping the
 /// layer's frame pinned to the view's bounds so it resizes correctly between small and expanded.
-private struct CameraPreview: NSViewRepresentable {
+/// Reused by the full-screen overlay (`MirrorOverlayView`), hence internal.
+struct CameraPreview: NSViewRepresentable {
     let layer: AVCaptureVideoPreviewLayer
 
     func makeNSView(context: Context) -> NSView {

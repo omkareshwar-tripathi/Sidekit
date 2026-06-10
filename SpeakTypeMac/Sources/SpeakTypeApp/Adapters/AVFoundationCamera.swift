@@ -25,6 +25,21 @@ final class AVFoundationCamera: CameraPort, @unchecked Sendable {
         discoveredDevices().map { CameraDevice(id: $0.uniqueID, name: $0.localizedName) }
     }
 
+    /// An additional mirrored preview layer on the **same session**, for the full-screen overlay to
+    /// host (a single `AVCaptureVideoPreviewLayer` can live in only one view hierarchy, so the overlay
+    /// can't reuse `previewLayer`). AVFoundation supports multiple preview layers per session, so this
+    /// opens **no second camera / green light**. Mirroring is set on the layer's own connection, which
+    /// exists immediately because the overlay is only ever entered from an already-running preview.
+    func makePreviewLayer() -> AVCaptureVideoPreviewLayer {
+        let layer = AVCaptureVideoPreviewLayer(session: session)
+        layer.videoGravity = .resizeAspectFill
+        if let connection = layer.connection, connection.isVideoMirroringSupported {
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = true
+        }
+        return layer
+    }
+
     func start(deviceID: String?) {
         queue.async { [self] in
             let device = resolveDevice(deviceID)

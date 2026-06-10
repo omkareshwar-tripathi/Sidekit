@@ -23,6 +23,10 @@ final class MirrorModel: ObservableObject {
     let camera = AVFoundationCamera()
     var previewLayer: AVCaptureVideoPreviewLayer { camera.previewLayer }
 
+    /// The full-display overlay window, created lazily on the first full-screen entry (no overlay
+    /// window exists until then) and driven by `state == .fullScreen` via `syncOverlay()`.
+    private var overlay: MirrorOverlayPanel?
+
     /// Primary tap on the Mirror: advance size, requesting camera permission the first time.
     func tap() {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -55,6 +59,20 @@ final class MirrorModel: ObservableObject {
         permissionDenied = false
         state = state.dismissed()
         syncCamera()
+        syncOverlay()
+    }
+
+    /// Toggle the full-display overlay: an open windowed preview goes full screen, the overlay exits
+    /// back to `.expanded`. Guarded on the Mirror being open so it can never enter full screen (and
+    /// start the camera) straight from `.collapsed`, bypassing the permission gate — the full-screen
+    /// control only exists in the open preview / the overlay, so this just hardens the invariant.
+    /// No `syncCamera()`: both sides of this toggle keep the camera running (openness is unchanged),
+    /// so the session is left alone — the overlay rides on a fresh preview layer of the same session,
+    /// avoiding a needless capture restart / green-light flicker on every toggle.
+    func toggleFullScreen() {
+        guard state.cameraShouldRun else { return }
+        state = state.toggledFullScreen()
+        syncOverlay()
     }
 
     /// Switch the active source; restart capture immediately if the Mirror is open.
@@ -73,6 +91,22 @@ final class MirrorModel: ObservableObject {
             camera.start(deviceID: selectedDeviceID)
         } else {
             camera.stop()
+        }
+    }
+
+    /// Bind the overlay window to `state == .fullScreen`: show it (creating it the first time) with a
+    /// fresh mirrored preview layer, or hide it. Exit (✕ / click / Esc) routes back through
+    /// `toggleFullScreen()` → `.expanded`. Hiding only touches an already-created overlay, so a normal
+    /// collapse never instantiates a window that was never used.
+    private func syncOverlay() {
+        if state == .fullScreen {
+            let overlay = overlay ?? MirrorOverlayPanel()
+            self.overlay = overlay
+            overlay.show(previewLayer: camera.makePreviewLayer()) { [weak self] in
+                self?.toggleFullScreen()
+            }
+        } else {
+            overlay?.hide()
         }
     }
 }
