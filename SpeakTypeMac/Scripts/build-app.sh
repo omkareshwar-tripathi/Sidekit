@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Assemble SpeakType.app from the SwiftPM executable.
+# Assemble Sidekit.app from the SwiftPM executable.
 #
 # macOS grants microphone/Accessibility permissions to a *bundle* with a stable
 # signed identity, not a loose binary — so even for local dev we wrap the executable
@@ -11,13 +11,13 @@ CONFIG="${1:-debug}"
 
 # Quit any running instance first — otherwise `open` just re-activates the old (now stale)
 # process instead of launching the freshly built one.
-pkill -f "SpeakType.app/Contents/MacOS/SpeakType" 2>/dev/null && echo "Quit running instance." || true
+pkill -f "Sidekit.app/Contents/MacOS/SpeakType" 2>/dev/null && echo "Quit running instance." || true
 
 echo "Building ($CONFIG)…"
 swift build -c "$CONFIG"
 
 BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
-APP="SpeakType.app"
+APP="Sidekit.app"
 CONTENTS="$APP/Contents"
 
 # Ensure the speech model is present, then bundle it so the app runs fully offline.

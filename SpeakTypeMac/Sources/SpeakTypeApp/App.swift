@@ -35,9 +35,9 @@ struct SpeakTypeApp: App {
             MenuBarLabel(controller: controller)
         }
 
-        // The main window stays closed until "Open SpeakType" is chosen; opening it flips the
+        // The main window stays closed until "Open Sidekit" is chosen; opening it flips the
         // app to a Dock-present `.regular` app, closing it returns to the menu-bar-only utility.
-        Window("SpeakType", id: MainWindow.id) {
+        Window("Sidekit", id: MainWindow.id) {
             MainWindow(notes: controller.notes, history: controller.history,
                        settings: controller.settings, shelf: controller.shelf)
                 .onAppear { AppController.setWindowMode(true) }
@@ -96,7 +96,7 @@ private struct MenuContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Button("Open SpeakType") { openWindow(id: MainWindow.id) }
+        Button("Open Sidekit") { openWindow(id: MainWindow.id) }
         Divider()
         Text(controller.statusText)
         if !controller.accessibilityTrusted {
@@ -105,7 +105,7 @@ private struct MenuContent: View {
             Button("Open Accessibility Settings…") { controller.openAccessibilitySettings() }
         }
         Divider()
-        Button("Quit SpeakType") { NSApplication.shared.terminate(nil) }
+        Button("Quit Sidekit") { NSApplication.shared.terminate(nil) }
             .keyboardShortcut("q")
     }
 }

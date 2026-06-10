@@ -1,7 +1,7 @@
 # SwiftPM build artifacts
 .build/
 # Assembled app bundle (produced by Scripts/build-app.sh)
-SpeakType.app/
+Sidekit.app/
 # Bundled speech model (large, reproducible via Scripts/fetch-model.sh)
 Models/
 # Xcode/SwiftPM local state
