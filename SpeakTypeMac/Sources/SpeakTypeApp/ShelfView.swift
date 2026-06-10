@@ -395,21 +395,27 @@ private struct ShelfTile: View {
                         }
                     }
                 if hovering {
+                    // Plain Buttons, not a Menu: a SwiftUI `Menu` popup won't open/deliver from a
+                    // non-activating floating panel (the popup needs a key window), so Copy/Reveal
+                    // silently did nothing — whereas plain Buttons fire fine here (as Save-all does).
                     HStack(spacing: 2) {
-                        Menu {
-                            Button("Copy", systemImage: "doc.on.doc", action: onCopy)
-                            if item.kind == .file || item.kind == .folder {
-                                Button("Reveal in Finder", systemImage: "magnifyingglass", action: onReveal)
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle.fill")
+                        Button(action: onCopy) {
+                            Image(systemName: "doc.on.doc.fill")
                                 .font(.system(size: 15))
                                 .foregroundStyle(.white, .black.opacity(0.55))
                         }
-                        .menuStyle(.borderlessButton)
-                        .menuIndicator(.hidden)
-                        .frame(width: 16)
-                        .help("Item actions")
+                        .buttonStyle(.plain)
+                        .help("Copy")
+
+                        if item.kind == .file || item.kind == .folder {
+                            Button(action: onReveal) {
+                                Image(systemName: "magnifyingglass.circle.fill")
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(.white, .black.opacity(0.55))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Reveal in Finder")
+                        }
 
                         Button { onRemove() } label: {
                             Image(systemName: "xmark.circle.fill")

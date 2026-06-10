@@ -50,7 +50,11 @@ final class ShelfModel: ObservableObject {
     /// clearing the clipboard and no-ops on missing/unreadable bytes — so Copy never wipes the
     /// clipboard without putting something back.
     func copyToClipboard(_ item: ShelfItem) {
-        guard let url = fileURL(for: item), FileManager.default.fileExists(atPath: url.path) else { return }
+        guard let url = fileURL(for: item), FileManager.default.fileExists(atPath: url.path) else {
+            Diag.log("shelf: copy no-op — bytes missing for \(item.displayName)")
+            return
+        }
+        Diag.log("shelf: copy \(item.kind.rawValue) \(item.displayName)")
         let pasteboard = NSPasteboard.general
         switch item.kind {
         case .text:
