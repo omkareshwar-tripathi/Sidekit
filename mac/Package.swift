@@ -14,10 +14,14 @@ let package = Package(
     ],
     targets: [
         .target(name: "SidekitCore"),
+        // The one network adapter (Supabase inserts), split out so SubmissionSelftest can
+        // verify it headlessly (same pattern as ModelSelftest for the Whisper model).
+        .target(name: "SidekitNet", dependencies: ["SidekitCore"]),
         .executableTarget(
             name: "SidekitApp",
             dependencies: [
                 "SidekitCore",
+                "SidekitNet",
                 .product(name: "WhisperKit", package: "WhisperKit"),
             ]
         ),
