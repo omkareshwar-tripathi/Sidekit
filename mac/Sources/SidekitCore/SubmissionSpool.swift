@@ -46,7 +46,10 @@ public final class SubmissionSpool {
     public private(set) var pending: [SpooledSubmission]
     private let persistence: SpoolPersisting
     private let sender: SubmissionSending
-    private var flushing = false
+    /// The one in-flight queue walk, if any. Entries enqueued during a walk land behind
+    /// its cursor and are processed by that same walk; `flush()` awaits it, so callers
+    /// always observe their entry's real disposition (drives an honest toast).
+    private var flushTask: Task<Void, Never>?
 
     public init(persistence: SpoolPersisting, sender: SubmissionSending) {
         self.persistence = persistence
@@ -71,11 +74,23 @@ public final class SubmissionSpool {
         await flush()
     }
 
-    /// Walk the queue once, by entry id (entries can be added/removed across awaits).
+    /// Ensure a walk is running and wait for it to finish.
     private func flush() async {
-        guard !flushing else { return }
-        flushing = true
-        defer { flushing = false }
+        if let task = flushTask {
+            await task.value // the running walk will reach entries appended behind it
+            return
+        }
+        let task = Task {
+            await self.walk()
+            // Cleared inside the task: no window where a finished walk looks in-flight.
+            self.flushTask = nil
+        }
+        flushTask = task
+        await task.value
+    }
+
+    /// Walk the queue once, by entry id (entries can be added/removed across awaits).
+    private func walk() async {
         var index = 0
         while index < pending.count {
             let entry = pending[index]

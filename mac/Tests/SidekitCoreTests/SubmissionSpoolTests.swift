@@ -80,4 +80,45 @@ struct SubmissionSpoolTests {
         #expect(SpoolCodec.decode(SpoolCodec.encode(entries)) == entries)
         #expect(SpoolCodec.decode(Data("garbage".utf8)) == [])
     }
+
+    @Test func enqueueDuringInFlightFlushReportsTheRealDisposition() async {
+        let persistence = FakeSpoolPersistence([SpooledSubmission(submission: signup)])
+        let sender = GatedSender()
+        let spool = SubmissionSpool(persistence: persistence, sender: sender)
+
+        // Launch-style retry suspends inside the seeded entry's send.
+        let retry = Task { await spool.retryAll() }
+        while await sender.sendCount < 1 { await Task.yield() }
+
+        // A user submission lands while that walk is in flight…
+        let enqueue = Task { await spool.enqueue(bug) }
+        while spool.pending.count < 2 { await Task.yield() }
+
+        await sender.releaseOne()                                // seeded entry → sent
+        while await sender.sendCount < 2 { await Task.yield() }  // walk reaches the tail
+        await sender.releaseOne()                                // tail (bug) → sent
+
+        // …and the caller still learns the truth: it DID go out now.
+        #expect(await enqueue.value)
+        await retry.value
+        #expect(spool.pending.isEmpty)
+        #expect(await sender.sent == [signup, bug])
+    }
+}
+
+/// Suspends every send until the test releases it — lets a test interleave an enqueue
+/// into a mid-flight walk deterministically.
+private actor GatedSender: SubmissionSending {
+    private(set) var sent: [RemoteSubmission] = []
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    var sendCount: Int { sent.count }
+    func send(_ submission: RemoteSubmission) async -> SendResult {
+        sent.append(submission)
+        await withCheckedContinuation { waiters.append($0) }
+        return .sent
+    }
+    func releaseOne() {
+        guard !waiters.isEmpty else { return }
+        waiters.removeFirst().resume()
+    }
 }
