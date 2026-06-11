@@ -89,16 +89,23 @@ struct SettingsView: View {
                 Section("Account") {
                     TextField("you@example.com", text: $emailDraft)
                         .onSubmit {
-                            if emailDraft.trimmingCharacters(in: .whitespaces).isEmpty {
-                                identity.clearEmail()
-                            } else {
-                                identity.submitEmail(emailDraft)
-                            }
+                            // Only act on a real change; a blank Return is a no-op so a
+                            // mid-edit Enter can never wipe the signup (review 2026-06-11).
+                            let trimmed = emailDraft.trimmingCharacters(in: .whitespaces)
+                            guard !trimmed.isEmpty, trimmed.lowercased() != identity.email else { return }
+                            identity.submitEmail(emailDraft)
                         }
                     Text(identity.email.map { "Signed up as \($0)" }
                          ?? "Not signed up — add an email to get updates & support.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if identity.email != nil {
+                        // Deliberate, explicit removal — local only (spec §2).
+                        Button("Remove email", role: .destructive) {
+                            identity.clearEmail()
+                            emailDraft = ""
+                        }
+                    }
                 }
                 Section("Dictation") {
                     Toggle("Remove filler words (um, uh, …)", isOn: $model.fillerRemoval)
