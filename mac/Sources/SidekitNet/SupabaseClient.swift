@@ -9,8 +9,8 @@ import SidekitCore
 /// The env overrides let a dev build point at a local stand-in server (M9 smoke test):
 ///   SIDEKIT_SUPABASE_URL=http://127.0.0.1:8765 SIDEKIT_SUPABASE_KEY=test swift run …
 public enum SupabaseConfig {
-    private static let defaultURL = ""      // e.g. "https://abcdefgh.supabase.co"
-    private static let defaultAnonKey = ""  // the project's anon/public key
+    private static let defaultURL = "https://ubqdjvbhanhnxlonqrii.supabase.co"
+    private static let defaultAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVicWRqdmJoYW5obnhsb25xcmlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTI3MDgsImV4cCI6MjA5Njc2ODcwOH0.vzAueH1LeE2YtWoPbmz1ybarEPos5cYU5z8AxQ2V1UQ"
 
     public static var projectURL: URL? {
         let raw = ProcessInfo.processInfo.environment["SIDEKIT_SUPABASE_URL"] ?? defaultURL
