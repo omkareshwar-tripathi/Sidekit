@@ -29,27 +29,42 @@ final class SettingsModel: ObservableObject {
             applyShelfTTL(shelfTTLSeconds == 0 ? nil : .seconds(shelfTTLSeconds))
         }
     }
+    /// Auto-add macOS screenshots to the Shelf (spec 2026-06-12 §3.3; default ON).
+    @Published var autoShelfScreenshots: Bool {
+        didSet {
+            UserDefaults.standard.set(autoShelfScreenshots, forKey: Self.screenshotsKey)
+            applyScreenshotCapture(autoShelfScreenshots)
+        }
+    }
 
     private static let fillerKey = "FillerRemoval"
     private static let shelfTTLKey = "ShelfTTL"
+    private static let screenshotsKey = "AutoShelfScreenshots"
     /// Pushes a new `Settings` to the live coordinator.
     private let applySettings: @MainActor (SidekitCore.Settings) -> Void
     /// Pushes a new retention TTL (nil = never expire) to the live shelf store.
     private let applyShelfTTL: @MainActor (Duration?) -> Void
+    /// Starts/stops the live screenshot watcher.
+    private let applyScreenshotCapture: @MainActor (Bool) -> Void
 
     init(applySettings: @escaping @MainActor (SidekitCore.Settings) -> Void,
-         applyShelfTTL: @escaping @MainActor (Duration?) -> Void) {
+         applyShelfTTL: @escaping @MainActor (Duration?) -> Void,
+         applyScreenshotCapture: @escaping @MainActor (Bool) -> Void) {
         self.applySettings = applySettings
         self.applyShelfTTL = applyShelfTTL
+        self.applyScreenshotCapture = applyScreenshotCapture
         let filler = UserDefaults.standard.object(forKey: Self.fillerKey) as? Bool ?? true
         self.fillerRemoval = filler // init assignment → didSet does not fire
         let ttl = UserDefaults.standard.object(forKey: Self.shelfTTLKey) as? Int ?? 48 * 3600
         self.shelfTTLSeconds = ttl
+        let shots = UserDefaults.standard.object(forKey: Self.screenshotsKey) as? Bool ?? true
+        self.autoShelfScreenshots = shots // init assignment → didSet does not fire
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
         self.micAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         self.accessibilityTrusted = AXIsProcessTrusted()
         applySettings(SidekitCore.Settings(fillerRemoval: filler)) // seed the coordinator with the saved value
         applyShelfTTL(ttl == 0 ? nil : .seconds(ttl))                // seed the shelf store likewise
+        applyScreenshotCapture(shots) // seed: starts the watcher when enabled (default on)
     }
 
     /// Re-read the OS permission state (the user may have changed it in System Settings).
@@ -114,6 +129,7 @@ struct SettingsView: View {
                     Toggle("Launch Sidekit at login", isOn: $model.launchAtLogin)
                 }
                 Section("Shelf") {
+                    Toggle("Auto-add screenshots to Shelf", isOn: $model.autoShelfScreenshots)
                     Picker("Keep items for", selection: $model.shelfTTLSeconds) {
                         Text("1 day").tag(24 * 3600)
                         Text("2 days").tag(48 * 3600)

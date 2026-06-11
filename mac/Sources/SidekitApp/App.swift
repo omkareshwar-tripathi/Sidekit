@@ -162,6 +162,7 @@ final class AppController: ObservableObject {
     private var shelfPanel: ShelfPanel?
     private var shelfStatusItem: ShelfStatusItem?
     private var shelfDragMonitor: ShelfDragStartMonitor?
+    private let screenshotWatcher: ScreenshotWatcher
     /// Hourly expiry sweep (spec §4) — lives as long as the controller (the whole app).
     private var shelfPruneTask: Task<Void, Never>?
 
@@ -173,6 +174,11 @@ final class AppController: ObservableObject {
         let notes = NotesModel()
         let history = HistoryModel()
         let shelf = ShelfModel()
+        // Auto-shelf screenshots (spec 2026-06-12 §3): detections take the same copy-in
+        // path as a drag-in, so TTL / thumbnails / drag-out all just work.
+        let screenshots = ScreenshotWatcher(
+            payloadRoot: AppPaths.applicationSupport.appendingPathComponent("Shelf", isDirectory: true),
+            ingest: { url in shelf.ingest(.file(url)) })
 
         // Identity + outbox (sign-up & feedback, spec 2026-06-11). recordLaunch() advances
         // the soft-gate counter before the window reads shouldShowWelcome.
@@ -226,7 +232,8 @@ final class AppController: ObservableObject {
         // persisted shelf TTL into the live shelf store (both seeded at init with saved values).
         let settings = SettingsModel(
             applySettings: { [weak coordinator] s in coordinator?.settings = s },
-            applyShelfTTL: { ttl in shelf.setRetentionTTL(ttl) })
+            applyShelfTTL: { ttl in shelf.setRetentionTTL(ttl) },
+            applyScreenshotCapture: { on in on ? screenshots.start() : screenshots.stop() })
         self.notes = notes
         self.history = history
         self.settings = settings
@@ -237,6 +244,7 @@ final class AppController: ObservableObject {
         self.welcomePanel = welcomePanel
         self.coordinator = coordinator
         self.hotkey = hotkey
+        self.screenshotWatcher = screenshots
 
         audio.onLevel = { [weak self] lvl in
             guard let self else { return }
