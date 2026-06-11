@@ -91,7 +91,8 @@ struct ShelfView: View {
                 ShelfFooter(count: model.items.count,
                             totalBytes: model.totalByteSize,
                             onSaveAll: saveAll,
-                            onClearAll: { selection.removeAll(); model.clearAll() })
+                            onClearAll: { selection.removeAll(); model.clearAll() },
+                            onCopyAgent: { model.copyAgentInstructions() })
             }
         }
         .padding(DS.Space.md)
@@ -513,12 +514,14 @@ private struct ShelfDragHandle: View {
     }
 }
 
-/// Footer: item count + total store size on the left, Clear all on the right.
+/// Footer: item count + store size on the left; For-agents copy, Save all, Clear all on the right.
 private struct ShelfFooter: View {
     let count: Int
     let totalBytes: Int64
     let onSaveAll: () -> Void
     let onClearAll: () -> Void
+    let onCopyAgent: () -> Void
+    @State private var copiedAgent = false
 
     var body: some View {
         HStack(spacing: DS.Space.sm) {
@@ -526,6 +529,15 @@ private struct ShelfFooter: View {
                 .font(DS.Typography.caption)
                 .foregroundStyle(DS.Palette.textSecondary)
             Spacer()
+            Button(copiedAgent ? "Copied ✓" : "For agents") {
+                onCopyAgent()
+                copiedAgent = true
+                Task { try? await Task.sleep(for: .seconds(1.5)); copiedAgent = false }
+            }
+            .buttonStyle(.plain)
+            .font(DS.Typography.caption)
+            .foregroundStyle(DS.Palette.textSecondary)
+            .help("Copy instructions that let any AI agent read this Shelf")
             Button("Save all to…") { onSaveAll() }
                 .buttonStyle(.plain)
                 .font(DS.Typography.caption)

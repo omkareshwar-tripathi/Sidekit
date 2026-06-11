@@ -14,6 +14,8 @@ final class ShelfModel: ObservableObject {
     private let payloadStore: ShelfPayloadStore
     /// Set by the production init — lets retention changes refresh the manifest's `expiresAt`.
     private var manifestStore: AgentManifestShelfStore?
+    /// The folder agents are told about — the symlink normally, the real folder as fallback.
+    private(set) var agentPath = "~/.sidekit/shelf"
 
     init(store: ShelfStore, payloadStore: ShelfPayloadStore = NoopShelfPayloadStore()) {
         self.store = store
@@ -31,6 +33,7 @@ final class ShelfModel: ObservableObject {
         self.init(store: ShelfStore(persistence: manifest, payloads: payloads), payloadStore: payloads)
         self.manifestStore = manifest
         manifest.writeAgentFiles(items) // heals a fresh install or a manual delete
+        self.agentPath = AgentShelfLink.ensure(realFolder: folder)
     }
 
     var items: [ShelfItem] { store.items }
@@ -76,6 +79,14 @@ final class ShelfModel: ObservableObject {
             pasteboard.clearContents()
             pasteboard.writeObjects([url as NSURL])
         }
+    }
+
+    /// Put the paste-ready agent prompt on the clipboard (spec §2.4) — the whole onboarding
+    /// for Claude Code / Antigravity / any agent that can read files.
+    func copyAgentInstructions() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(ShelfManifest.instructions(path: agentPath), forType: .string)
     }
 
     /// Reveal the item's stored file in Finder (used for file/folder items). No-op if bytes are missing.
