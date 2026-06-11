@@ -28,5 +28,8 @@
 	<string>Sidekit uses SpeakType to transcribe your speech on-device and type for you.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Sidekit shows a live self-view mirror; video is never recorded or saved.</string>
+	<!-- Needed so NSMetadataQuery can watch ~/Desktop for new screenshots. -->
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Sidekit adds new screenshots to the Shelf.</string>
 </dict>
 </plist>
