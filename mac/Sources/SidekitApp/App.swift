@@ -158,6 +158,7 @@ final class AppController: ObservableObject {
     private let hotkey: FnKeyMonitor
     private var pill: PillPanel?
     private var feedbackBox: FeedbackBox?
+    private var welcomePanel: WelcomePanel?
     private var shelfPanel: ShelfPanel?
     private var shelfStatusItem: ShelfStatusItem?
     private var shelfDragMonitor: ShelfDragStartMonitor?
@@ -185,6 +186,7 @@ final class AppController: ObservableObject {
         // Created before the RoutingSink: when the feedback box is the key window,
         // dictation routes into it instead of the notes (spec §3, dictation-first).
         let feedbackBox = FeedbackBox(identity: identity, spool: spool)
+        let welcomePanel = WelcomePanel(identity: identity)
 
         // Route the cleaned transcript: into the active note when Sidekit is the focused app
         // (creating one if the list is empty), otherwise paste at the cursor as before (spec §3).
@@ -232,6 +234,7 @@ final class AppController: ObservableObject {
         self.identity = identity
         self.spool = spool
         self.feedbackBox = feedbackBox
+        self.welcomePanel = welcomePanel
         self.coordinator = coordinator
         self.hotkey = hotkey
 
@@ -311,6 +314,15 @@ final class AppController: ObservableObject {
 
         // Flush anything queued while offline last session (spec §6).
         Task { await spool.retryAll() }
+
+        // Soft gate (spec §2): the welcome rides its own panel so it shows even when the
+        // main window stays closed (menu-bar-centric; launch-at-login suppresses auto-open).
+        // Deferred one turn so the panel never fronts before the app finishes launching.
+        Task { @MainActor [weak self] in
+            guard let self, self.identity.shouldShowWelcome else { return }
+            self.identity.welcomeShown()
+            self.welcomePanel?.show()
+        }
     }
 
     var iconName: String {

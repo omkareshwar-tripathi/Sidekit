@@ -17,7 +17,6 @@ struct MainWindow: View {
 
     @State private var showSettings = false
     @State private var showHistory = false
-    @State private var showWelcome = false
 
     var body: some View {
         NavigationSplitView {
@@ -40,14 +39,6 @@ struct MainWindow: View {
         }
         .sheet(isPresented: $showSettings) { SettingsView(model: settings, shelf: shelf, identity: identity) }
         .sheet(isPresented: $showHistory) { HistoryView(history: history) }
-        .onAppear {
-            // Soft gate (spec §2): the store says whether this is one of the ≤2 auto-shows.
-            if identity.shouldShowWelcome {
-                identity.welcomeShown()
-                showWelcome = true
-            }
-        }
-        .sheet(isPresented: $showWelcome) { WelcomeSheet(identity: identity) }
         // Brand the window to match the icon/pill: dark frosted-glass surface with purple accents
         // (selection, buttons, controls — and the sheets inherit the tint). Layout is unchanged so
         // long notes stay readable (no gradient behind text).
