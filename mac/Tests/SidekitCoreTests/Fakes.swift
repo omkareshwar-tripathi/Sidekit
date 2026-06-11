@@ -114,3 +114,24 @@ final class FakeIdentityPersistence: IdentityPersisting, @unchecked Sendable {
     func load() -> IdentityState { stored }
     func save(_ state: IdentityState) { saveCount += 1; stored = state }
 }
+
+/// In-memory SpoolPersisting: seeds the spool on load and records what it saved.
+final class FakeSpoolPersistence: SpoolPersisting, @unchecked Sendable {
+    var stored: [SpooledSubmission]
+    private(set) var saveCount = 0
+    init(_ initial: [SpooledSubmission] = []) { stored = initial }
+    func load() -> [SpooledSubmission] { stored }
+    func save(_ entries: [SpooledSubmission]) { saveCount += 1; stored = entries }
+}
+
+/// Scripted SubmissionSending: returns queued results FIFO (empty → `defaultResult`) and
+/// records every submission it saw. Mutated only from the main actor (the spool is @MainActor).
+final class FakeSender: SubmissionSending, @unchecked Sendable {
+    var results: [SendResult] = []
+    var defaultResult: SendResult = .sent
+    private(set) var sent: [RemoteSubmission] = []
+    func send(_ submission: RemoteSubmission) async -> SendResult {
+        sent.append(submission)
+        return results.isEmpty ? defaultResult : results.removeFirst()
+    }
+}
