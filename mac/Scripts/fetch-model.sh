@@ -3,7 +3,7 @@
 # run fully offline (no first-run download). Idempotent. The files are gitignored (large,
 # reproducible) — like the Windows app's baked-in speech model.
 set -euo pipefail
-cd "$(dirname "$0")/.."   # → SpeakTypeMac/
+cd "$(dirname "$0")/.."   # → mac/
 
 MODEL_REPO="argmaxinc/whisperkit-coreml"
 MODEL_PATH="openai_whisper-base.en"

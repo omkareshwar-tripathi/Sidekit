@@ -13,7 +13,7 @@ import SidekitCore
 final class AVFoundationCamera: CameraPort, @unchecked Sendable {
     private let session = AVCaptureSession()
     let previewLayer: AVCaptureVideoPreviewLayer
-    private let queue = DispatchQueue(label: "com.speaktype.camera.session")
+    private let queue = DispatchQueue(label: "com.sidekit.camera.session")
     private let lock = NSLock()
 
     init() {

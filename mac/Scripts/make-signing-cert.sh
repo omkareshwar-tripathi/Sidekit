@@ -7,7 +7,7 @@
 # grant sticks across rebuilds. Idempotent: does nothing if the identity already exists.
 set -euo pipefail
 
-CERT="SpeakType Local Signing"
+CERT="Sidekit Local Signing"
 if security find-certificate -c "$CERT" >/dev/null 2>&1; then
   echo "Signing identity '$CERT' already present."
   exit 0
@@ -21,7 +21,7 @@ distinguished_name = dn
 x509_extensions = ext
 prompt = no
 [dn]
-CN = SpeakType Local Signing
+CN = Sidekit Local Signing
 [ext]
 basicConstraints = critical, CA:false
 keyUsage = critical, digitalSignature

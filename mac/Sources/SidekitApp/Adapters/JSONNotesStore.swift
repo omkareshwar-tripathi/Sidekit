@@ -17,7 +17,7 @@ import SidekitCore
 /// write runs on the serial `queue`. `url` is immutable.
 final class JSONNotesStore: NotesPersisting, @unchecked Sendable {
     private let url: URL
-    private let queue = DispatchQueue(label: "com.speaktype.notes-save")
+    private let queue = DispatchQueue(label: "com.sidekit.notes-save")
     private let debounce: DispatchTimeInterval = .milliseconds(400)
     private let lock = NSLock()
     private var pending: DispatchWorkItem?

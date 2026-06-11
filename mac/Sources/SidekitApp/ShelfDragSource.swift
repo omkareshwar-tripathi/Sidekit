@@ -18,7 +18,7 @@ struct ShelfDragFile {
 /// tile arrives without its `public.file-url`, defeating the `isStored` check), but the pasteboard
 /// itself keeps every declared type.
 enum ShelfDragMarker {
-    static let typeID = "com.speaktype.shelf-drag"
+    static let typeID = "com.sidekit.shelf-drag"
     static let pasteboardType = NSPasteboard.PasteboardType(typeID)
     static let data = Data("1".utf8)
 

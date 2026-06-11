@@ -1,13 +1,13 @@
 #!/usr/bin/env swift
-// Generates SpeakType's app icon from code — no external art, fully reproducible.
+// Generates Sidekit's app icon from code — no external art, fully reproducible.
 //
-// The mark is the SpeakType **equalizer** (the same 5-bar waveform shipped in the Windows app —
-// see windows/SpeakType.App/Branding/AppIcon.cs), drawn once in a 0…1000 design space and
+// The mark is the Sidekit **equalizer** (the same 5-bar waveform shipped in the Windows app —
+// see windows/Sidekit.App/Branding/AppIcon.cs), drawn once in a 0…1000 design space and
 // rendered two ways:
 //   • the full-colour app icon  → AppBundle/AppIcon.iconset/*.png → (iconutil) AppIcon.icns
 //   • a monochrome menu-bar glyph → AppBundle/MenuBarIcon.pdf (a template image macOS tints)
 //
-// Run from SpeakTypeMac/:  ./Scripts/make-icon.swift   (then build-app.sh copies them in)
+// Run from mac/:  ./Scripts/make-icon.swift   (then build-app.sh copies them in)
 // Re-run only when the artwork changes; the outputs are committed.
 
 import AppKit
@@ -21,7 +21,7 @@ let cs = CGColorSpace(name: CGColorSpace.sRGB)!
 
 // MARK: - The mark
 
-/// Draws the SpeakType equalizer — 5 symmetric rounded bars — filled with the current colour,
+/// Draws the Sidekit equalizer — 5 symmetric rounded bars — filled with the current colour,
 /// in a 0…1000 (y-up) design space centred on x=500. `refW` scales the whole mark: bar width,
 /// gap and heights are all fractions of it (proportions hand-matched to the Windows `.ico`).
 func drawEqualizer(_ ctx: CGContext, refW: CGFloat, cy: CGFloat = 500) {
@@ -82,7 +82,7 @@ func writePNG(_ image: CGImage, to url: URL) {
 // `#filePath` is this script's own path — robust no matter how it's invoked (cwd, symlink, PATH).
 let root = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent()    // Scripts/
-    .deletingLastPathComponent()    // SpeakTypeMac/
+    .deletingLastPathComponent()    // mac/
 let bundle = root.appendingPathComponent("AppBundle")
 let iconset = bundle.appendingPathComponent("AppIcon.iconset")
 try? FileManager.default.removeItem(at: iconset)
