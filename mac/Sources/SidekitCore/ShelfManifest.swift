@@ -28,6 +28,8 @@ public enum ShelfManifest {
 
     /// The `manifest.json` bytes for the current shelf. `expiresAt` is computed from the
     /// retention TTL at write time; "never expire" writes an explicit `null` (key always present).
+    /// Dates are whole-second ISO-8601 — deliberately unlike `ShelfCodec`'s exact reference-date
+    /// seconds: agents need a parseable standard; `shelf.json` keeps the precise value for expiry.
     public static func json(items: [ShelfItem], retention: ShelfRetentionPolicy, now: Date) -> Data {
         let ttl = retention.ttl.map { Double($0.components.seconds) }
         let entries = items.sorted { $0.addedAt > $1.addedAt }.map { item in

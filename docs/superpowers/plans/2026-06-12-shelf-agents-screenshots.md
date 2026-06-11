@@ -192,7 +192,7 @@ public enum ShelfManifest {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `swift test --filter ShelfManifestTests` → 8 pass. Then full `swift test` → **148/148**.
+Run: `swift test --filter ShelfManifestTests` → 7 pass. Then full `swift test` → **147/147**.
 
 - [ ] **Step 5: Commit**
 
@@ -300,7 +300,7 @@ actually expired, so force a rewrite):
 
 - [ ] **Step 3: Build + behavior check**
 
-Run: `swift build && swift test` → builds clean, still **148/148** (core untouched).
+Run: `swift build && swift test` → builds clean, still **147/147** (core untouched).
 Then verify the files appear and stay in sync without launching the UI:
 
 ```bash
@@ -459,7 +459,7 @@ Call site (~line 91) gains the argument:
 - [ ] **Step 4: Build + verify the link and the prompt**
 
 ```bash
-swift build && swift test          # clean, 148/148
+swift build && swift test          # clean, 147/147
 swift run Sidekit & sleep 8; kill %1
 ls -la ~/.sidekit/                 # shelf -> …/Application Support/Sidekit/Shelf
 cat ~/.sidekit/shelf/manifest.json # readable THROUGH the link
@@ -576,7 +576,7 @@ public struct ScreenshotGate: Sendable {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `swift test --filter ScreenshotGateTests` → 5 pass. Full `swift test` → **153/153**.
+Run: `swift test --filter ScreenshotGateTests` → 5 pass. Full `swift test` → **152/152**.
 
 - [ ] **Step 5: Commit**
 
@@ -751,7 +751,7 @@ Extend the `SettingsModel` call (~line 227) and store the watcher with the other
 - [ ] **Step 4: Build + live verify (machine-drivable)**
 
 ```bash
-swift build && swift test                          # clean, 153/153
+swift build && swift test                          # clean, 152/152
 Scripts/build-app.sh release && open <built .app>  # the signed app, real run
 sleep 5
 screencapture -x "$HOME/Desktop/sidekit-m10-probe.png"
@@ -804,7 +804,7 @@ one item's content back. Capture the transcript snippet as evidence.
 - [ ] **Step 3: Update BRICKS.md**
 
 One consolidated Done entry (SHIP-1..7 precedent): what shipped, files, verification (test count
-delta 140→153, M10 results), notes (symlink fallback rule, the copy→detect loop guard, accepted
+delta 140→152, M10 results), notes (symlink fallback rule, the copy→detect loop guard, accepted
 limits from spec §3.3). Remove **SHELF-AGENTS** + **SHELF-SCREENSHOTS** from "Next iterations";
 keep Done at 3 entries (archive the oldest to `BRICKS-ARCHIVE.md` verbatim).
 
