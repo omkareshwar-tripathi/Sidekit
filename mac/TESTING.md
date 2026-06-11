@@ -1,6 +1,6 @@
 # TESTING.md (Mac)
 
-Manual test plan for the **SpeakType Mac app** (the native Swift fork on `feat/mac-app`).
+Manual test plan for the **Sidekit Mac app** (the native Swift fork on `feat/mac-app`).
 The pure logic is covered by `swift test` (60 automated tests); this file covers everything
 that only a human in front of a running Mac can verify — the floating pill, the Fn hotkey,
 real audio, paste, the scratchpad window, settings, permissions, and app lifecycle.
@@ -16,9 +16,9 @@ real audio, paste, the scratchpad window, settings, permissions, and app lifecyc
 The pill and permissions only work from the signed `.app` bundle, **not** `swift run`.
 
 ```bash
-cd SpeakTypeMac
+cd mac
 ./Scripts/build-app.sh release      # builds, bakes in the Whisper model, signs
-open SpeakType.app
+open Sidekit.app
 ```
 
 - Automated baseline (optional, fast): `swift test` → expect **60 tests passed**.
@@ -33,7 +33,7 @@ open SpeakType.app
 - [ ] **A 🎙 mic icon appears in the menu bar** (top-right). No Dock icon yet, no window.
 - [ ] A **Microphone** permission prompt appears → click **Allow**.
 - [ ] An **Accessibility** prompt (or the menu-bar "⚠︎ Grant Accessibility…" item) appears →
-      open System Settings, enable **SpeakType** under Privacy & Security → Accessibility.
+      open System Settings, enable **Sidekit** under Privacy & Security → Accessibility.
 - [ ] After granting Accessibility, the menu-bar **⚠︎ warning item disappears** (re-open the
       menu to check). Accessibility is required for the Fn key and for pasting.
 - [ ] Because the build is signed with a **stable** identity, these grants **persist across
@@ -59,7 +59,7 @@ open SpeakType.app
 ## 3. Push-to-talk dictation → paste at cursor  _(spec §3, default destination)_
 
 Test in a normal text field first (e.g. **TextEdit**, a browser address bar, or Notes — anything
-that is **not** SpeakType).
+that is **not** Sidekit).
 
 - [ ] Click into a text field. **Hold Fn, say "hello world", release** → after a beat,
       **"hello world "** appears at the cursor (note the **trailing space**).
@@ -75,7 +75,7 @@ that is **not** SpeakType).
       menu-bar status reads **"No speech heard"** (no hallucinated text).
 - [ ] If paste is blocked (rare — e.g. an elevated app has focus), the text is **left on the
       clipboard** and the status says so ("Left on clipboard (paste manually)").
-- [ ] **Dictation History:** after any dictation, open **SpeakType** (menu bar → Open SpeakType)
+- [ ] **Dictation History:** after any dictation, open **Sidekit** (menu bar → Open Sidekit)
       and open **History** (toolbar History/clock button) → the dictation appears in the list with
       its time, its outcome (Pasted / Left on clipboard / Added to note), and a **Copy** button;
       clicking Copy puts that text back on the clipboard. History persists across relaunch and
@@ -85,7 +85,7 @@ that is **not** SpeakType).
 
 ## 4. The scratchpad window  _(spec §2.3 — standalone voice notepad)_
 
-- [ ] **Menu bar → "Open SpeakType"** → a window opens with a **sidebar** (notes list) on the left
+- [ ] **Menu bar → "Open Sidekit"** → a window opens with a **sidebar** (notes list) on the left
       and a **text editor** on the right. A **Dock icon** now appears (app becomes a regular app).
 - [ ] **Empty state:** with no notes, the sidebar shows **"No notes yet"** and a **"New note"**
       button. Click it → a new, empty note is created and selected.
@@ -97,9 +97,9 @@ that is **not** SpeakType).
       list (the most recently edited note leads).
 - [ ] **Delete:** **right-click** a note in the sidebar → **Delete** → the row animates out and is
       removed.
-- [ ] **Persistence:** type some text, **Quit SpeakType** (menu bar → Quit, or ⌘Q), then relaunch
+- [ ] **Persistence:** type some text, **Quit Sidekit** (menu bar → Quit, or ⌘Q), then relaunch
       and open the window → **your notes are still there**, including the last edit you made right
-      before quitting (saved to `~/Library/Application Support/SpeakType/notes.json`).
+      before quitting (saved to `~/Library/Application Support/Sidekit/notes.json`).
 - [ ] **Close the window** (red ⌘ button) → the **Dock icon disappears**; the app keeps running as
       a menu-bar utility (the pill stays, Fn still dictates).
 
@@ -107,15 +107,15 @@ that is **not** SpeakType).
 
 ## 5. Dictation routed into the focused note  _(spec §3 — in-app destination)_
 
-- [ ] Open the SpeakType window and **click into the editor so SpeakType is the focused app**.
+- [ ] Open the Sidekit window and **click into the editor so Sidekit is the focused app**.
 - [ ] **Hold Fn, speak, release** → the transcript is **appended into the open note** (not pasted
       elsewhere). The menu-bar status reads **"Added to note ✓"**.
 - [ ] **Delete all notes** so the sidebar shows the empty state (this *is* the "no note exists"
       state — there's no separate deselect), then dictate → a **new note is created** and the speech
       lands in it.
-- [ ] **Open another app** (e.g. TextEdit), click into its text area so SpeakType is **not** the
+- [ ] **Open another app** (e.g. TextEdit), click into its text area so Sidekit is **not** the
       front app, then hold Fn and speak → the text pastes at your cursor there (status
-      **"Pasted ✓"**), NOT into a SpeakType note. (Contrast 5.1, where SpeakType's own editor is
+      **"Pasted ✓"**), NOT into a Sidekit note. (Contrast 5.1, where Sidekit's own editor is
       focused and the text goes into a note.)
 
 ---
@@ -132,7 +132,7 @@ that is **not** SpeakType).
       sometimes omits disfluencies by itself, so this toggle only has a visible effect when "um"
       actually appears in the raw transcript.
 - [ ] Re-open Settings → the toggle is **still OFF** (persisted). Toggle it back ON.
-- [ ] **Launch SpeakType at login** — toggle **ON**. _(This only actually registers from the signed
+- [ ] **Launch Sidekit at login** — toggle **ON**. _(This only actually registers from the signed
       `.app`, which you have.)_ To verify: it should appear in **System Settings → General →
       Login Items**. Toggle OFF → it's removed.
 

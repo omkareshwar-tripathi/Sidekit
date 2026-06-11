@@ -1,4 +1,4 @@
-# SpeakType — Product Spec (v1)
+# Sidekit — Product Spec (v1)
 
 **What it is:** A Windows app that turns your voice into clean, formatted text. Hold a hotkey, speak, release — your words appear at your cursor, anywhere you can type.
 
@@ -28,13 +28,13 @@ The runtime is a strict state machine: **Idle → Recording → Transcribing →
 | Concern | Choice | Notes |
 |---|---|---|
 | Runtime | **.NET 8 (LTS)**, **x64 only** | win-arm64 deferred past v1. |
-| Project structure | **`SpeakType.Core`** (`net8.0`) + **`SpeakType.App`** (`net8.0-windows`, WinForms) + **`SpeakType.Tests`** (`net8.0`) | Core holds all pure logic + port interfaces and builds/tests on **macOS or Windows**; App holds Win32/NAudio/Whisper adapters + UI and builds on **Windows only**; Tests reference Core only. Enables a two-machine dev flow: write+unit-test the core on a Mac, build+run the real app on Windows, Git as the bridge. CI runs on GitHub Actions `windows-latest`. |
-| UI | **WinForms** | Built-in `NotifyIcon` for tray; lightest path for a tray utility. In `SpeakType.App` only. |
+| Project structure | **`Sidekit.Core`** (`net8.0`) + **`Sidekit.App`** (`net8.0-windows`, WinForms) + **`Sidekit.Tests`** (`net8.0`) | Core holds all pure logic + port interfaces and builds/tests on **macOS or Windows**; App holds Win32/NAudio/Whisper adapters + UI and builds on **Windows only**; Tests reference Core only. Enables a two-machine dev flow: write+unit-test the core on a Mac, build+run the real app on Windows, Git as the bridge. CI runs on GitHub Actions `windows-latest`. |
+| UI | **WinForms** | Built-in `NotifyIcon` for tray; lightest path for a tray utility. In `Sidekit.App` only. |
 | Speech-to-text | **Whisper.NET** (`Whisper.net` + `Whisper.net.Runtime`) | Managed wrapper over whisper.cpp; CPU by default; no native build to own. |
 | Audio capture | **NAudio** | Capture from default input device; resample to 16 kHz mono float. |
 | Packaging | **Self-contained, single-file `win-x64` `.exe`** | Bundles .NET 8 (runs on a clean machine). No installer in v1. App is **unsigned** in v1 → users will see a Windows SmartScreen warning on first launch (accepted). |
-| Settings store | **`%APPDATA%\SpeakType\settings.json`** | Human-readable JSON; changes apply immediately (no Save button). |
-| Single instance | **Named mutex `SpeakType.Single`** | Second launch shows a balloon and exits (prevents two global hooks). |
+| Settings store | **`%APPDATA%\Sidekit\settings.json`** | Human-readable JSON; changes apply immediately (no Save button). |
+| Single instance | **Named mutex `Sidekit.Single`** | Second launch shows a balloon and exits (prevents two global hooks). |
 
 Publish command (reference):
 ```
@@ -82,7 +82,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 - Inference runs on the **CPU** by default, on a **background thread** (UI never blocks). Thread count = `max(1, processorCount − 1)`.
 
 **Model delivery (download-on-first-run)**
-- Models are **downloaded on demand** (not bundled) into `%LOCALAPPDATA%\SpeakType\models`. **Requires internet exactly once per model**; fully offline thereafter.
+- Models are **downloaded on demand** (not bundled) into `%LOCALAPPDATA%\Sidekit\models`. **Requires internet exactly once per model**; fully offline thereafter.
 - **First run:** a small **Welcome window** shows a one-line how-to ("Hold Right Ctrl, speak, release.") and a progress bar downloading `base.en`. The hotkey is **inert until the download completes**, then a **"Ready!"** tray balloon appears.
 - **Switching model size in Settings:** downloads the new model with a progress bar **while the current model keeps working**; switches over only after the new file is **verified (size + checksum)**. On success, the new model becomes active.
 - **Download failure** (network/disk/corrupt): show **"Download failed — [Retry]"** and **stay on the previous model**.
@@ -211,7 +211,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 - **Debug logging** — on/off (default OFF; see Logging).
 
 **Persistence**
-- Single `%APPDATA%\SpeakType\settings.json`. Schema (illustrative):
+- Single `%APPDATA%\Sidekit\settings.json`. Schema (illustrative):
   ```json
   { "hotkey": "RightCtrl", "modelSize": "base.en",
     "fillerRemoval": true, "overlay": true,
@@ -227,7 +227,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 ## Logging & Privacy
 
-- **Rolling local log** at `%APPDATA%\SpeakType\logs\speaktype.log`.
+- **Rolling local log** at `%APPDATA%\Sidekit\logs\sidekit.log`.
 - **Default (metadata only):** events, errors, and timings — e.g. `recording 7.2s`, `transcribe 1.4s, 38 chars`, `download failed: …`. **Never** logs transcript text or audio.
 - **Debug logging toggle (default OFF):** when enabled, also records the **transcribed text** (to diagnose cleanup bugs). Clearly marked as storing sensitive content on disk.
 - **No network telemetry, ever.**
@@ -250,7 +250,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 ## App Lifecycle & Robustness
 
-- **Single instance:** named mutex `SpeakType.Single`. A second launch shows **"SpeakType is already running"** and exits.
+- **Single instance:** named mutex `Sidekit.Single`. A second launch shows **"Sidekit is already running"** and exits.
 - **Global exception handling:** wrap the app in handlers (`AppDomain.UnhandledException`, `Application.ThreadException`). On an unhandled error: **log the stack, show a tray balloon, and recover to Idle** if possible rather than dying silently.
 
 **How to test**

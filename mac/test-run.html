@@ -142,9 +142,9 @@
      Absent (e.g. fresh clone) → the Build field just stays manual. -->
 <script src="build-info.js"></script>
 <script>
-// Test plan — mirrors SpeakTypeMac/TESTING.md. Each item: { id, desc, hint? }
+// Test plan — mirrors mac/TESTING.md. Each item: { id, desc, hint? }
 // TARGETED re-test — only the two items that failed last round, now fixed. The full 37-item plan
-// lives in SpeakTypeMac/TESTING.md and is run as one major pass before shipping.
+// lives in mac/TESTING.md and is run as one major pass before shipping.
 const PLAN = [
   { title: "Re-test (honest paste status)", items: [
     { id: "3.1", desc: "Click into a REAL text field (e.g. TextEdit) → hold Fn, say \"hello world\", release → it pastes at the cursor, status \"Pasted ✓\". THEN click the desktop / a Finder window (no text field) and dictate → it must NOT say Pasted; the status/pill reads \"Copied to clipboard — ⌘V to paste\", and the text is on the clipboard + in History." },
