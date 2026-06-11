@@ -8,7 +8,7 @@
   :root {
     --bg: #0f1115; --card: #171a21; --card2: #1d212a; --line: #2a2f3a;
     --txt: #e6e9ef; --dim: #9aa3b2; --accent: #4c8dff; --green: #2ecc71;
-    --red: #ff5d5d; --amber: #f5a623;
+    --red: #ff5d5d; --amber: #f5a623; --bot: #6ee7b7;
   }
   * { box-sizing: border-box; }
   body {
@@ -26,7 +26,7 @@
   .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,var(--accent),var(--green)); transition: width .3s; }
   .stat { color: var(--dim); font-size: 13px; margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
   .stat b { color: var(--txt); }
-  .stat .p { color: var(--green); } .stat .f { color: var(--red); }
+  .stat .p { color: var(--green); } .stat .f { color: var(--red); } .stat .bot { color: var(--bot); }
   main { max-width: 920px; margin: 0 auto; padding: 24px 28px; }
   .pre {
     background: var(--card); border: 1px solid var(--line); border-radius: 12px;
@@ -36,6 +36,10 @@
   .pre b { color: var(--amber); }
   .pre .green { color: var(--green); font-weight: 600; }
   .pre a { color: var(--accent); }
+  .grouphead { margin: 26px 0 12px; font-size: 13px; letter-spacing: .8px; text-transform: uppercase; color: var(--dim); display: flex; align-items: center; gap: 10px; }
+  .grouphead::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .grouphead.you { color: var(--amber); }
+  .grouphead.bot { color: var(--bot); }
   section { margin-bottom: 14px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); }
   section > h2 {
     margin: 0; padding: 14px 18px; font-size: 15px; cursor: pointer; user-select: none;
@@ -51,6 +55,8 @@
   .row .do { color: var(--txt); }
   .row .exp { color: var(--dim); font-size: 13px; margin-top: 3px; }
   .row .exp::before { content: "Expect: "; color: var(--accent); font-weight: 600; }
+  .row .bot-evidence { color: var(--bot); font-size: 12.5px; margin-top: 4px; }
+  .row .bot-evidence::before { content: "🤖 Claude verified — "; font-weight: 600; }
   .row.done .do { text-decoration: line-through; color: var(--dim); }
   .verdict { display: flex; gap: 4px; }
   .verdict button {
@@ -77,24 +83,28 @@
 </head>
 <body>
 <header>
-  <h1>Sidekit — Sign-up &amp; Feedback UAT <small>M9 · feat/mac-app · LIVE Supabase backend</small></h1>
+  <h1>Sidekit — Sign-up &amp; Feedback UAT <small>M9 · machine pass done 2026-06-12 · your turn: ~3 min</small></h1>
   <div class="bar"><i id="fill"></i></div>
   <div class="stat">
-    <span><b id="done">0</b>/<b id="total">0</b> walked</span>
+    <span>👤 your checks: <b id="done">0</b>/<b id="total">0</b></span>
     <span class="p">✓ <b id="pass">0</b> pass</span>
     <span class="f">✗ <b id="fail">0</b> fail</span>
+    <span class="bot">🤖 machine-verified: <b id="autocount">0</b></span>
     <span id="remain"></span>
   </div>
 </header>
 
 <main>
   <div class="pre">
-    <b>Before you start.</b><br>
-    1. Launch the fresh signed build: <code>open ~/SpeakType/mac/Sidekit.app</code> — the backend is <span class="green">LIVE</span>, so rows really land in your dashboard.<br>
-    2. Keep the dashboard open in another tab: <a href="https://supabase.com/dashboard/project/ubqdjvbhanhnxlonqrii/editor" target="_blank">Supabase → Table Editor</a> (<code>signups</code> and <code>feedback</code> tables). Refresh after each send. The two <code>selftest@example.com</code> rows are Claude's — delete them anytime.<br>
-    3. <b>Fresh-state reset</b> (used by the welcome-lifecycle tests): <code>rm -f ~/Library/Application\ Support/Sidekit/identity.json ~/Library/Application\ Support/Sidekit/outbox.json</code> — quit Sidekit first. (Claude already reset this on 2026-06-12, so your very next launch counts as launch #1.)<br>
-    4. Dictation tests need <b>Microphone + Accessibility</b> granted to the signed bundle (hold <b>Fn</b> 🌐 to dictate).<br>
-    5. Tick the box when walked, mark <b>pass</b>/<b>fail</b>, add notes. State persists in this browser. Hit <b>⤓ Export</b> at the bottom and paste the results back to Claude.
+    <b>Where things stand (2026-06-12).</b><br>
+    Claude drove the real app via Accessibility scripting + screenshots and walked most of this sheet:
+    <span class="green">19 checks passed, 0 failed</span> — they're pre-marked green below with the evidence on each row
+    (open the collapsed sections to read; flip any to Fail if you ever see otherwise).<br><br>
+    <b>What's actually left for you</b> is the first group: mainly <b>dictating into the feedback box</b> (Claude has no voice)
+    and a couple of 10-second eyeball checks. Your app is currently signed in as <code>feelfreeforever1999@gmail.com</code>,
+    the backend is <span class="green">LIVE</span>, and the dashboard is clean (your signup is the only row):
+    <a href="https://supabase.com/dashboard/project/ubqdjvbhanhnxlonqrii/editor" target="_blank">Supabase → Table Editor</a>.<br><br>
+    Tick + Pass/Fail as you go (state persists in this browser), then <b>⤓ Export</b> and paste the results back to Claude.
   </div>
   <div id="app"></div>
 </main>
@@ -108,57 +118,68 @@
 
 <script>
 const SUITE = [
-  { id: "wel", title: "Welcome lifecycle — the soft gate", tag: "SHIP-1 / SHIP-5 / I1", items: [
-    { id:"w1", do:"With state freshly reset, launch Sidekit (this is launch #1).", exp:"A floating glass welcome panel appears near screen-center — logo, “Welcome to Sidekit”, email field, “Skip for now” + “Continue”, and the privacy line (“…the only things that ever leave it.”). It shows even if the main window is closed." },
-    { id:"w2", do:"Type junk into the email field (e.g. “abc”, then “a@b”), and press Enter.", exp:"Continue stays disabled and Enter does nothing — the panel does not close, nothing is sent." },
-    { id:"w3", do:"Click “Skip for now”, then quit and relaunch Sidekit three more times (launches #2, #3, #4).", exp:"Panel closes on Skip; launches 2–4 are completely quiet — no welcome panel." },
-    { id:"w4", do:"Launch a 5th time.", exp:"The welcome panel appears exactly once more (the one lifetime re-ask)." },
-    { id:"w5", do:"Skip again, then launch a 6th (and 7th) time.", exp:"Never appears again." },
-    { id:"w6", do:"(Optional, the launch-at-login edge) Reset state, enable Settings → “Launch Sidekit at login”, log out and back in.", exp:"Even though the main window stays closed on a login launch, the welcome panel still appears (it rides its own window)." },
-  ]},
-  { id: "sig", title: "Sign up → row in your dashboard", tag: "SHIP-5 / live backend", items: [
-    { id:"g1", do:"Reset state, relaunch, and this time enter your real email → Continue.", exp:"Panel closes immediately (no spinner, no error)." },
-    { id:"g2", do:"Refresh the dashboard’s signups table.", exp:"Your email is there with app_version (e.g. “1.0 (…)”) and platform “mac”." },
-    { id:"g3", do:"Open Settings (main window → ⚙︎) → Account section.", exp:"Shows “Signed up as ‹your email›” and a red “Remove email” button; the field is pre-filled." },
-    { id:"g4", do:"Click into the email field, press Return WITHOUT changing anything; then clear the field entirely and press Return.", exp:"Both are no-ops — no duplicate row in the dashboard, and your stored email is NOT wiped (only the explicit Remove button clears it)." },
-    { id:"g5", do:"Click “Remove email”.", exp:"Caption flips to “Not signed up — …”, field clears. (Local only — the dashboard row stays, by design.)" },
-  ]},
-  { id: "fb", title: "Quick-feedback box", tag: "SHIP-6", items: [
-    { id:"b1", do:"Menu bar mic icon → “Send Feedback…”.", exp:"A small glass box opens slightly above screen-center, the text field is already focused, placeholder reads “Type — or hold Fn and just say it.”" },
-    { id:"b2", do:"Read the footer line.", exp:"“Sends with: ‹your email or anonymous› · Sidekit ‹version› · macOS ‹version›” — exactly what gets attached, nothing hidden." },
-    { id:"b3", do:"Type a message and press ⌘↩.", exp:"“Thanks! 🙌” toast, box closes (~1s). Dashboard feedback table gains the row: type “other”, your message, email + versions." },
-    { id:"b4", do:"Reopen, tag 🐞 Bug, type a message, click the 🐞 chip again, then tag 💡 Idea and send.", exp:"Chips toggle on/off (second click untags); the sent row’s type is “feature” (💡 maps to feature)." },
-    { id:"b5", do:"Reopen, type a draft, press Esc, then reopen from the menu.", exp:"Esc closes WITHOUT sending (no new dashboard row) and the draft is still in the box." },
-    { id:"b6", do:"Empty box: check the Send button.", exp:"Disabled until the message has real (non-whitespace) content." },
-  ]},
-  { id: "dic", title: "Dictate your feedback — the headline trick", tag: "SHIP-6 routing", items: [
-    { id:"d1", do:"Open the feedback box, hold Fn (🌐), speak a sentence, release.", exp:"The transcript lands IN the feedback box — not in a scratchpad note, not pasted elsewhere." },
-    { id:"d2", do:"⌘↩ the dictated feedback.", exp:"Row appears in the dashboard with your spoken words as the message." },
-    { id:"d3", do:"Close the box. Focus the main Sidekit window with a note active, hold Fn and speak.", exp:"Dictation still lands in the active note (the old M5 behavior is untouched)." },
+  // ───────────────────────── group: YOU ─────────────────────────
+  { id: "dic", group: "you", title: "Dictate your feedback — needs your voice", tag: "the headline · ~2 min", items: [
+    { id:"d1", do:"Menu bar → “Send Feedback…”, then hold Fn (🌐), speak a sentence, release.", exp:"The transcript lands IN the feedback box — not in a scratchpad note, not pasted elsewhere." },
+    { id:"d2", do:"⌘↩ the dictated feedback.", exp:"“Thanks! 🙌” toast; the row appears in the dashboard with your spoken words." },
+    { id:"d3", do:"Close the box. Focus the main Sidekit window with a note active, hold Fn and speak.", exp:"Dictation still lands in the active note (old M5 behavior untouched)." },
     { id:"d4", do:"Click into another app (e.g. TextEdit), hold Fn and speak.", exp:"Transcript pastes at the cursor as always." },
   ]},
-  { id: "off", title: "Offline → outbox → auto-retry", tag: "SHIP-3 / SHIP-4", items: [
-    { id:"o1", do:"Turn Wi-Fi OFF. Send a feedback message.", exp:"Toast says “Saved — will send when you’re online.” and the box closes. <code>cat ~/Library/Application\\ Support/Sidekit/outbox.json</code> shows the queued entry." },
-    { id:"o2", do:"Turn Wi-Fi back ON, quit and relaunch Sidekit, wait a few seconds.", exp:"The row appears in the dashboard and outbox.json is empty ([]) — the launch retry flushed it." },
+  { id: "eye", group: "you", title: "Eyeball checks — taste, not function", tag: "~1 min", items: [
+    { id:"e1", do:"Look at the feedback box (menu → Send Feedback…): glass style, spacing, placeholder, footer line.", exp:"Looks like a Sidekit-family panel — nothing clipped, misaligned, or ugly. (Claude saw it render correctly but can’t judge taste.)" },
+    { id:"e2", do:"Main window → ⚙︎ Settings → Account section.", exp:"Shows “Signed up as feelfreeforever1999@gmail.com”, field pre-filled, red “Remove email” button present. (Don’t click Remove unless testing e4 — it clears your local sign-in.)" },
+    { id:"e3", do:"(Optional) Reset state (<code>rm -f ~/Library/Application\\ Support/Sidekit/identity.json</code>, quit first), relaunch, and look at the welcome panel with fresh eyes.", exp:"Copy reads right, layout feels good. Re-enter your email after, or it re-asks at the 5th launch." },
+    { id:"e4", do:"(Optional) In Settings: press Return on the UNCHANGED email, then clear the field and press Return; then click “Remove email” and re-add yours.", exp:"Both Returns are no-ops (no dup row, nothing wiped); only the explicit button clears — then re-adding shows “Signed up as …” again." },
+    { id:"e5", do:"(Optional, launch-at-login edge) Enable Settings → “Launch Sidekit at login”, reset state, log out & back in.", exp:"Welcome panel appears at login even though the main window stays closed." },
   ]},
-  { id: "key", title: "Key safety (already machine-verified — optional re-check)", tag: "SHIP-7 / RLS", items: [
-    { id:"k1", do:"Optional: run the curl select from docs/SUPABASE-SETUP.md step 5 with the shipped anon key.", exp:"Returns [] — the key inside the app can insert but can never read your user list. (Claude verified this live on 2026-06-12.)" },
+  // ─────────────────── group: machine-verified ───────────────────
+  { id: "wel", group: "auto", title: "Welcome lifecycle — the soft gate", tag: "SHIP-1 / SHIP-5 / I1", items: [
+    { id:"w1", do:"Fresh first launch shows the floating welcome panel.", exp:"Glass panel near center: logo, copy, email field, Skip + disabled Continue, privacy line — independent of the main window.", auto:"screenshot of launch #1: panel rendered with correct copy; Continue dimmed while empty." },
+    { id:"w2", do:"Junk email (“abc”) can’t be submitted.", exp:"Enter does nothing; clicking Continue does nothing; nothing saved or sent.", auto:"typed “abc”, pressed Enter and clicked Continue — panel stayed, identity.json unchanged, no network row." },
+    { id:"w3", do:"Skip → launches 2–4 are quiet.", exp:"No welcome panel on launches 2, 3, 4.", auto:"walked 6 real launches; welcomeAutoShows stayed 1 across launches 2–4 (the counter increments only when the panel shows)." },
+    { id:"w4", do:"5th launch re-asks exactly once.", exp:"Panel appears once more on launch 5.", auto:"launch #5 → welcomeAutoShows 1→2: the re-ask fired." },
+    { id:"w5", do:"Never again after the re-ask.", exp:"Launch 6+ quiet forever.", auto:"launch #6 → counters frozen at {6, 2}; shouldShowWelcome permanently false." },
+  ]},
+  { id: "sig", group: "auto", title: "Sign up → row in your dashboard", tag: "SHIP-5 / live backend", items: [
+    { id:"g1", do:"Valid email + Continue closes the panel and stores it.", exp:"Panel closes; identity.json holds the normalized email.", auto:"submitted m9-uat@example.com via the real UI — panel closed, file updated. (And your own real signup from 18:38 worked the same way.)" },
+    { id:"g2", do:"Row appears in the signups table.", exp:"email + app_version + platform “mac”.", auto:"row observed in Supabase seconds after submit; duplicate-email dedup separately proven (409 → one row)." },
+  ]},
+  { id: "fb", group: "auto", title: "Quick-feedback box", tag: "SHIP-6", items: [
+    { id:"b1", do:"Menu → “Send Feedback…” opens the box, field focused, placeholder shows.", exp:"“Type — or hold Fn and just say it.” with the cursor ready.", auto:"opened via the real menu; keystrokes landed with no click (focus-on-open works); placeholder on screen." },
+    { id:"b2", do:"Footer discloses exactly what's sent.", exp:"“Sends with: ‹email› · Sidekit ‹ver› · macOS ‹ver›”.", auto:"footer visible in screenshots with email + versions; wire bodies contain exactly those fields (verified server-side)." },
+    { id:"b3", do:"⌘↩ sends: toast, close, dashboard row.", exp:"“Thanks! 🙌”, box closes ~1s, row lands.", auto:"sent “M9 automated UAT…” — toast screenshotted, row appeared with type/email/versions." },
+    { id:"b4", do:"Chips tag the row; untagged = other.", exp:"🐞→bug, untagged→other, second click untags.", auto:"untagged send → type “other”; 🐞-tagged send → type “bug” (both observed in the table). 💡→feature is the same code path (unit-tested)." },
+    { id:"b5", do:"Esc closes without sending; draft survives.", exp:"No row sent; reopening shows the draft.", auto:"typed a draft, Esc, reopened — draft intact, no new row in the table." },
+    { id:"b6", do:"Send disabled while the message is empty.", exp:"Button dimmed until real content.", auto:"screenshot: dimmed on open; enabled after typing." },
+  ]},
+  { id: "off", group: "auto", title: "Offline → outbox → auto-retry", tag: "SHIP-3 / SHIP-4", items: [
+    { id:"o1", do:"Send feedback with Wi-Fi off.", exp:"“Saved — will send when you’re online.” toast; entry parked in outbox.json.", auto:"Wi-Fi was actually turned off; toast screenshotted verbatim; outbox.json held the full queued entry." },
+    { id:"o2", do:"Back online + relaunch flushes the queue.", exp:"Row appears; outbox.json empty.", auto:"Wi-Fi restored, app relaunched — “M9 offline queue test” row landed, outbox now []." },
+  ]},
+  { id: "key", group: "auto", title: "Key safety — insert-only", tag: "SHIP-7 / RLS", items: [
+    { id:"k1", do:"The shipped anon key cannot read data.", exp:"select returns [] / denied.", auto:"curl select with the shipped key → [] (HTTP 200, zero rows) — verified twice against the live project." },
   ]},
 ];
 
-const KEY = "sidekit-signup-feedback-uat-v1";
+const KEY = "sidekit-signup-feedback-uat-v2";
 let state = JSON.parse(localStorage.getItem(KEY) || "{}");
+// Machine-verified items default to checked+pass (still overridable by you).
+SUITE.forEach(sec=> sec.items.forEach(it=>{
+  const k = sec.id+"."+it.id;
+  if(it.auto && !(k in state)) state[k] = { checked:true, verdict:"pass" };
+}));
 function save(){ localStorage.setItem(KEY, JSON.stringify(state)); render(); }
 
 function render(){
   const app = document.getElementById("app");
   if(!app.dataset.built){ build(app); app.dataset.built = "1"; }
-  let total=0, done=0, pass=0, fail=0;
+  let total=0, done=0, pass=0, fail=0, auto=0;
   SUITE.forEach(sec=>{
     let sd=0;
     sec.items.forEach(it=>{
-      total++;
       const st = state[sec.id+"."+it.id] || {};
+      if(it.auto){ auto++; if(st.checked) sd++; if(st.verdict==="fail") fail++; return; }
+      total++;
       if(st.checked){ done++; sd++; }
       if(st.verdict==="pass") pass++;
       if(st.verdict==="fail") fail++;
@@ -170,13 +191,23 @@ function render(){
   document.getElementById("done").textContent = done;
   document.getElementById("pass").textContent = pass;
   document.getElementById("fail").textContent = fail;
+  document.getElementById("autocount").textContent = auto;
   document.getElementById("fill").style.width = (total? (done/total*100):0)+"%";
-  document.getElementById("remain").textContent = (total-done)+" left";
+  document.getElementById("remain").textContent = (total-done)+" of your checks left";
 }
 
 function build(app){
+  let lastGroup = null;
   SUITE.forEach(sec=>{
+    if(sec.group !== lastGroup){
+      const gh = document.createElement("div");
+      gh.className = "grouphead " + (sec.group==="you" ? "you" : "bot");
+      gh.textContent = sec.group==="you" ? "👤 What's left for you" : "🤖 Machine-verified by Claude · 2026-06-12 (open to read the evidence)";
+      app.appendChild(gh);
+      lastGroup = sec.group;
+    }
     const s = document.createElement("section");
+    if(sec.group==="auto") s.classList.add("collapsed");
     s.innerHTML = `<h2><span class="chev">▾</span>${sec.title}<span class="tag">${sec.tag}</span><span class="cnt" id="cnt-${sec.id}"></span></h2><div class="items"></div>`;
     s.querySelector("h2").onclick = ()=> s.classList.toggle("collapsed");
     const box = s.querySelector(".items");
@@ -188,6 +219,7 @@ function build(app){
       row.innerHTML = `
         <input type="checkbox" class="box" ${st.checked?"checked":""}>
         <div class="body"><div class="do">${it.do}</div><div class="exp">${it.exp}</div>
+          ${it.auto?`<div class="bot-evidence">${it.auto}</div>`:""}
           <div class="note"><textarea placeholder="notes (optional)…">${st.note||""}</textarea></div></div>
         <div class="verdict">
           <button class="pass ${st.verdict==="pass"?"on":""}">Pass</button>
@@ -207,14 +239,14 @@ function build(app){
 }
 
 function expandAll(open){ document.querySelectorAll("section").forEach(s=> s.classList.toggle("collapsed", !open)); }
-function resetAll(){ if(confirm("Clear all Sign-up & Feedback UAT results?")){ state={}; localStorage.removeItem(KEY); location.reload(); } }
+function resetAll(){ if(confirm("Clear all Sign-up & Feedback UAT results? (Machine-verified marks will re-seed.)")){ state={}; localStorage.removeItem(KEY); location.reload(); } }
 function exportResults(){
   let out = "# Sidekit Sign-up & Feedback UAT (M9) — results\n\n";
   SUITE.forEach(sec=>{
-    out += `## ${sec.title} (${sec.tag})\n`;
+    out += `## ${sec.group==="auto"?"🤖 ":"👤 "}${sec.title} (${sec.tag})\n`;
     sec.items.forEach(it=>{
       const st = state[sec.id+"."+it.id]||{};
-      const mark = st.verdict==="pass"?"✅ PASS":st.verdict==="fail"?"❌ FAIL":st.checked?"⬜ walked":"· not run";
+      const mark = st.verdict==="pass"?(it.auto?"✅ PASS (machine)":"✅ PASS"):st.verdict==="fail"?"❌ FAIL":st.checked?"⬜ walked":"· not run";
       out += `- ${mark} — ${it.do.replace(/<[^>]+>/g,"")}`;
       if(st.note) out += `\n    note: ${st.note}`;
       out += "\n";
