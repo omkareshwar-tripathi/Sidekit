@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-One-time export of grammarly/coedit-large to an fp16 ONNX zip for SpeakType's
+One-time export of grammarly/coedit-large to an fp16 ONNX zip for Sidekit's
 on-device CoEdIT Polish feature. The app downloads this zip once on first run
 (see CE-3); end users never run this script.
 

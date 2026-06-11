@@ -116,7 +116,7 @@ When writing a brick plan, a /simplify follow-up, or any multi-step task list, e
 
 ### 6. Skills for this project
 
-The installed skills below are the ones suited to SpeakType (a **C# / .NET Windows desktop** app). Use them per §5 — name the relevant one on each plan step's `Skill:` line.
+The installed skills below are the ones suited to Sidekit (a **C# / .NET Windows desktop** app). Use them per §5 — name the relevant one on each plan step's `Skill:` line.
 
 **Domain (C#/.NET) — use these for the actual app:**
 

@@ -135,6 +135,7 @@ that make sense to share.
 
 - `vision/` *(this folder)* — the Sidekit north star and per-capability intent. Evolves as we learn.
 - `vision/ROADMAP.md` — the build order (launch first, then the horizon) and the risk spikes that gate it.
+- `vision/WEBSITE-BRIEF.md` — the single source of truth for the marketing site (sidekit.app): pitch, features, tech story, visual identity, and messaging pillars.
 - `vision/text-correction-pipeline.md` — the shared Whisper→SymSpell→CNN-BiLSTM→GECToR spec.
 - `vision/scratchpad-and-polish.md` — the on-device Polish + (future) Drafting intelligence.
 - `vision/pillars/` — one file per capability (kept under the old "pillar" filenames; re-bracketed here).
