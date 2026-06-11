@@ -27,7 +27,8 @@ building or operating any auth system or server.
 | 2 | **No OAuth / no auth** | "Sign in with Google" is **deliberately cut** — it is auth infrastructure. A plain email field, format-checked only. No verification, no password, no account object in the app. |
 | 3 | **Backend** | **Supabase free tier.** Two tables (`signups`, `feedback`), written via the REST endpoint with the public **anon key**, locked to **insert-only** by row-level security. No server of our own. |
 | 4 | **Comms back to users** | **Email list only.** Export emails from the Supabase dashboard; replies/updates go from the developer's own inbox. Nothing extra in the app (no announcements feed, no community link). |
-| 5 | **Privacy posture** | These two endpoints are the **only** network calls in the app, both user-initiated and fully visible. The welcome sheet and feedback form say exactly what is sent. |
+| 5 | **Privacy posture** | These two endpoints are the **only** network calls in the app, both user-initiated and fully visible. The welcome sheet and feedback box say exactly what is sent. |
+| 6 | **Feedback speed** | **One box, dictation-first** (revised 2026-06-11). No form: a single text box, optional 🐞/💡 chips, **⌘↩ sends**. Users can hold **Fn and speak** their feedback — Sidekit's own dictation fills the box. Entry point: menu-bar item only. |
 
 **Non-goals (v1).**
 - No accounts, sessions, log-in state, or "Sign in with Google/Apple".
@@ -62,19 +63,28 @@ feedback you choose to send — are the only things that ever leave it."*
 
 ---
 
-## 3. Feedback UX (the "Send Feedback…" form)
+## 3. Feedback UX (the quick-feedback box)
 
-A **"Send Feedback…"** item in the menu-bar menu opens a small form (sheet over the main window, or
-its own little window if the main window is closed):
+Feedback is a **5-second action, not a form**. A **"Send Feedback…"** item in the menu-bar menu
+opens a small floating box (its own little always-on-top window in the family glass style — Sidekit
+is menu-bar-centric, so it never depends on the main window being open), with the text field already
+focused:
 
-- **Type** — segmented picker: `Bug` / `Feature request` / `Other`.
-- **Message** — multiline text, required (non-empty after trimming), client-capped at 4 000 chars.
-- **Email** — optional; pre-filled from the stored sign-up email, editable per-submission.
-- **Auto-attached, shown in a footer line** — app version + macOS version
-  (e.g. *"Will include: Sidekit 1.0 (12) · macOS 15.5"*). Nothing else is collected.
+- **One text box** — required (non-empty after trimming), client-capped at 4 000 chars. Placeholder:
+  *"Type — or hold Fn and just say it."*
+- **Dictation-first** — because Sidekit's dictation pastes at the cursor and the box is a focused
+  text field, **hold Fn → speak → release** fills the box with the transcript. No new audio code;
+  the box deliberately does **not** auto-listen on open (same Fn muscle memory as everywhere else,
+  no surprise hot mic).
+- **Optional chips** — two one-click toggles, 🐞 Bug / 💡 Idea. Untagged submissions land as
+  `other`. Nobody is forced to categorize.
+- **Email** — attached automatically from the stored sign-up email (no field); a tiny footer line
+  shows everything that will be sent: *"Sends with: you@example.com · Sidekit 1.0 (12) ·
+  macOS 15.5"*. If no email is stored, that part simply reads "anonymous".
+- **⌘↩ sends** (button too). The box vanishes with a brief "Thanks!" toast (or "Saved — will send
+  when you're online", see §6). Esc closes without sending.
 
-**Send** queues a `feedback` submission and closes with a brief "Thanks — sent!" (or "Saved — will
-send when you're online", see §6). No screenshots, logs, or attachments in v1.
+No screenshots, logs, or attachments in v1.
 
 ---
 
@@ -145,8 +155,9 @@ existing `SidekitCore` / `SidekitApp` split:
   "keep queued". ~10 s timeout.
 - JSON persistence adapters for identity + spool (mirroring `JSONShelfStore` / `JSONHistoryStore`).
 
-**UI (`SidekitApp`):** `WelcomeSheet`, `FeedbackView`, the menu item, and the Settings email field —
-all thin, calling into `IdentityStore` / `SubmissionSpool`.
+**UI (`SidekitApp`):** `WelcomeSheet`, `FeedbackBox` (the small floating window — an ordinary
+focused text field, which is what makes Fn-dictation work for free), the menu item, and the Settings
+email field — all thin, calling into `IdentityStore` / `SubmissionSpool`.
 
 ---
 
@@ -171,7 +182,8 @@ all thin, calling into `IdentityStore` / `SubmissionSpool`.
 - **Adapter:** manual verification against the real Supabase project (insert lands in dashboard),
   plus a `curl` smoke test documented in the setup notes.
 - **Manual pass:** new `M9` item in `TESTING.md` — fresh-container first launch shows sheet; skip →
-  no sheet until 5th launch; sign up → row appears in dashboard; send feedback offline → queued →
+  no sheet until 5th launch; sign up → row appears in dashboard; open feedback box, **hold Fn and
+  dictate** → transcript lands in the box → ⌘↩ → row in dashboard; send feedback offline → queued →
   appears after relaunch online; verify anon key cannot `select` (curl returns error).
 
 ## 8. What the developer does once (~20 min, walked through)
