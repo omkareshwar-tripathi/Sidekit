@@ -108,6 +108,8 @@ private struct MenuContent: View {
         Button("Open Sidekit") { openWindow(id: MainWindow.id) }
         Divider()
         Text(controller.statusText)
+        Divider()
+        Button("Send Feedback…") { controller.showFeedbackBox() }
         if !controller.accessibilityTrusted {
             Divider()
             Text("⚠︎ Grant Accessibility to paste & use Fn")
@@ -155,6 +157,7 @@ final class AppController: ObservableObject {
     private let coordinator: DictationCoordinator
     private let hotkey: FnKeyMonitor
     private var pill: PillPanel?
+    private var feedbackBox: FeedbackBox?
     private var shelfPanel: ShelfPanel?
     private var shelfStatusItem: ShelfStatusItem?
     private var shelfDragMonitor: ShelfDragStartMonitor?
@@ -179,6 +182,10 @@ final class AppController: ObservableObject {
                                     log: { Diag.log($0) })
         let identity = IdentityModel(store: identityStore, spool: spool)
 
+        // Created before the RoutingSink: when the feedback box is the key window,
+        // dictation routes into it instead of the notes (spec §3, dictation-first).
+        let feedbackBox = FeedbackBox(identity: identity, spool: spool)
+
         // Route the cleaned transcript: into the active note when Sidekit is the focused app
         // (creating one if the list is empty), otherwise paste at the cursor as before (spec §3).
         // The sink's `deliver` is invoked on the main actor by the coordinator, so the AppKit /
@@ -187,8 +194,14 @@ final class AppController: ObservableObject {
             isAppFocused: { MainActor.assumeIsolated { NSApp.isActive } },
             appendToNote: { text in
                 MainActor.assumeIsolated {
-                    let id = notes.activeID ?? notes.newNote().id
-                    notes.append(text, to: id)
+                    // Spec §3 (2026-06-11): the feedback box outranks the notes while
+                    // it's the key window — "hold Fn and just say it".
+                    if feedbackBox.isKey {
+                        feedbackBox.model.appendDictated(text)
+                    } else {
+                        let id = notes.activeID ?? notes.newNote().id
+                        notes.append(text, to: id)
+                    }
                 }
             },
             pasteSink: PasteSink(paste: paste))
@@ -218,6 +231,7 @@ final class AppController: ObservableObject {
         self.shelf = shelf
         self.identity = identity
         self.spool = spool
+        self.feedbackBox = feedbackBox
         self.coordinator = coordinator
         self.hotkey = hotkey
 
@@ -337,6 +351,8 @@ final class AppController: ObservableObject {
         NSWorkspace.shared.open(url)
         accessibilityTrusted = AXIsProcessTrusted()
     }
+
+    func showFeedbackBox() { feedbackBox?.show() }
 
     /// Loads the bundled menu-bar template glyph (`Resources/MenuBarIcon.pdf`), sized for the menu
     /// bar and marked as a template so macOS tints it for light/dark. nil if absent (un-bundled run).
