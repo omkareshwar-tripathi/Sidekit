@@ -5,6 +5,8 @@ import Foundation
 /// dot-files, our own payload copies (a shelved screenshot keeps the screenshot attribute —
 /// admitting it would loop copy → detect → copy), and recently-seen paths (each screenshot
 /// lands exactly once). The recent list is a small FIFO so memory stays bounded.
+/// The payload-root prefix is the *sole* loop guard — the FIFO can't stop a copy loop, because
+/// every copied payload gets a fresh `<uuid>/` path the FIFO has never seen.
 public struct ScreenshotGate: Sendable {
     private let payloadRootPrefix: String
     private let capacity: Int
