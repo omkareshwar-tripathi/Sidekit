@@ -35,6 +35,14 @@ struct RemoteSubmissionTests {
         let max = String(repeating: "x", count: RemoteSubmission.feedbackMessageLimit)
         #expect(RemoteSubmission.validateFeedbackMessage(max) == max)             // exactly at cap
         #expect(RemoteSubmission.validateFeedbackMessage(max + "x") == nil)       // over cap
+
+        // Cap counts code points (Postgres char_length), not graphemes: 👨‍👩‍👧 is 1 grapheme
+        // but 5 code points, so 3999 x's + the emoji (4004 points) must fail …
+        let emoji = "👨‍👩‍👧"
+        #expect(RemoteSubmission.validateFeedbackMessage(String(repeating: "x", count: 3999) + emoji) == nil)
+        // … while 3995 x's + the emoji (4000 points) passes.
+        let exactly = String(repeating: "x", count: 3995) + emoji
+        #expect(RemoteSubmission.validateFeedbackMessage(exactly) == exactly)
     }
 
     @Test func submissionsAreCodableForTheSpool() throws {

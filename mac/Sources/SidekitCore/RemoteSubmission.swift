@@ -9,6 +9,7 @@ public enum FeedbackKind: String, Sendable, Equatable, Codable {
 /// One outbound write — the only data Sidekit ever sends anywhere (spec §1 decision 5).
 /// Knows its target table and its exact JSON body, so the network adapter stays a dumb pipe
 /// and the wire format is unit-tested here. Codable so the spool can persist it.
+/// (The synthesized case/label names are the persisted outbox format — don't rename them.)
 public enum RemoteSubmission: Sendable, Equatable, Codable {
     case signup(email: String, appVersion: String)
     case feedback(kind: FeedbackKind, message: String, email: String?,
@@ -18,9 +19,11 @@ public enum RemoteSubmission: Sendable, Equatable, Codable {
     public static let feedbackMessageLimit = 4000
 
     /// Trimmed message if sendable (non-blank, within the cap), else nil.
+    /// Counts unicode scalars to match Postgres `char_length` (code points), so a
+    /// client-approved message can never trip the server's check constraint.
     public static func validateFeedbackMessage(_ raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed.count <= feedbackMessageLimit else { return nil }
+        guard !trimmed.isEmpty, trimmed.unicodeScalars.count <= feedbackMessageLimit else { return nil }
         return trimmed
     }
 
