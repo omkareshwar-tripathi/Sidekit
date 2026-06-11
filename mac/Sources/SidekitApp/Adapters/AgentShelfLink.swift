@@ -1,5 +1,4 @@
 import Foundation
-import SidekitCore
 
 /// Launch-time keeper of the agent-facing path: `~/.sidekit/shelf` → the real payload folder
 /// (spec 2026-06-12 §2.1). Returns the path to advertise in the copy-instructions prompt — the
