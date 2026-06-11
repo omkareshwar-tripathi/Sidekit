@@ -1,0 +1,140 @@
+import SwiftUI
+import SidekitCore
+
+/// The scratchpad window (spec §2.3, layout B): a sidebar of saved notes on the left, a plain-text
+/// editor for the selected note on the right. Reads/writes `NotesModel`; the same glass aesthetic
+/// as the pill. Settings + delete arrive in UI-10.
+struct MainWindow: View {
+    static let id = "main"
+
+    @ObservedObject var notes: NotesModel
+    let history: HistoryModel
+    let settings: SettingsModel
+    /// Passed through to the settings sheet (shelf TTL + store-size readout).
+    let shelf: ShelfModel
+
+    @State private var showSettings = false
+    @State private var showHistory = false
+
+    var body: some View {
+        NavigationSplitView {
+            sidebar
+        } detail: {
+            editor
+                .id(notes.activeID)                       // new identity per note → cross-fade
+                .transition(.opacity)
+        }
+        .animation(.easeInOut(duration: 0.2), value: notes.activeID)
+        .frame(minWidth: 640, minHeight: 420)
+        // Toolbar lives on the split view (not the sidebar) so New note / History / Settings stay
+        // visible even when the sidebar is collapsed.
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { notes.newNote() } label: { Label("New note", systemImage: "square.and.pencil") }
+                Button { showHistory = true } label: { Label("History", systemImage: "clock.arrow.circlepath") }
+                Button { showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+            }
+        }
+        .sheet(isPresented: $showSettings) { SettingsView(model: settings, shelf: shelf) }
+        .sheet(isPresented: $showHistory) { HistoryView(history: history) }
+        // Brand the window to match the icon/pill: dark frosted-glass surface with purple accents
+        // (selection, buttons, controls — and the sheets inherit the tint). Layout is unchanged so
+        // long notes stay readable (no gradient behind text).
+        .tint(DS.Palette.accent)
+        .preferredColorScheme(.dark)
+    }
+
+    // MARK: - Sidebar
+
+    private var sidebar: some View {
+        List(selection: selection) {
+            ForEach(notes.notes) { note in
+                NoteRow(note: note)
+                    .tag(note.id)
+                    .contextMenu {
+                        Button("Delete", role: .destructive) { notes.delete(note.id) }
+                    }
+            }
+        }
+        // Animate inserts/deletes and the newest-first reorder — a dictated note gliding to the
+        // top is the gentle "transcript landed" cue at the list level.
+        .animation(.easeInOut(duration: 0.25), value: notes.notes.map(\.id))
+        .overlay {
+            if notes.notes.isEmpty {
+                ContentUnavailableView {
+                    VStack(spacing: DS.Space.sm) {
+                        EqualizerMark(height: 44)
+                        Text("No notes yet")
+                    }
+                } description: {
+                    Text("Dictate with Fn while this window is focused, or create a note to start.")
+                } actions: {
+                    Button("New note") { notes.newNote() }
+                }
+            }
+        }
+        .navigationTitle("Notes")
+    }
+
+    private var selection: Binding<Note.ID?> {
+        Binding(get: { notes.activeID }, set: { if let id = $0 { notes.select(id) } })
+    }
+
+    // MARK: - Editor
+
+    @ViewBuilder private var editor: some View {
+        if let id = notes.activeID {
+            TextEditor(text: body(of: id))
+                .font(DS.Typography.body)
+                .scrollContentBackground(.hidden)
+                .background(.ultraThinMaterial)
+                .padding(DS.Space.lg)
+        } else {
+            ContentUnavailableView {
+                VStack(spacing: DS.Space.sm) {
+                    EqualizerMark(height: 44)
+                    Text("No note selected")
+                }
+            } description: {
+                Text("Create a note to start writing.")
+            }
+        }
+    }
+
+    /// Two-way binding from the editor to the active note's body. Writes go through `NotesModel`,
+    /// which bumps `updatedAt`, re-sorts, and (debounced) persists.
+    private func body(of id: Note.ID) -> Binding<String> {
+        Binding(
+            get: { notes.notes.first { $0.id == id }?.body ?? "" },
+            set: { notes.setBody($0, for: id) })
+    }
+}
+
+/// One row in the sidebar: title (first non-empty line, or "New note"), a preview line, and the
+/// relative edit time.
+private struct NoteRow: View {
+    let note: Note
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.xs) {
+            Text(note.title.isEmpty ? "New note" : note.title)
+                .font(DS.Typography.body)
+                .lineLimit(1)
+            HStack {
+                Text(preview)
+                    .lineLimit(1)
+                Spacer()
+                Text(note.updatedAt, format: .relative(presentation: .named))
+            }
+            .font(DS.Typography.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, DS.Space.xs)
+    }
+
+    /// The first body line after the title line, or a placeholder when the note is otherwise empty.
+    private var preview: String {
+        let lines = note.body.split(separator: "\n", omittingEmptySubsequences: true)
+        return lines.count > 1 ? String(lines[1]) : (note.title.isEmpty ? "No additional text" : " ")
+    }
+}
