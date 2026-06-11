@@ -12,9 +12,12 @@ struct MainWindow: View {
     let settings: SettingsModel
     /// Passed through to the settings sheet (shelf TTL + store-size readout).
     let shelf: ShelfModel
+    /// Sign-up identity — drives the one-time welcome sheet and the settings email field.
+    @ObservedObject var identity: IdentityModel
 
     @State private var showSettings = false
     @State private var showHistory = false
+    @State private var showWelcome = false
 
     var body: some View {
         NavigationSplitView {
@@ -35,8 +38,16 @@ struct MainWindow: View {
                 Button { showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
             }
         }
-        .sheet(isPresented: $showSettings) { SettingsView(model: settings, shelf: shelf) }
+        .sheet(isPresented: $showSettings) { SettingsView(model: settings, shelf: shelf, identity: identity) }
         .sheet(isPresented: $showHistory) { HistoryView(history: history) }
+        .onAppear {
+            // Soft gate (spec §2): the store says whether this is one of the ≤2 auto-shows.
+            if identity.shouldShowWelcome {
+                identity.welcomeShown()
+                showWelcome = true
+            }
+        }
+        .sheet(isPresented: $showWelcome) { WelcomeSheet(identity: identity) }
         // Brand the window to match the icon/pill: dark frosted-glass surface with purple accents
         // (selection, buttons, controls — and the sheets inherit the tint). Layout is unchanged so
         // long notes stay readable (no gradient behind text).

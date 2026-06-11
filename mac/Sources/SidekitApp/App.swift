@@ -4,6 +4,7 @@ import AVFoundation
 import ApplicationServices
 import ServiceManagement
 import SidekitCore
+import SidekitNet
 
 /// Posted when the app should bring its main window forward — on launch and whenever the user
 /// re-activates the app (clicks it in Launchpad / Finder / Dock). `MenuBarLabel` (always alive in
@@ -46,7 +47,8 @@ struct SidekitApp: App {
         // app to a Dock-present `.regular` app, closing it returns to the menu-bar-only utility.
         Window("Sidekit", id: MainWindow.id) {
             MainWindow(notes: controller.notes, history: controller.history,
-                       settings: controller.settings, shelf: controller.shelf)
+                       settings: controller.settings, shelf: controller.shelf,
+                       identity: controller.identity)
                 .onAppear { AppController.setWindowMode(true) }
                 .onDisappear { AppController.setWindowMode(false) }
         }
@@ -142,6 +144,10 @@ final class AppController: ObservableObject {
     let settings: SettingsModel
     /// The Shelf (observable wrapper over the pure store). Surfaced to the summoned `ShelfPanel`.
     let shelf: ShelfModel
+    /// Sign-up identity (observable wrapper). Drives the welcome sheet + settings field.
+    let identity: IdentityModel
+    /// The persistent outbox for sign-up/feedback writes (spec §5).
+    let spool: SubmissionSpool
     /// Custom menu-bar glyph (mic + waveform) shown in the idle state. nil when running un-bundled
     /// (plain `swift run`) — the label then falls back to the "mic" SF Symbol.
     let menuBarIcon: NSImage? = AppController.loadMenuBarIcon()
@@ -163,6 +169,15 @@ final class AppController: ObservableObject {
         let notes = NotesModel()
         let history = HistoryModel()
         let shelf = ShelfModel()
+
+        // Identity + outbox (sign-up & feedback, spec 2026-06-11). recordLaunch() advances
+        // the soft-gate counter before the window reads shouldShowWelcome.
+        let identityStore = IdentityStore(persistence: JSONIdentityStore())
+        identityStore.recordLaunch()
+        let spool = SubmissionSpool(persistence: JSONSpoolStore(),
+                                    sender: SupabaseSubmissionSender(),
+                                    log: { Diag.log($0) })
+        let identity = IdentityModel(store: identityStore, spool: spool)
 
         // Route the cleaned transcript: into the active note when Sidekit is the focused app
         // (creating one if the list is empty), otherwise paste at the cursor as before (spec §3).
@@ -201,6 +216,8 @@ final class AppController: ObservableObject {
         self.history = history
         self.settings = settings
         self.shelf = shelf
+        self.identity = identity
+        self.spool = spool
         self.coordinator = coordinator
         self.hotkey = hotkey
 
@@ -277,6 +294,9 @@ final class AppController: ObservableObject {
                 self?.shelf.prune()
             }
         }
+
+        // Flush anything queued while offline last session (spec §6).
+        Task { await spool.retryAll() }
     }
 
     var iconName: String {

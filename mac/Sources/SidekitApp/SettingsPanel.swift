@@ -78,11 +78,28 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     /// The live shelf — drives the store-size readout and Clear all (observed so the size updates).
     @ObservedObject var shelf: ShelfModel
+    /// Sign-up email (spec §2: also editable here, any time).
+    @ObservedObject var identity: IdentityModel
+    @State private var emailDraft = ""
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Account") {
+                    TextField("you@example.com", text: $emailDraft)
+                        .onSubmit {
+                            if emailDraft.trimmingCharacters(in: .whitespaces).isEmpty {
+                                identity.clearEmail()
+                            } else {
+                                identity.submitEmail(emailDraft)
+                            }
+                        }
+                    Text(identity.email.map { "Signed up as \($0)" }
+                         ?? "Not signed up — add an email to get updates & support.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Section("Dictation") {
                     Toggle("Remove filler words (um, uh, …)", isOn: $model.fillerRemoval)
                 }
@@ -122,7 +139,7 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
-            .onAppear { model.refreshPermissions() }
+            .onAppear { model.refreshPermissions(); emailDraft = identity.email ?? "" }
         }
         .frame(width: 400, height: 460)
     }
