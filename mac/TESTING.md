@@ -21,7 +21,7 @@ cd mac
 open Sidekit.app
 ```
 
-- Automated baseline (optional, fast): `swift test` → expect **60 tests passed**.
+- Automated baseline (optional, fast): `swift test` → expect **140 tests passed**.
 - This is a **self-signed local dev** build. On first open, if macOS Gatekeeper blocks it
   ("unidentified developer"), right-click the app → **Open**, or approve it in
   **System Settings → Privacy & Security**. Expected for a dev build — not a bug.
@@ -159,6 +159,31 @@ that is **not** Sidekit).
 
 ---
 
+## 9. Sign-up & feedback  _(spec 2026-06-11 — the app's only network feature)_
+
+Reset first: `rm -f ~/Library/Application\ Support/Sidekit/identity.json ~/Library/Application\ Support/Sidekit/outbox.json`
+
+- [ ] **First launch:** welcome sheet appears over the main window (logo, email field,
+      Skip / Continue). **Skip** → sheet gone; quit & relaunch (launches 2–4) → **no sheet**;
+      5th launch → sheet appears **once more**; after that, never again.
+- [ ] **Sign up:** enter an email → Continue. Row appears in the Supabase `signups` table
+      (needs `docs/SUPABASE-SETUP.md` done). Settings → Account shows "Signed up as …".
+- [ ] **Quick feedback:** menu bar → **Send Feedback…** → box opens centered, field focused.
+      **Hold Fn and dictate** → transcript lands in the box (not in a note). ⌘↩ → "Thanks!"
+      toast → row in the `feedback` table with type/email/versions.
+- [ ] **Esc** closes without sending; reopening keeps the draft. Chips 🐞/💡 toggle; untagged
+      sends as `other`.
+- [ ] **Offline:** disconnect Wi-Fi → send feedback → toast says "Saved — will send when
+      you're online" and the entry sits in `outbox.json`. Reconnect → relaunch → row appears
+      and `outbox.json` is empty.
+- [ ] **Routing regression (M5):** with the box closed and the main window focused,
+      dictation still lands in the active note; with Sidekit unfocused it still pastes at
+      the cursor.
+- [ ] **Key safety:** the curl `select` from `SUPABASE-SETUP.md` step 5 returns an error —
+      the shipped key cannot read data.
+
+---
+
 ## Sign-off
 
 Fill this in as you go — it's the record of a pass.
@@ -173,6 +198,7 @@ Fill this in as you go — it's the record of a pass.
 | 6  | Settings sheet                        |                |       |
 | 7  | Menu bar & lifecycle                  |                |       |
 | 8  | Reduced motion (optional)             |                |       |
+| 9  | Sign-up & feedback                    |                |       |
 
 **Tester:** ____________  **Date:** ____________  **Build:** `build-app.sh release` @ commit ________
 

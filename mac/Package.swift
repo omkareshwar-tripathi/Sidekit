@@ -35,5 +35,12 @@ let package = Package(
             name: "ModelSelftest",
             dependencies: [.product(name: "WhisperKit", package: "WhisperKit")]
         ),
+        // Dev tool: verify the Supabase sender headlessly against a real project or a
+        // local stand-in. Usage:
+        //   SIDEKIT_SUPABASE_URL=… SIDEKIT_SUPABASE_KEY=… swift run SubmissionSelftest
+        .executableTarget(
+            name: "SubmissionSelftest",
+            dependencies: ["SidekitCore", "SidekitNet"]
+        ),
     ]
 )
