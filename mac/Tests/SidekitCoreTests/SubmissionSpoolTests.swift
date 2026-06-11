@@ -45,7 +45,10 @@ struct SubmissionSpoolTests {
     }
 
     @Test func rejectedEntryIsDroppedAfterThreeStrikes() async {
-        let (spool, _, sender) = makeSUT()
+        let persistence = FakeSpoolPersistence()
+        let sender = FakeSender()
+        var logged: [String] = []
+        let spool = SubmissionSpool(persistence: persistence, sender: sender) { logged.append($0) }
         sender.results = [.rejected]
         _ = await spool.enqueue(bug)               // strike 1
         #expect(spool.pending.first?.rejections == 1)
@@ -55,6 +58,7 @@ struct SubmissionSpoolTests {
         sender.results = [.rejected]
         await spool.retryAll()                     // strike 3 — dropped (poison payload)
         #expect(spool.pending.isEmpty)
+        #expect(logged.count == 1)                 // the drop is not silent (spec §6)
     }
 
     @Test func capacityDropsTheOldestEntry() async {

@@ -46,14 +46,19 @@ public final class SubmissionSpool {
     public private(set) var pending: [SpooledSubmission]
     private let persistence: SpoolPersisting
     private let sender: SubmissionSending
+    /// Sink for rare diagnostics (the poison drop). The app wires this to `Diag.log`;
+    /// the default is silent. Main-actor because the spool only calls it from its walk.
+    private let log: @MainActor (String) -> Void
     /// The one in-flight queue walk, if any. Entries enqueued during a walk land behind
     /// its cursor and are processed by that same walk; `flush()` awaits it, so callers
     /// always observe their entry's real disposition (drives an honest toast).
     private var flushTask: Task<Void, Never>?
 
-    public init(persistence: SpoolPersisting, sender: SubmissionSending) {
+    public init(persistence: SpoolPersisting, sender: SubmissionSending,
+                log: @escaping @MainActor (String) -> Void = { _ in }) {
         self.persistence = persistence
         self.sender = sender
+        self.log = log
         self.pending = persistence.load()
     }
 
@@ -103,6 +108,7 @@ public final class SubmissionSpool {
                 if let i = pending.firstIndex(where: { $0.id == entry.id }) {
                     pending[i].rejections += 1
                     if pending[i].rejections >= Self.maxRejections {
+                        log("spool: dropping \(entry.submission.table) entry after \(Self.maxRejections) rejections (spec §6 poison rule)")
                         pending.remove(at: i)
                     } else {
                         index = i + 1

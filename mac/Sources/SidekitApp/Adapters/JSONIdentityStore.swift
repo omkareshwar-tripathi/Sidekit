@@ -14,7 +14,11 @@ final class JSONIdentityStore: IdentityPersisting, @unchecked Sendable {
             Diag.log("identity: could not read \(url.lastPathComponent)")
             return IdentityState()
         }
-        return IdentityCodec.decode(data)
+        let state = IdentityCodec.decode(data)
+        if state == IdentityState() && !data.isEmpty {
+            Diag.log("identity: \(url.lastPathComponent) empty/corrupt — starting fresh")
+        }
+        return state
     }
 
     func save(_ state: IdentityState) {

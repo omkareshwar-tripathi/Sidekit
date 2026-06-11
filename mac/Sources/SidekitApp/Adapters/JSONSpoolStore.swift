@@ -14,7 +14,11 @@ final class JSONSpoolStore: SpoolPersisting, @unchecked Sendable {
             Diag.log("outbox: could not read \(url.lastPathComponent)")
             return []
         }
-        return SpoolCodec.decode(data)
+        let entries = SpoolCodec.decode(data)
+        if entries.isEmpty && !data.isEmpty {
+            Diag.log("outbox: \(url.lastPathComponent) empty/corrupt — starting fresh")
+        }
+        return entries
     }
 
     func save(_ entries: [SpooledSubmission]) {

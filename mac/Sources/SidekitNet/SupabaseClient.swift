@@ -47,6 +47,8 @@ public struct SupabaseSubmissionSender: SubmissionSending {
                 return .sent
             case 409 where submission.table == "signups":
                 return .sent // duplicate email — already on the list, goal met (spec §4)
+            case 408, 429:
+                return .retryable // timeout / rate-limit — transient, keep queued
             case 400..<500:
                 return .rejected
             default:
