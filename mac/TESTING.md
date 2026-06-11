@@ -1,7 +1,7 @@
 # TESTING.md (Mac)
 
 Manual test plan for the **Sidekit Mac app** (the native Swift fork on `feat/mac-app`).
-The pure logic is covered by `swift test` (60 automated tests); this file covers everything
+The pure logic is covered by `swift test` (140 automated tests); this file covers everything
 that only a human in front of a running Mac can verify — the floating pill, the Fn hotkey,
 real audio, paste, the scratchpad window, settings, permissions, and app lifecycle.
 
