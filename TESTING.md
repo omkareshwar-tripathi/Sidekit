@@ -1,6 +1,6 @@
 # TESTING.md
 
-Test plan for SpeakType v1. Derived from `SpeakType-v1-spec.md`.
+Test plan for Sidekit's Windows dictation app (v1). Derived from `Sidekit-v1-spec.md`.
 
 Two layers:
 

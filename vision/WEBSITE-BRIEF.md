@@ -149,10 +149,9 @@ local API vs. MCP-style — is still open. The Mirror stays human-only.)
 
 ## 11. Watch-outs for whoever builds the site
 
-- The repo's root `README.md` still describes the **old** standalone Windows "SpeakType" product
-  (Right-Ctrl hotkey, single `.exe`). That's **legacy framing** — the current product is **Sidekit**, and
-  the Mac app already rebranded to present as "Sidekit" (commit `b6b5dc3`). Don't pull hero copy from
-  that README.
+- The repo's root `README.md` now describes **Sidekit** as the product (with SpeakType/Shelf/Mirror as
+  features), and points to the per-OS apps in `mac/` and `windows/`. It's developer-facing setup copy,
+  though — accurate for framing, but don't pull marketing hero copy straight from it.
 - A few facts are deliberately **unresolved** in the vision docs (exact shelf retention rule, the agent
   mechanism, what syncs the devices). Keep the site's language on those aspirational/vague rather than
   claiming specifics.
