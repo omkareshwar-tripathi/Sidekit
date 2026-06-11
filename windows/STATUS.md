@@ -1,6 +1,6 @@
 # Windows app — STATUS (parked)
 
-**State: dormant / parked.** We are building the **Mac app first** (`SpeakTypeMac/`), to a meaningful slice of the vision. The Windows app resumes **after the Mac app launches** — then we replicate the polished Mac experience here and bring it to parity.
+**State: dormant / parked.** We are building the **Mac app first** (`mac/`), to a meaningful slice of the vision. The Windows app resumes **after the Mac app launches** — then we replicate the polished Mac experience here and bring it to parity.
 
 > ⚠️ **The files in this `windows/` folder are a pre-split BASELINE** of the C#/.NET app — the copy that happened to live on the `feat/mac-app` branch. **It is not the latest Windows work.** When you resume Windows, start from the branches below, not from this baseline.
 
@@ -18,7 +18,7 @@ These branches are pushed to `origin` and are safe; nothing here is lost.
 ## Resume plan (after Mac launch)
 
 1. Start from `main` consolidated with `chore/windows-folder` (windows/ layout) + `feat/correction-pipeline` (correction work).
-2. **Replicate the Mac UX to parity** — floating pill, scratchpad/notes, dictation **History trail**, settings sheet, push-to-talk, and the **honest paste status** ("Copied to clipboard" when no editable field is focused). See `SpeakTypeMac/` for the reference behavior and `BRICKS.md` for the brick history.
+2. **Replicate the Mac UX to parity** — floating pill, scratchpad/notes, dictation **History trail**, settings sheet, push-to-talk, and the **honest paste status** ("Copied to clipboard" when no editable field is focused). See `mac/` for the reference behavior and `BRICKS.md` for the brick history.
 3. Continue the text-correction pipeline beyond SymSpell (→ CNN-BiLSTM punctuation/casing → GECToR grammar), per `vision/text-correction-pipeline.md`.
 4. Consolidate everything onto `main` once Windows reaches the target slice.
 

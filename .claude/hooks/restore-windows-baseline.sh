@@ -1,7 +1,7 @@
 #!/bin/bash
 # SessionStart + Stop hook — auto-heal the parked windows/ baseline.
 #
-# The pre-split .NET baseline (windows/SpeakType.App) kept getting deleted from
+# The pre-split .NET baseline (windows/Sidekit.App) kept getting deleted from
 # the WORKTREE during manual Shelf drag-testing on the Mac — a Finder-side move
 # during a drag gesture, never a commit (investigated 2026-06-10, see the
 # BRICKS.md "windows/ phantom deletions" note). On this branch the baseline is
@@ -17,7 +17,7 @@ PROJ="${CLAUDE_PROJECT_DIR:-$PWD}"
 [ -d "$PROJ/.git" ] || exit 0
 cd "$PROJ" || exit 0
 
-WIN_BASE="windows/SpeakType.App"
+WIN_BASE="windows/Sidekit.App"
 
 # Tracked at all? (If the baseline is ever properly removed/moved, do nothing.)
 git ls-files --error-unmatch "$WIN_BASE" >/dev/null 2>&1 || exit 0
