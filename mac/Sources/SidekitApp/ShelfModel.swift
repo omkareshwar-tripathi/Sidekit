@@ -12,6 +12,8 @@ final class ShelfModel: ObservableObject {
     /// The same payload store the `ShelfStore` deletes through — held here too so drag-in can copy
     /// bytes off the main actor (see `ingest`). `nonisolated`/`Sendable`, so safe to touch off-main.
     private let payloadStore: ShelfPayloadStore
+    /// Set by the production init — lets retention changes refresh the manifest's `expiresAt`.
+    private var manifestStore: AgentManifestShelfStore?
 
     init(store: ShelfStore, payloadStore: ShelfPayloadStore = NoopShelfPayloadStore()) {
         self.store = store
@@ -20,10 +22,15 @@ final class ShelfModel: ObservableObject {
     }
 
     /// Production store backed by the JSON index file (`shelf.json`) + the filesystem payload store
-    /// (one instance copies bytes in on drop and deletes them on remove / clear / expire).
+    /// (one instance copies bytes in on drop and deletes them on remove / clear / expire). Wraps
+    /// persistence in `AgentManifestShelfStore` so `manifest.json` and `AGENTS.md` stay in sync.
     convenience init() {
         let payloads = FileSystemShelfPayloadStore()
-        self.init(store: ShelfStore(persistence: JSONShelfStore(), payloads: payloads), payloadStore: payloads)
+        let folder = AppPaths.applicationSupport.appendingPathComponent("Shelf", isDirectory: true)
+        let manifest = AgentManifestShelfStore(inner: JSONShelfStore(), folder: folder)
+        self.init(store: ShelfStore(persistence: manifest, payloads: payloads), payloadStore: payloads)
+        self.manifestStore = manifest
+        manifest.writeAgentFiles(items) // heals a fresh install or a manual delete
     }
 
     var items: [ShelfItem] { store.items }
@@ -142,7 +149,9 @@ final class ShelfModel: ObservableObject {
     /// window in Settings takes effect right away rather than at the next scheduled prune.
     func setRetentionTTL(_ ttl: Duration?) {
         store.retention = ShelfRetentionPolicy(ttl: ttl)
+        manifestStore?.retention = ShelfRetentionPolicy(ttl: ttl)
         prune()
+        manifestStore?.writeAgentFiles(items)
     }
 }
 
