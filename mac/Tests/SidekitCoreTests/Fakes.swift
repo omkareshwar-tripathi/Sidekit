@@ -105,3 +105,12 @@ final class FakeCamera: CameraPort {
         isRunning = false
     }
 }
+
+/// In-memory IdentityPersisting: seeds the store on load and records what it saved.
+final class FakeIdentityPersistence: IdentityPersisting, @unchecked Sendable {
+    var stored: IdentityState
+    private(set) var saveCount = 0
+    init(_ initial: IdentityState = IdentityState()) { stored = initial }
+    func load() -> IdentityState { stored }
+    func save(_ state: IdentityState) { saveCount += 1; stored = state }
+}
