@@ -2,7 +2,7 @@ import Foundation
 import SpeakTypeCore
 
 /// `NotesPersisting` backed by a JSON file at
-/// `~/Library/Application Support/SpeakType/notes.json`.
+/// `~/Library/Application Support/Sidekit/notes.json`.
 ///
 /// Atomic write with a single retry (spec §9); tolerant load (missing or corrupt file → empty
 /// list, logged via `Diag`). Notes never live only on disk — a save that fails twice logs and
@@ -24,10 +24,7 @@ final class JSONNotesStore: NotesPersisting, @unchecked Sendable {
     private var latest: Data?
 
     init() {
-        let support = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SpeakType", isDirectory: true)
-        self.url = support.appendingPathComponent("notes.json")
+        self.url = AppPaths.applicationSupport.appendingPathComponent("notes.json")
     }
 
     func load() -> [Note] {

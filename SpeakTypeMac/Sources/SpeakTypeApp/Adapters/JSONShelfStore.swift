@@ -2,8 +2,8 @@ import Foundation
 import SpeakTypeCore
 
 /// `ShelfPersisting` backed by a JSON index file at
-/// `~/Library/Application Support/SpeakType/shelf.json` (same support dir as `notes.json` /
-/// `history.json` — all three move together when the app rebrands to "Sidekit").
+/// `~/Library/Application Support/Sidekit/shelf.json` (same support dir as `notes.json` /
+/// `history.json`; all three share `AppPaths.applicationSupport`).
 ///
 /// Stores only the item **index** (metadata); the payload bytes are a separate concern, copied by
 /// the drop handler. Unlike `JSONNotesStore`, saves are **not debounced** — shelf mutations (a
@@ -16,10 +16,7 @@ final class JSONShelfStore: ShelfPersisting, @unchecked Sendable {
     private let url: URL
 
     init() {
-        let support = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SpeakType", isDirectory: true)
-        self.url = support.appendingPathComponent("shelf.json")
+        self.url = AppPaths.applicationSupport.appendingPathComponent("shelf.json")
     }
 
     func load() -> [ShelfItem] {

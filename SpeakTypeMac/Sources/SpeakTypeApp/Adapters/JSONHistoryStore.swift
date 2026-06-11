@@ -2,7 +2,7 @@ import Foundation
 import SpeakTypeCore
 
 /// On-disk persistence for the dictation trail, at
-/// `~/Library/Application Support/SpeakType/history.json` (same folder as `notes.json`).
+/// `~/Library/Application Support/Sidekit/history.json` (same folder as `notes.json`).
 ///
 /// Tolerant load (missing or corrupt file → empty list, logged via `Diag`); atomic write with a
 /// single retry. The trail is small and only written once per dictation, so saves are immediate
@@ -12,10 +12,7 @@ final class JSONHistoryStore: @unchecked Sendable {
     private let url: URL
 
     init() {
-        let support = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SpeakType", isDirectory: true)
-        self.url = support.appendingPathComponent("history.json")
+        self.url = AppPaths.applicationSupport.appendingPathComponent("history.json")
     }
 
     func load() -> [DictationHistoryEntry] {

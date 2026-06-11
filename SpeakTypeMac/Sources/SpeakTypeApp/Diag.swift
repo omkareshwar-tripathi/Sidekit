@@ -1,7 +1,7 @@
 import Foundation
 
 /// Minimal append-only file logger for on-device diagnostics. Writes to
-/// ~/Library/Logs/SpeakType.log (reliable, unlike NSLog→unified-log for a GUI app).
+/// ~/Library/Logs/Sidekit.log (reliable, unlike NSLog→unified-log for a GUI app).
 ///
 /// Opt-in: silent by default so normal runs leave no log. Enable it to trace the dictation
 /// pipeline when something misbehaves, either way:
@@ -10,8 +10,7 @@ import Foundation
 /// Disable again with `defaults delete com.speaktype.mac SpeakTypeDebug`.
 enum Diag {
     private static let lock = NSLock()
-    static let url = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Logs/SpeakType.log")
+    static let url = AppPaths.logFile
 
     /// Read once at launch. `defaults` covers the GUI app (`open` drops the shell environment);
     /// the env var covers running the executable straight from a terminal.

@@ -26,7 +26,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct SpeakTypeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var controller = AppController()
+    @StateObject private var controller: AppController
+
+    init() {
+        // Move any data left by the former "SpeakType" app into the Sidekit locations *before*
+        // the controller (and its notes/history/shelf stores) touch disk.
+        AppPaths.migrateLegacyDataIfNeeded()
+        _controller = StateObject(wrappedValue: AppController())
+    }
 
     var body: some Scene {
         MenuBarExtra {

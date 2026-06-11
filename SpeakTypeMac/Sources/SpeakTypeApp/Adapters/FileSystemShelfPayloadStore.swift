@@ -2,8 +2,8 @@ import Foundation
 import SpeakTypeCore
 
 /// `ShelfPayloadStore` backed by the filesystem: each shelved item's copied bytes live in a
-/// per-item folder under `~/Library/Application Support/SpeakType/Shelf/<uuid>/…` (same support dir
-/// as `shelf.json` — both move together when the app rebrands to "Sidekit").
+/// per-item folder under `~/Library/Application Support/Sidekit/Shelf/<uuid>/…` (same support dir
+/// as `shelf.json`, via `AppPaths.applicationSupport`).
 ///
 /// This brick implements **deletion** — called by `ShelfStore` whenever an item is removed, the
 /// shelf is cleared, or an item expires, so bytes never outlive their index entry. The copy-in path
@@ -17,9 +17,7 @@ final class FileSystemShelfPayloadStore: ShelfPayloadStore, @unchecked Sendable 
     private let root: URL
 
     init() {
-        self.root = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SpeakType/Shelf", isDirectory: true)
+        self.root = AppPaths.applicationSupport.appendingPathComponent("Shelf", isDirectory: true)
     }
 
     /// Copy a dropped source into a fresh `<uuid>/` folder under the store root and report back its
