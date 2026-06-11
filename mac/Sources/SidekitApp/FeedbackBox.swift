@@ -11,6 +11,14 @@ final class FeedbackModel: ObservableObject {
     @Published var kind: FeedbackKind?          // nil → lands as .other
     @Published private(set) var toast: String?  // non-nil → sent, box is closing
 
+    /// Bumped on every open; the view watches it to re-focus the editor (the panel is
+    /// reused, so `.onAppear` alone would only focus the first open).
+    @Published private(set) var focusToken = 0
+
+    /// True while a send is in flight — disables Send/⌘↩ so a fast double-press can't
+    /// queue the same feedback twice.
+    @Published private(set) var isSending = false
+
     private let identity: IdentityModel
     private let spool: SubmissionSpool
 
@@ -19,7 +27,7 @@ final class FeedbackModel: ObservableObject {
         self.spool = spool
     }
 
-    var canSend: Bool { RemoteSubmission.validateFeedbackMessage(message) != nil }
+    var canSend: Bool { !isSending && RemoteSubmission.validateFeedbackMessage(message) != nil }
 
     /// Footer transparency line (spec §3: everything sent is visible).
     var footer: String {
@@ -37,7 +45,10 @@ final class FeedbackModel: ObservableObject {
 
     /// Validate, queue, toast. Returns false when the message isn't sendable.
     func send() async -> Bool {
-        guard let body = RemoteSubmission.validateFeedbackMessage(message) else { return false }
+        guard !isSending,
+              let body = RemoteSubmission.validateFeedbackMessage(message) else { return false }
+        isSending = true
+        defer { isSending = false }
         let submission = RemoteSubmission.feedback(
             kind: kind ?? .other, message: body, email: identity.email,
             appVersion: AppInfo.appVersion, osVersion: AppInfo.osVersion)
@@ -48,8 +59,12 @@ final class FeedbackModel: ObservableObject {
         return true
     }
 
-    /// Reset the toast for the next open (drafts survive an Esc — only a send clears them).
-    func reopened() { toast = nil }
+    /// Reset the toast and re-focus for the next open (drafts survive an Esc — only a
+    /// send clears them).
+    func reopened() {
+        toast = nil
+        focusToken += 1
+    }
 }
 
 /// The 5-second feedback view: text box (placeholder invites dictation), two optional
@@ -57,6 +72,7 @@ final class FeedbackModel: ObservableObject {
 struct FeedbackView: View {
     @ObservedObject var model: FeedbackModel
     let onClose: () -> Void
+    @FocusState private var editorFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.md) {
@@ -77,6 +93,7 @@ struct FeedbackView: View {
                 }
                 TextEditor(text: $model.message)
                     .scrollContentBackground(.hidden)
+                    .focused($editorFocused)
                     .frame(height: 88)
             }
             .padding(DS.Space.sm)
@@ -106,6 +123,8 @@ struct FeedbackView: View {
             }
         }
         .background(KeyCatcher(onEscape: onClose))   // Esc closes without sending (spec §3)
+        .onAppear { editorFocused = true }
+        .onChange(of: model.focusToken) { editorFocused = true }
         .tint(DS.Palette.accent)
         .preferredColorScheme(.dark)
     }
@@ -175,7 +194,7 @@ final class FeedbackBox {
         model = FeedbackModel(identity: identity, spool: spool)
         let canvas = NSRect(x: 0, y: 0, width: 440, height: 240)
         panel = KeyablePanel(contentRect: canvas,
-                             styleMask: [.borderless, .fullSizeContentView],
+                             styleMask: [.borderless],
                              backing: .buffered, defer: false)
         let hosting = NSHostingView(rootView:
             FeedbackView(model: model, onClose: { [weak self] in self?.hide() }))
@@ -186,6 +205,7 @@ final class FeedbackBox {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.hasShadow = false      // the glass card draws its own shadow
         panel.isMovableByWindowBackground = true
         panel.hidesOnDeactivate = false
     }
