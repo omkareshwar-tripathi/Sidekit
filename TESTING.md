@@ -9,7 +9,7 @@ Two layers:
 
 > **Status:** stub. Items are written against intended v1 behavior; check them off as each brick lands. An item for unbuilt behavior stays unchecked.
 
-> **Shelf drag-tests (Mac): never drag repo files.** Use the disposable samples in `~/SpeakType-TestFiles/` (sample.txt / sample.sh / sample.png / sample-folder). A fumbled Finder drag of a repo file/folder silently *moves* it (this is how `windows/Sidekit.App` kept vanishing from the worktree — see the BRICKS.md note; a hook now auto-restores it).
+> **Shelf drag-tests (Mac): never drag repo files.** Use the disposable samples in `~/SpeakType-TestFiles/` (sample.txt / sample.sh / sample.png / sample-folder). A fumbled Finder drag of a repo file/folder silently *moves* it — keep them clear. (The Windows UI project was renamed `Sidekit.App`→`Sidekit.WinApp` to end the macOS `.App`/`.app`-bundle collision that used to make it vanish from the worktree; the `restore-windows-baseline.sh` hook that guarded it is now redundant.)
 
 ---
 

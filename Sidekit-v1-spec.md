@@ -28,8 +28,8 @@ The runtime is a strict state machine: **Idle → Recording → Transcribing →
 | Concern | Choice | Notes |
 |---|---|---|
 | Runtime | **.NET 8 (LTS)**, **x64 only** | win-arm64 deferred past v1. |
-| Project structure | **`Sidekit.Core`** (`net8.0`) + **`Sidekit.App`** (`net8.0-windows`, WinForms) + **`Sidekit.Tests`** (`net8.0`) | Core holds all pure logic + port interfaces and builds/tests on **macOS or Windows**; App holds Win32/NAudio/Whisper adapters + UI and builds on **Windows only**; Tests reference Core only. Enables a two-machine dev flow: write+unit-test the core on a Mac, build+run the real app on Windows, Git as the bridge. CI runs on GitHub Actions `windows-latest`. |
-| UI | **WinForms** | Built-in `NotifyIcon` for tray; lightest path for a tray utility. In `Sidekit.App` only. |
+| Project structure | **`Sidekit.Core`** (`net8.0`) + **`Sidekit.WinApp`** (`net8.0-windows`, WinForms) + **`Sidekit.Tests`** (`net8.0`) | Core holds all pure logic + port interfaces and builds/tests on **macOS or Windows**; App holds Win32/NAudio/Whisper adapters + UI and builds on **Windows only**; Tests reference Core only. Enables a two-machine dev flow: write+unit-test the core on a Mac, build+run the real app on Windows, Git as the bridge. CI runs on GitHub Actions `windows-latest`. |
+| UI | **WinForms** | Built-in `NotifyIcon` for tray; lightest path for a tray utility. In `Sidekit.WinApp` only. |
 | Speech-to-text | **Whisper.NET** (`Whisper.net` + `Whisper.net.Runtime`) | Managed wrapper over whisper.cpp; CPU by default; no native build to own. |
 | Audio capture | **NAudio** | Capture from default input device; resample to 16 kHz mono float. |
 | Packaging | **Self-contained, single-file `win-x64` `.exe`** | Bundles .NET 8 (runs on a clean machine). No installer in v1. App is **unsigned** in v1 → users will see a Windows SmartScreen warning on first launch (accepted). |

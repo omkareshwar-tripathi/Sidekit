@@ -1,14 +1,14 @@
 using System.Drawing;
 using System.Net.Http;
 using System.Windows.Forms;
-using Sidekit.App.Audio;
-using Sidekit.App.Input;
-using Sidekit.App.Overlay;
-using Sidekit.App.Paste;
-using Sidekit.App.Settings;
-using Sidekit.App.Startup;
-using Sidekit.App.Threading;
-using Sidekit.App.Tray;
+using Sidekit.WinApp.Audio;
+using Sidekit.WinApp.Input;
+using Sidekit.WinApp.Overlay;
+using Sidekit.WinApp.Paste;
+using Sidekit.WinApp.Settings;
+using Sidekit.WinApp.Startup;
+using Sidekit.WinApp.Threading;
+using Sidekit.WinApp.Tray;
 using Sidekit.Core;
 using Sidekit.Core.Cleanup;
 using Sidekit.Core.Input;
@@ -22,7 +22,7 @@ using Sidekit.Core.Time;
 using Sidekit.Core.Transcription;
 using Sidekit.Whisper;
 
-namespace Sidekit.App;
+namespace Sidekit.WinApp;
 
 internal static class Program
 {

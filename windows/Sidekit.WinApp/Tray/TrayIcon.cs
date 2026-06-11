@@ -1,11 +1,11 @@
 using System.Drawing;
 using System.Windows.Forms;
-using Sidekit.App.Branding;
-using Sidekit.App.Theme;
+using Sidekit.WinApp.Branding;
+using Sidekit.WinApp.Theme;
 using Sidekit.Core;
 using Sidekit.Core.Orchestration;
 
-namespace Sidekit.App.Tray;
+namespace Sidekit.WinApp.Tray;
 
 /// <summary>
 /// The system-tray surface (spec Feature 6): a <see cref="NotifyIcon"/> whose icon and

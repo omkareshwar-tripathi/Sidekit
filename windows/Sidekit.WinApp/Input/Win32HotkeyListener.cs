@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using Sidekit.Core.Input;
 
-namespace Sidekit.App.Input;
+namespace Sidekit.WinApp.Input;
 
 /// <summary>
 /// Windows <see cref="IHotkeyListener"/> backed by a <c>WH_KEYBOARD_LL</c> low-level

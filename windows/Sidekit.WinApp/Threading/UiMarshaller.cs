@@ -1,6 +1,6 @@
 using System.Windows.Forms;
 
-namespace Sidekit.App.Threading;
+namespace Sidekit.WinApp.Threading;
 
 /// <summary>
 /// Marshals work onto the UI thread (the STA, message-pumping thread that owns the tray and forms).

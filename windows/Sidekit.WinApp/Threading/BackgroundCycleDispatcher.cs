@@ -1,6 +1,6 @@
 using Sidekit.Core.Orchestration;
 
-namespace Sidekit.App.Threading;
+namespace Sidekit.WinApp.Threading;
 
 /// <summary>
 /// <see cref="ICycleDispatcher"/> that runs each dictation cycle on a thread-pool thread, so the

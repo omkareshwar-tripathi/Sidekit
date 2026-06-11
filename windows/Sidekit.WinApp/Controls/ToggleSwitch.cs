@@ -1,9 +1,9 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-using Sidekit.App.Theme;
+using Sidekit.WinApp.Theme;
 
-namespace Sidekit.App.Controls;
+namespace Sidekit.WinApp.Controls;
 
 /// <summary>
 /// A small owner-drawn on/off switch that replaces the square WinForms CheckBox in the

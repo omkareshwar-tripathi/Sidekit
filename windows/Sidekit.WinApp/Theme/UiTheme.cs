@@ -1,7 +1,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace Sidekit.App.Theme;
+namespace Sidekit.WinApp.Theme;
 
 /// <summary>
 /// Central light-theme tokens and small styling helpers for the modern-light UI restyle

@@ -55,12 +55,12 @@ Artifacts are kept for 90 days.
 ### Run / test / build from source
 
 ```sh
-dotnet run    --project windows/Sidekit.App
+dotnet run    --project windows/Sidekit.WinApp
 dotnet test   windows/Sidekit.sln
-dotnet publish windows/Sidekit.App/Sidekit.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish windows/Sidekit.WinApp/Sidekit.WinApp.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
-The cross-platform `Sidekit.Core` / `Sidekit.Tests` suites also run on macOS/Linux; the `Sidekit.App` UI layer (hotkey hook, audio, tray, clipboard) is **Windows-only**. The published single-file exe lands at `windows/Sidekit.App/bin/Release/net8.0-windows/win-x64/publish/Sidekit.exe`.
+The cross-platform `Sidekit.Core` / `Sidekit.Tests` suites also run on macOS/Linux; the `Sidekit.WinApp` UI layer (hotkey hook, audio, tray, clipboard) is **Windows-only**. The published single-file exe lands at `windows/Sidekit.WinApp/bin/Release/net8.0-windows/win-x64/publish/Sidekit.exe`.
 
 ### SmartScreen warning (expected)
 

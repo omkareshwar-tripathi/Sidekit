@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sidekit.Core", "Sidekit.Cor
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sidekit.Tests", "Sidekit.Tests\Sidekit.Tests.csproj", "{481296C5-B464-45F8-92C2-933AA494AB94}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sidekit.App", "Sidekit.App\Sidekit.App.csproj", "{C7A2E1F4-8B3D-4A6C-9E12-7F5B0D3A6C82}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sidekit.WinApp", "Sidekit.WinApp\Sidekit.WinApp.csproj", "{C7A2E1F4-8B3D-4A6C-9E12-7F5B0D3A6C82}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sidekit.Whisper", "Sidekit.Whisper\Sidekit.Whisper.csproj", "{A5827075-6BF6-4E46-AEC5-BDF5C93C6C5D}"
 EndProject

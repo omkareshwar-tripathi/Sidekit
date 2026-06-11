@@ -1,7 +1,7 @@
 using NAudio.Wave;
 using Sidekit.Core.Audio;
 
-namespace Sidekit.App.Audio;
+namespace Sidekit.WinApp.Audio;
 
 /// <summary>
 /// Windows <see cref="IAudioCapture"/> backed by NAudio's <see cref="WaveInEvent"/>.

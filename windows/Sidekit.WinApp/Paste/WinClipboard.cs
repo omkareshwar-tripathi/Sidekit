@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using Sidekit.Core.Paste;
 using Clipboard = System.Windows.Forms.Clipboard;
 
-namespace Sidekit.App.Paste;
+namespace Sidekit.WinApp.Paste;
 
 /// <summary>
 /// Windows <see cref="IClipboard"/> adapter. Text save/restore uses WinForms

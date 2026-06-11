@@ -1,9 +1,9 @@
 using System.Windows.Forms;
-using Sidekit.App.Branding;
-using Sidekit.App.Theme;
+using Sidekit.WinApp.Branding;
+using Sidekit.WinApp.Theme;
 using Sidekit.Core.Models;
 
-namespace Sidekit.App.Startup;
+namespace Sidekit.WinApp.Startup;
 
 /// <summary>
 /// A modal model-download window with a progress bar and Retry-on-failure. Used for the first-run

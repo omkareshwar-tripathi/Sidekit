@@ -1,7 +1,7 @@
-using Sidekit.App.Threading;
+using Sidekit.WinApp.Threading;
 using Sidekit.Core.Paste;
 
-namespace Sidekit.App.Paste;
+namespace Sidekit.WinApp.Paste;
 
 /// <summary>
 /// Wraps an STA-only <see cref="IClipboard"/> (the WinForms-backed <see cref="WinClipboard"/>) so every

@@ -3,7 +3,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
-    <RootNamespace>Sidekit.App</RootNamespace>
+    <RootNamespace>Sidekit.WinApp</RootNamespace>
     <AssemblyName>Sidekit</AssemblyName>
     <!-- Required by [LibraryImport] source-generated P/Invoke (SYSLIB1062). -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

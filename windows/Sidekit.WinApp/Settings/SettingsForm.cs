@@ -1,12 +1,12 @@
 using System.Windows.Forms;
-using Sidekit.App.Branding;
-using Sidekit.App.Controls;
-using Sidekit.App.Theme;
+using Sidekit.WinApp.Branding;
+using Sidekit.WinApp.Controls;
+using Sidekit.WinApp.Theme;
 using Sidekit.Core.Input;
 using Sidekit.Core.Models;
 using Sidekit.Core.Settings;
 
-namespace Sidekit.App.Settings;
+namespace Sidekit.WinApp.Settings;
 
 /// <summary>
 /// The settings window (spec Feature 7): a small fixed dialog over the shared, live

@@ -1,6 +1,6 @@
 using Sidekit.Core.Input;
 
-namespace Sidekit.App.Input;
+namespace Sidekit.WinApp.Input;
 
 /// <summary>
 /// Maps a parsed <see cref="Hotkey"/> to the Win32 virtual-key (VK) codes a low-level

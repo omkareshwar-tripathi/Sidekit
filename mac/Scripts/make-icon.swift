@@ -2,7 +2,7 @@
 // Generates Sidekit's app icon from code — no external art, fully reproducible.
 //
 // The mark is the Sidekit **equalizer** (the same 5-bar waveform shipped in the Windows app —
-// see windows/Sidekit.App/Branding/AppIcon.cs), drawn once in a 0…1000 design space and
+// see windows/Sidekit.WinApp/Branding/AppIcon.cs), drawn once in a 0…1000 design space and
 // rendered two ways:
 //   • the full-colour app icon  → AppBundle/AppIcon.iconset/*.png → (iconutil) AppIcon.icns
 //   • a monochrome menu-bar glyph → AppBundle/MenuBarIcon.pdf (a template image macOS tints)

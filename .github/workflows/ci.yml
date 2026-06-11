@@ -26,7 +26,7 @@ jobs:
       - name: Restore
         run: dotnet restore Sidekit.sln
 
-      # Builds the whole solution, including Sidekit.App (net8.0-windows),
+      # Builds the whole solution, including Sidekit.WinApp (net8.0-windows),
       # which cannot be built on macOS — this is the real Windows-build check.
       - name: Build
         run: dotnet build Sidekit.sln -c Release --no-restore
@@ -40,12 +40,12 @@ jobs:
       # Packaging smoke test (spec Feature 26): prove the self-contained single-file win-x64 publish
       # actually succeeds and emits the exe. Running that exe on a clean machine is the manual M-test.
       - name: Publish (single-file)
-        run: dotnet publish Sidekit.App/Sidekit.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+        run: dotnet publish Sidekit.WinApp/Sidekit.WinApp.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 
       - name: Verify the single-file exe exists
         shell: pwsh
         run: |
-          $exe = "Sidekit.App/bin/Release/net8.0-windows/win-x64/publish/Sidekit.exe"
+          $exe = "Sidekit.WinApp/bin/Release/net8.0-windows/win-x64/publish/Sidekit.exe"
           if (-not (Test-Path $exe)) { Write-Error "Publish did not produce $exe"; exit 1 }
           Write-Host ("Published {0:N1} MB single-file exe" -f ((Get-Item $exe).Length / 1MB))
 
@@ -55,5 +55,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Sidekit-win-x64
-          path: Sidekit.App/bin/Release/net8.0-windows/win-x64/publish/Sidekit.exe
+          path: Sidekit.WinApp/bin/Release/net8.0-windows/win-x64/publish/Sidekit.exe
           if-no-files-found: error

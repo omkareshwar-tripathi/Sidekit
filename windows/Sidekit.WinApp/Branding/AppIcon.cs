@@ -2,7 +2,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 
-namespace Sidekit.App.Branding;
+namespace Sidekit.WinApp.Branding;
 
 /// <summary>
 /// The app's visual identity: a waveform/equalizer mark in the accent blue (the "C" logo).

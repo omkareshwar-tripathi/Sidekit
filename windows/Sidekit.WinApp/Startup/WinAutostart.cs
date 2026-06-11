@@ -2,7 +2,7 @@ using Microsoft.Win32;
 using Sidekit.Core;
 using Sidekit.Core.Startup;
 
-namespace Sidekit.App.Startup;
+namespace Sidekit.WinApp.Startup;
 
 /// <summary>
 /// Windows adapter for <see cref="IAutostart"/> (spec Feature 6 "Start with Windows", also

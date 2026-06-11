@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Sidekit.Core.Overlay;
 
-namespace Sidekit.App.Overlay;
+namespace Sidekit.WinApp.Overlay;
 
 /// <summary>
 /// The recording overlay (spec Feature 6): a small, always-on-top, click-through window that
