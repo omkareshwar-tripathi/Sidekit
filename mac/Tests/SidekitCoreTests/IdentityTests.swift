@@ -66,6 +66,13 @@ struct IdentityTests {
         #expect(!second.shouldShowWelcome)
     }
 
+    @Test func reAskAlsoFiresAfterTheFifthLaunch() {
+        // A skipped user who next launches on run 6+ must still get the one re-ask (>=5, not ==5).
+        let (store, _) = makeSUT(seed: IdentityState(launchCount: 5, welcomeAutoShows: 1))
+        store.recordLaunch() // launch 6
+        #expect(store.shouldShowWelcome)
+    }
+
     // MARK: - setEmail / clearEmail
 
     @Test func setEmailTrimsLowercasesAndPersists() {
