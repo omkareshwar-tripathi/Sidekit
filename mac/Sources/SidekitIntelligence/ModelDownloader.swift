@@ -2,14 +2,14 @@ import Foundation
 import HuggingFace
 import SidekitCore
 
-/// Owns the model files (spec §6): HF hub snapshots of BOTH models into the app's own
-/// folder, presence check, and Settings removal. One download action covers both, with
-/// combined progress — no second surprise download mid-flow. AppKit-free; the app injects
-/// its root (AppPaths) and logger (Diag).
+/// Owns the model files (spec §6): HF hub snapshot of the single shared model into the
+/// app's own folder, presence check, and Settings removal. One download action handles
+/// one repo, with progress 0…1. AppKit-free; the app injects its root (AppPaths) and
+/// logger (Diag).
 public final class ModelDownloader: ModelProvisioning, @unchecked Sendable {
-    public static let polishRepoID = "mlx-community/gemma-2-2b-it-4bit"
-    public static let draftRepoID  = "mlx-community/Qwen3-1.7B-4bit"
-    private static let repoIDs = [polishRepoID, draftRepoID]
+    /// The single shared model (spec §1 round 3): Qwen2.5-1.5B serves polish AND draft.
+    public static let modelRepoID = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
+    private static let repoIDs = [modelRepoID]
 
     /// `…/Application Support/Sidekit/Intelligence` in the app; the selftest uses the same.
     public let root: URL
@@ -62,13 +62,13 @@ public final class ModelDownloader: ModelProvisioning, @unchecked Sendable {
 
     // MARK: - ModelProvisioning
 
-    /// Both snapshots complete — a partial download lacks config.json and the load path
+    /// Snapshot complete — a partial download lacks config.json and the load path
     /// then reports "damaged" → re-download (spec §6).
     public var isDownloaded: Bool {
         Self.repoIDs.allSatisfy { snapshotDirectory(for: $0) != nil }
     }
 
-    /// ONE action downloads both models in sequence; combined progress 0…1 (spec §6).
+    /// Downloads the single shared model; progress 0…1 (spec §6).
     ///
     /// Each repo contributes 1/count of the range; per-file progress from the hub client
     /// is mapped into that slice: `base + fraction * (1/count)`.

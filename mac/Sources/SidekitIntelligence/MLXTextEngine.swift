@@ -9,10 +9,10 @@ import SidekitCore
 public enum IntelligenceEngineError: Error { case notLoaded }
 
 /// MLXLLM-backed `TextGenerating` (spec §5/§8). An actor: one model in RAM, `load()`
-/// idempotent, `unload()` drops the container and clears the MLX cache. Two instances ship
-/// (spec §1): Gemma-2 polish — whose chat template has NO system role, so the system prompt
-/// is folded into the user turn — and Qwen3-1.7B draft with thinking disabled at the template
-/// level (the lab scored it with think off); `IntelligencePrompt.sanitize` strips any leak.
+/// idempotent, `unload()` drops the container and clears the MLX cache. One instance ships,
+/// shared by both roles (Qwen2.5-1.5B, spec §1 round 3); `foldsSystemIntoUser` is retained
+/// but unused in shipping config — it exists for templates with no system role (e.g. Gemma-2,
+/// which may return after the upstream mlx-swift-lm 3.31.3 forward-pass defect is fixed).
 public actor MLXTextEngine: TextGenerating {
     private let modelDirectory: @Sendable () -> URL
     private let foldsSystemIntoUser: Bool

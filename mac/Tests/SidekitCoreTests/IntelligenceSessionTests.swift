@@ -224,4 +224,32 @@ struct IntelligenceSessionTests {
         #expect(rig.polish.unloads == 1)
         #expect(rig.session.state == .needsModel)
     }
+
+    /// When both engine slots point to the SAME object (shared Qwen2.5), a role switch
+    /// must relabel warmRole without unloading. The engine loads exactly once and zero unloads.
+    @Test func sharedEngineRoleSwitchRelabelsWithoutUnload() async {
+        let shared = FakeEngine()
+        let provisioner = FakeProvisioner(downloaded: true)
+        let idle = FakeIdleTimer()
+        let session = IntelligenceSession(polishEngine: shared, draftEngine: shared,
+                                          provisioner: provisioner, idle: idle)
+        let rec = Recorder()
+        session.onStateChanged = { rec.states.append($0) }
+        session.onResult    = { rec.results.append($0) }
+        session.onError     = { rec.errors.append($0) }
+
+        // Warm up the polish role.
+        await session.run(chip: .polish, tone: .keepTone, input: "hello")?.value
+        #expect(shared.loads == 1)
+
+        // Switch to draft role — shared engine must NOT be unloaded/reloaded.
+        await session.run(chip: .draftEmail, tone: .professional, input: "world")?.value
+        #expect(shared.loads == 1,  "engine loaded more than once — should relabel, not swap")
+        #expect(shared.unloads == 0, "engine was unloaded on a role switch — should not be")
+        #expect(rec.results.count == 2, "both runs should produce a result")
+
+        // The session must never have gone through .loading a second time.
+        let loadingCount = rec.states.filter { $0 == .loading }.count
+        #expect(loadingCount == 1, "went through .loading \(loadingCount) times; expected exactly 1")
+    }
 }

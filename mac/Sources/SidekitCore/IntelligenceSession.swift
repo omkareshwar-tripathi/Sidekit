@@ -1,9 +1,10 @@
 import Foundation
 
 /// The RAM-guest state machine (spec 2026-06-12 §5): a model loads on demand, stays warm
-/// for an idle window, then unloads — never resident. Two role-specific engines (spec §1:
-/// Gemma polishes, Qwen drafts) but only ONE is ever warm — switching roles unloads the
-/// other first. Pure over the ports; the UI mirrors `state` + the result/error callbacks.
+/// for an idle window, then unloads — never resident. Two engine slots (spec §1 round 3):
+/// the shipping app passes one shared Qwen2.5 engine to both, in which case a role switch
+/// is a relabel — no unload/reload churn. Pure over the ports; the UI mirrors `state` +
+/// the result/error callbacks.
 /// @MainActor like the app models it feeds; engine work runs off-main behind the async port.
 /// Owned for the app's lifetime by the Intelligence feature — not designed to be created
 /// per-use (dropping the only reference mid-cycle would strand a loaded engine until
@@ -31,6 +32,8 @@ public final class IntelligenceSession {
     private let provisioner: any ModelProvisioning
     private let idle: any IntelligenceIdleTimer
     private let idleSeconds: Double
+    /// True when both slots reference the same object — a role switch is then a relabel only.
+    private let sharesEngine: Bool
     /// Which engine is warm; nil ↔ state ready/needsModel.
     private var warmRole: IntelligenceRole?
     private var generationTask: Task<Void, Never>?
@@ -47,6 +50,7 @@ public final class IntelligenceSession {
         self.idle = idle
         self.idleSeconds = idleSeconds
         self.state = provisioner.isDownloaded ? .ready : .needsModel
+        self.sharesEngine = (polishEngine as AnyObject) === (draftEngine as AnyObject)
     }
 
     private func engine(for role: IntelligenceRole) -> any TextGenerating {
@@ -98,10 +102,14 @@ public final class IntelligenceSession {
         let task = Task { [weak self] in
             guard let self else { return }
             if let warm = self.warmRole, warm != role {
-                // Role switch: the warm model leaves before the other arrives (spec §5).
-                self.state = .loading
-                self.warmRole = nil
-                await self.engine(for: warm).unload()
+                if self.sharesEngine {
+                    self.warmRole = role   // same weights serve both roles — relabel, no swap
+                } else {
+                    // Role switch: the warm model leaves before the other arrives (spec §5).
+                    self.state = .loading
+                    self.warmRole = nil
+                    await self.engine(for: warm).unload()
+                }
             }
             if self.warmRole == nil {
                 self.state = .loading

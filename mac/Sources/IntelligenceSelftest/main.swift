@@ -2,12 +2,13 @@ import Foundation
 import SidekitCore
 import SidekitIntelligence
 
-// Permanent headless verifier for the on-device LLMs (spec 2026-06-12 §7).
+// Permanent headless verifier for the on-device LLM (spec 2026-06-12 §7).
 // Drives the REAL shipping adapters (MLXTextEngine + ModelDownloader) + IntelligencePrompt.
-// Two-model variant: Gemma-2-2B polishes (NO system role — foldsSystemIntoUser = true),
-// Qwen3-1.7B drafts (thinking off via additionalContext + sanitize strips any leak).
-// Downloads on first run into the app's own Intelligence folder, then per model:
-// load → real IntelligencePrompt generation → unload, printing timings.
+// Single-model variant: Qwen2.5-1.5B-Instruct-4bit serves BOTH polish and draft roles
+// (Gemma-2 sidelined by an upstream mlx-swift-lm 3.31.3 forward-pass defect, see spec §7).
+// Downloads on first run into the app's own Intelligence folder, then:
+// load once → polish generation → draft generation (no unload between, mirrors shipping
+// behaviour on a role switch) → unload once, printing timings.
 // Exits non-zero on any failure.
 // Budgets (spec §5): warm-disk load ≤ 5 s; each generation ≤ 8 s.
 //
@@ -51,30 +52,28 @@ do {
         print("Models already on disk — skipping download.")
     }
 
-    guard let polishDir = downloader.snapshotDirectory(for: ModelDownloader.polishRepoID) else {
-        fail("polish snapshot directory not found at \(root.path)")
-    }
-    guard let draftDir = downloader.snapshotDirectory(for: ModelDownloader.draftRepoID) else {
-        fail("draft snapshot directory not found at \(root.path)")
+    guard let modelDir = downloader.snapshotDirectory(for: ModelDownloader.modelRepoID) else {
+        fail("model snapshot directory not found at \(root.path)")
     }
 
-    // --- Polish engine (Gemma-2-2B, foldsSystemIntoUser) ---
-    let polishEngine = MLXTextEngine(
-        modelDirectory: { polishDir },
-        foldsSystemIntoUser: true)
+    // --- Single shared engine (Qwen2.5-1.5B, no system fold — it has a real system role) ---
+    let engine = MLXTextEngine(modelDirectory: { modelDir })
 
+    print("\nLoading engine (Qwen2.5-1.5B-Instruct-4bit)…")
+    let loadStart = clock.now
+    try await engine.load()
+    let loadDuration = loadStart.duration(to: clock.now)
+    print("load: \(loadDuration)")
+
+    // --- Polish case (lab case sc-8, deterministic at greedy temp 0.0) ---
     let (polishSystem, polishTemp) = IntelligencePrompt.build(chip: .polish, tone: .keepTone)
-    let polishInput = "um so basically i think we should uh ship it on tuesday actually no wednesday"
-
-    print("\nLoading polish engine (gemma-2-2b-it-4bit)…")
-    let polishLoadStart = clock.now
-    try await polishEngine.load()
-    let polishLoadDuration = polishLoadStart.duration(to: clock.now)
-    print("polish load: \(polishLoadDuration)")
+    let polishInput = "lets meet on tuesday no wait wednesday at three"
 
     let polishGenStart = clock.now
-    let polishRaw = try await polishEngine.generate(
-        system: polishSystem, user: IntelligencePrompt.userPayload(chip: .polish, tone: .keepTone, input: polishInput), temperature: polishTemp)
+    let polishRaw = try await engine.generate(
+        system: polishSystem,
+        user: IntelligencePrompt.userPayload(chip: .polish, tone: .keepTone, input: polishInput),
+        temperature: polishTemp)
     let polishGenDuration = polishGenStart.duration(to: clock.now)
     print("polish gen: \(polishGenDuration)")
 
@@ -83,27 +82,17 @@ do {
 
     if polished.isEmpty { fail("polish returned empty") }
     if !polished.localizedCaseInsensitiveContains("wednesday") { fail("polish lost the correction") }
+    if polished.localizedCaseInsensitiveContains("tuesday") { fail("polish kept the false start 'tuesday'") }
 
-    await polishEngine.unload()
-    print("polish engine unloaded.")
-
-    // --- Draft engine (Qwen3-1.7B, no system fold, thinking off) ---
-    let draftEngine = MLXTextEngine(
-        modelDirectory: { draftDir },
-        foldsSystemIntoUser: false)
-
+    // --- Draft case (same engine, no unload — mirrors a role-switch relabel in the app) ---
     let (draftSystem, draftTemp) = IntelligencePrompt.build(chip: .draftEmail, tone: .professional)
     let draftInput = "tell priya the invoice for 4500 dollars went out, ask her to cc me going forward"
 
-    print("Loading draft engine (Qwen3-1.7B-4bit)…")
-    let draftLoadStart = clock.now
-    try await draftEngine.load()
-    let draftLoadDuration = draftLoadStart.duration(to: clock.now)
-    print("draft load: \(draftLoadDuration)")
-
     let draftGenStart = clock.now
-    let draftRaw = try await draftEngine.generate(
-        system: draftSystem, user: draftInput, temperature: draftTemp)
+    let draftRaw = try await engine.generate(
+        system: draftSystem,
+        user: IntelligencePrompt.userPayload(chip: .draftEmail, tone: .professional, input: draftInput),
+        temperature: draftTemp)
     let draftGenDuration = draftGenStart.duration(to: clock.now)
     print("draft gen: \(draftGenDuration)")
 
@@ -112,10 +101,11 @@ do {
 
     if drafted.isEmpty { fail("draft returned empty") }
     if drafted.contains("<think>") { fail("thinking mode leaked into draft output") }
-    if !drafted.contains("4500") { fail("draft dropped the exact amount") }
+    let draftSanitizedForAmount = drafted.replacingOccurrences(of: ",", with: "")
+    if !draftSanitizedForAmount.contains("4500") { fail("draft dropped the exact amount") }
 
-    await draftEngine.unload()
-    print("draft engine unloaded.")
+    await engine.unload()
+    print("engine unloaded.")
 
     // --- Totals ---
     let diskGB = Double(diskBytes(at: root)) / 1_073_741_824
