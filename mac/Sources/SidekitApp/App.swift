@@ -49,7 +49,8 @@ struct SidekitApp: App {
         Window("Sidekit", id: MainWindow.id) {
             MainWindow(notes: controller.notes, history: controller.history,
                        settings: controller.settings, shelf: controller.shelf,
-                       identity: controller.identity)
+                       identity: controller.identity,
+                       intelligence: controller.intelligence)
                 .onAppear { AppController.setWindowMode(true) }
                 .onDisappear { AppController.setWindowMode(false) }
         }

@@ -95,6 +95,9 @@ struct SettingsView: View {
     @ObservedObject var shelf: ShelfModel
     /// Sign-up email (spec §2: also editable here, any time).
     @ObservedObject var identity: IdentityModel
+    /// The Intelligence panel model — drives the model-state row (spec 2026-06-12 §6).
+    /// Optional: nil only in previews/tests that don't build the stack.
+    var intelligence: IntelligencePanelModel?
     @State private var emailDraft = ""
     @Environment(\.dismiss) private var dismiss
 
@@ -145,6 +148,13 @@ struct SettingsView: View {
                         }
                     }
                 }
+                Section("Intelligence") {
+                    if let intelligence {
+                        IntelligenceSettingsRow(model: intelligence)
+                    } else {
+                        Text("Unavailable").foregroundStyle(.secondary)
+                    }
+                }
                 Section("Permissions") {
                     LabeledContent("Microphone") { badge(model.micAuthorized) }
                     LabeledContent("Accessibility") {
@@ -177,5 +187,26 @@ struct SettingsView: View {
         Label(ok ? "Granted" : "Not granted",
               systemImage: ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
             .foregroundStyle(ok ? DS.Palette.success : DS.Palette.recDot)
+    }
+}
+
+/// Model presence + removal (spec §6). State reads from the live session; Remove drops the
+/// files and tells the session, so the next chip use re-offers the download.
+private struct IntelligenceSettingsRow: View {
+    @ObservedObject var model: IntelligencePanelModel
+
+    var body: some View {
+        if model.sessionState == .needsModel {
+            Text("On-device model: not downloaded — the Scratchpad offers it on first use.")
+                .font(.caption).foregroundStyle(.secondary)
+        } else {
+            HStack {
+                Text("On-device model: downloaded")
+                Spacer()
+                Button("Remove model", role: .destructive) { model.removeModel() }
+            }
+            Text("Frees the disk space; the Scratchpad re-offers the download when needed.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }

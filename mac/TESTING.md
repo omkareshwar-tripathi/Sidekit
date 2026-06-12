@@ -1,7 +1,7 @@
 # TESTING.md (Mac)
 
 Manual test plan for the **Sidekit Mac app** (the native Swift fork on `feat/mac-app`).
-The pure logic is covered by `swift test` (152 automated tests); this file covers everything
+The pure logic is covered by `swift test` (184 automated tests); this file covers everything
 that only a human in front of a running Mac can verify — the floating pill, the Fn hotkey,
 real audio, paste, the scratchpad window, settings, permissions, and app lifecycle.
 
@@ -21,7 +21,7 @@ cd mac
 open Sidekit.app
 ```
 
-- Automated baseline (optional, fast): `swift test` → expect **152 tests passed**.
+- Automated baseline (optional, fast): `swift test` → expect **184 tests passed**.
 - This is a **self-signed local dev** build. On first open, if macOS Gatekeeper blocks it
   ("unidentified developer"), right-click the app → **Open**, or approve it in
   **System Settings → Privacy & Security**. Expected for a dev build — not a bug.
@@ -222,6 +222,26 @@ or the Settings UI.
 
 ---
 
+---
+
+## 11. Intelligence v1  _(spec 2026-06-12 — pill hover menu, scratchpad, on-device model)_  _(M11)_
+
+**AMENDED items (from single-model round-3 decision):** m11-4 and m11-8 reflect that ONE Qwen2.5-1.5B-Instruct-4bit model serves both polish and draft roles; the two-model wording is retired.
+
+- [ ] **m11-1 · Pill hover menu blooms** — hover the idle pill dot (no click) → a 3-button menu appears (Polish / Scratchpad / Dictate); move the mouse away → it collapses.
+- [ ] **m11-2 · Scratchpad draft-email end-to-end (first use)** — pill → Scratchpad → the panel opens; click the Draft chip (first use: a "Download model (≈0.9 GB, one time)" button shows) → click Download → progress % appears → "Warming up…" → "Drafting…" → an email draft appears in the result area → click Copy → paste into TextEdit → text matches.
+- [ ] **m11-3 · Polish entry end-to-end** — copy a sentence to the clipboard → pill → Polish → the panel opens with the clipboard text pre-filled and the Polish chip highlighted → click Polish with Keep tone → a cleaned version appears; it is faithful (no new content added, only cleanup applied).
+- [ ] **m11-4 · (AMENDED) Polish immediately after a draft run — no second warm-up** — with the model warm from a draft chip run, click the Polish chip: the SAME model stays warm and generation starts without a second "Warming up…" pause. A reload pause here is a regression (the session relabels the role switch; the model is NOT reloaded).
+- [ ] **m11-5 · Hands-free Fn dictation into scratchpad** — open the scratchpad panel → hold Fn and speak → words land in the scratchpad editor, not pasted elsewhere.
+- [ ] **m11-6 · Pill Dictate → click to stop** — pill → Dictate → recording starts (pill shows recording state) without any Fn key held → click the pill → recording stops and the transcript routes like a normal Fn dictation.
+- [ ] **m11-7 · Esc closes; draft survives** — type text in the scratchpad editor → press Esc → panel closes → reopen via pill → the typed text is still there.
+- [ ] **m11-8 · (AMENDED) Memory drops after idle — model unloads** — in Activity Monitor, watch Sidekit's memory after the last generation completes: within ~3 minutes of idle, memory drops by approximately 1.1 GB (the model unloads on the 180 s idle timer). Starting another generation should reload it.
+- [ ] **m11-9 · Idle dot opens main window** — click (not hover) the idle pill dot → the main Sidekit window comes to front.
+- [ ] **m11-10 · Settings → Remove model → re-offer on next use** — Settings → Intelligence → "Remove model" (destructive button) → confirm the model files are gone → open the scratchpad → the "Download model" button re-appears (not an error; the panel correctly re-offers the download).
+- [ ] **m11-11 · Offline behavior** — **(a) model already downloaded:** disconnect Wi-Fi → open scratchpad → run a chip → draft/polish works (the model is local, no internet needed). **(b) model not downloaded:** remove the model (m11-10), then go offline → open scratchpad → the "Download model" button is present; click it → an error or message reading "You're offline — the one-time model download needs internet." (no silent hang, no crash).
+
+---
+
 ## Sign-off
 
 Fill this in as you go — it's the record of a pass.
@@ -238,6 +258,7 @@ Fill this in as you go — it's the record of a pass.
 | 8  | Reduced motion (optional)             |                |       |
 | 9  | Sign-up & feedback                    |                |       |
 | 10 | Shelf for agents + auto-screenshots   |                |       |
+| 11 | Intelligence v1 (M11)                 |                |       |
 
 **Tester:** ____________  **Date:** ____________  **Build:** `build-app.sh release` @ commit ________
 

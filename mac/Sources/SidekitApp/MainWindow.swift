@@ -14,6 +14,8 @@ struct MainWindow: View {
     let shelf: ShelfModel
     /// Sign-up identity — drives the one-time welcome sheet and the settings email field.
     @ObservedObject var identity: IdentityModel
+    /// Passed through to the settings sheet Intelligence row (spec §6).
+    let intelligence: IntelligencePanelModel?
 
     @State private var showSettings = false
     @State private var showHistory = false
@@ -37,7 +39,7 @@ struct MainWindow: View {
                 Button { showSettings = true } label: { Label("Settings", systemImage: "gearshape") }
             }
         }
-        .sheet(isPresented: $showSettings) { SettingsView(model: settings, shelf: shelf, identity: identity) }
+        .sheet(isPresented: $showSettings) { SettingsView(model: settings, shelf: shelf, identity: identity, intelligence: intelligence) }
         .sheet(isPresented: $showHistory) { HistoryView(history: history) }
         // Brand the window to match the icon/pill: dark frosted-glass surface with purple accents
         // (selection, buttons, controls — and the sheets inherit the tint). Layout is unchanged so
