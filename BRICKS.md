@@ -22,6 +22,17 @@ _**Repo tidy (2026-06-07):** the old root .NET solution was parked under **`wind
 
 _**windows/ phantom deletions — investigated & guarded (2026-06-10):** `windows/SpeakType.App` was repeatedly deleted from the **worktree** (never committed) during the user's manual Shelf drag-test rounds. Ruled out by direct testing: GitNexus hooks (`augment`/`analyze` leave the tree clean), `build-app.sh` from any cwd, the app's payload-delete path (App-Support-scoped), all project hooks (read-only), gitignore case-collisions, and parallel Claude sessions (transcripts show one lineage). Conclusion: a **Finder-side move during a drag gesture** (the panel is a small target that can slip away mid-drag; Finder spring-loading makes a fumbled release a silent move — and a landing inside the gitignored `SpeakTypeMac/SpeakType.app` bundle, case-insensitively the same name, is invisible to git and erased by the next build's `rm -rf`). **Guards now in place:** (1) `.claude/hooks/restore-windows-baseline.sh` (SessionStart + Stop) auto-restores any *unstaged* deletion under the baseline — verified against simulated damage; intentional staged `git rm` is respected. (2) Drag tests use `~/SpeakType-TestFiles/` (disposable samples), never repo files — noted in TESTING.md._
 
+#### Intelligence v1 — M11 feedback fixes (queued 2026-06-12, user-reported, work these FIRST)
+
+_First user walk of the new pill/scratchpad surfaced three UI defects (user's words distilled). Each is a small brick: fix, build, re-verify on the signed `.app`. Spec sections in `docs/superpowers/specs/2026-06-12-sidekit-intelligence-v1-design.md`._
+
+- [ ] **INTEL-UI-HOVER — pill hover target is far too large.** The 260x36 invisible pad claims a big strip of screen; the menu blooms when the cursor is nowhere near the dot. User: the small dot alone should be the trigger ("previously that small button was more than enough"). Fix: collapsed-state hover region shrinks to the dot + small margin (spec floor >=80x30 max, likely exactly that); while EXPANDED the bloomed menu itself keeps hover alive (its buttons hit-test), so the 2f590a3 tracking-region concern is handled by state, not by an always-huge pad. Verify: hover well left/right of the dot -> nothing; hover the dot -> bloom; move along the menu -> stays; leave -> collapse.
+  - Skill: none (manual verify on the .app)
+- [ ] **INTEL-UI-CLOSE — scratchpad has no visible close affordance.** Esc works but is undiscoverable; user expected a close/done button. Fix: small X button in the panel header (right side, FeedbackBox-style if precedent exists) calling the same `onClose`. Verify: click closes, draft survives reopen (spec section 3).
+  - Skill: none
+- [ ] **INTEL-UI-GROW — panel too small; content gets cut.** Fixed 460pt width + 110pt editor + 160pt result cap cramps real polish/draft output; user "not able to see everything properly", and the result-card Copy / Use-as-input buttons were effectively lost below the cramped scroll. Fix: panel grows with content (taller result area, larger max height, width modestly up; keep an upper bound + inner scroll past it; window resizes/re-anchors above the pill as SwiftUI content size changes). Copy button must stay visible whenever a result exists. Verify with a long polish result + a multi-paragraph draft.
+  - Skill: none
+
 #### Next iterations — post-launch direction (queued 2026-06-12, user-dictated)
 
 _The user's four next bets, in their words distilled. None is specced yet — each starts with a brainstorm → spec → plan cycle (CLAUDE.md flow) before any brick is cut._
