@@ -14,14 +14,15 @@ public enum IntelligenceChip: CaseIterable, Sendable {
         }
     }
 
-    /// Which model serves this chip (spec §1 two-model split): Polish runs on Gemma-2-2B,
-    /// every drafting chip on the draft model.
+    /// Which role serves this chip. In the shipping single-model config (spec §1 round 3)
+    /// both roles map to the same engine; the label still drives prompt selection.
     public var role: IntelligenceRole {
         self == .polish ? .polish : .draft
     }
 }
 
-/// The two engine roles of the two-model split (spec §1/§5). One is warm at a time.
+/// The two engine roles (spec §1/§5). One is warm at a time (a relabel when both roles
+/// share one engine).
 public enum IntelligenceRole: Sendable, Equatable {
     case polish, draft
 }

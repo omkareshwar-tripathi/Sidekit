@@ -148,7 +148,7 @@ struct IntelligenceSessionTests {
         let rig = make()
         await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
         await rig.session.run(chip: .draftEmail, tone: .keepTone, input: "y")?.value
-        #expect(rig.polish.unloads == 1)    // Gemma left before Qwen arrived
+        #expect(rig.polish.unloads == 1)    // distinct engines: the warm one leaves first
         #expect(rig.draft.loads == 1)
         #expect(rig.session.state == .warm)
     }
