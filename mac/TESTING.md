@@ -211,10 +211,14 @@ or the Settings UI.
       the instructions "complete and sufficient". Human remainder (~30 s, optional): click
       **For agents** in the Shelf footer → "Copied ✓" → paste into your own Claude Code /
       Antigravity session for the same result.
-- [ ] **m10-8 · Desktop consent:** first ⌘⇧3 that saves to the Desktop → macOS asks
-      "Sidekit would like to access files in your Desktop folder" **once** (our usage string
-      visible). Allow → tile appears. (If you deny: no tile, no crash — re-enable later in
-      System Settings → Privacy & Security → Files & Folders.)
+- [ ] **m10-8 · Desktop consent:** on the first **normal launch** (Dock/login — not launched
+      from a dev shell, which inherits its access) macOS asks "Sidekit would like to access
+      files in your Desktop folder" **once** (our usage string visible) — the watcher touches
+      the Desktop at start because Spotlight silently filters protected folders and a query
+      alone never trips the prompt (debugged 2026-06-12). Allow → next ⌘⇧3 lands. (Deny: no
+      tile, no crash — re-enable in System Settings → Privacy & Security → Files & Folders.)
+      Heads-up: **clipboard-only captures (⌃-modifier / "Save to Clipboard") create no file
+      and can never land** — spec §3.3 accepted limit.
 
 ---
 
