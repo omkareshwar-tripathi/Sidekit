@@ -12,7 +12,7 @@
 |---|---|
 | Where does LLM polish run? | **On-demand only**, behind the pill. The dictation pipeline is untouched — no auto-polish in v1 (future settings toggle, out of scope). |
 | RAM posture | **The model is a guest in RAM, not a resident.** Load on first use, stay warm for an idle window, then unload. Never two models in memory. Unload immediately on system memory pressure. |
-| One model or two? | **One shared model for Polish + Drafting: `mlx-community/Qwen3.5-2B-OptiQ-4bit`** (lab assistant score 24/29 · 1.84 GB peak RAM · 3.0 s load · run with thinking **disabled**, `think: False`). Gated by §7 Brick 0; fallback chain in §7. |
+| One model or two? | **Two role-specific models (Gate A outcome, decided by the user 2026-06-12):** `mlx-community/gemma-2-2b-it-4bit` runs **Polish** (148/190 faithful-cleanup PASS; its chat template has **no system role** — the engine folds the system prompt into the user turn) and `mlx-community/Qwen3.5-2B-OptiQ-4bit` runs the **drafting chips** (24/29 assistant, arithmetic guardrail 2/2; thinking **disabled**, `think: False`). The one-shared-model hope died at Gate A — see §7 for the recorded results. Still only ONE model ever in RAM: switching roles unloads one, loads the other. |
 | Drafting UX | **Preset chips + tones.** No free-form instruction field in v1. |
 | Polish entry point | Opens the scratchpad **pre-loaded with clipboard text**, Polish chip pre-selected. Nothing ever silently rewrites the clipboard. |
 | Tone selector | **Global in the panel** — applies to whatever chip runs, Polish included. Default **Keep tone**. |
@@ -72,7 +72,7 @@ Two system-prompt families. All are pure functions of (chip, tone) in core code,
 
 The arithmetic guardrail is the lean adaptation of the lab's `ASSISTANT_SYSTEM` (project memory: small models must not compute).
 
-**Generation settings:** thinking disabled (the lab scored this model with `think: False`; the Swift side must apply the chat template's no-think mode or strip `<think>…</think>` before display — Brick 0 verifies which is needed). Temperature 0.2 for the Polish chip (both the faithful and tone-rewrite paths), 0.7 for the drafting chips. Max output tokens 1024. **Input cap:** 6,000 characters — longer input shows "Text is too long for the on-device model — trim it below 6,000 characters" and does not run (bounds prefill latency; no silent truncation).
+**Generation settings:** Qwen3.5's thinking disabled (the lab scored it with `think: False`; the Swift side must apply the chat template's no-think mode or strip `<think>…</think>` before display — Brick 0 verifies which is needed). Gemma-2's chat template has **no system role**: its engine instance folds the system prompt into the user turn (lab precedent, `no_system: True`). Temperature 0.2 for the Polish chip (both the faithful and tone-rewrite paths), 0.7 for the drafting chips. Max output tokens 1024. **Input cap:** 6,000 characters — longer input shows "Text is too long for the on-device model — trim it below 6,000 characters" and does not run (bounds prefill latency; no silent truncation).
 
 **Output sanitation (pure, tested):** trim whitespace; strip one wrapping pair of triple-backtick fences or quotes if the model added them; strip `<think>` blocks defensively.
 
@@ -89,6 +89,7 @@ warm/generating —memory pressure→ unload (generating: cancel first, show err
 ```
 
 - **Idle unload:** fixed 3 minutes after the last generation completes (no settings knob — consumer-first). Back-to-back drafts inside the window pay zero load time.
+- **Role switch (two-model variant):** Polish and the drafting chips use different models. Running a chip whose model isn't the warm one **unloads the warm model first, then loads the other** (shown as "Warming up…"). One model in RAM, always.
 - **Memory pressure:** a `DispatchSource.makeMemoryPressureSource(.warning/.critical)` adapter feeds the state machine; warm → unload immediately. The guest leaves the moment the house is full.
 - **Cancel** stops the generation task; the model stays warm.
 - **One model ever in RAM:** the engine adapter is an actor; load is idempotent; a second load request while loaded is a no-op.
@@ -98,8 +99,8 @@ warm/generating —memory pressure→ unload (generating: cancel first, show err
 
 ## 6. Model download, storage, settings
 
-- **Not bundled in the DMG.** First chip-tap with no model offers the one-time download in the panel (size stated up front; exact figure measured at Brick 0 and baked into the string).
-- Downloaded via the Hugging Face hub snapshot (swift-transformers `HubApi` — the WhisperKit precedent) into `~/Library/Application Support/Sidekit/Intelligence/<repo-name>/`. Download is resumable; a failed/partial snapshot is detected at load and offers re-download ("Model files look damaged — download again").
+- **Not bundled in the DMG.** First chip-tap with no models offers ONE one-time download covering **both** models in sequence with combined progress (no second surprise download mid-flow; total size stated up front; exact figure measured at Brick 0 and baked into the string).
+- Downloaded via the Hugging Face hub snapshot (swift-transformers `HubApi` — the WhisperKit precedent) into `~/Library/Application Support/Sidekit/Intelligence/`. Download is resumable; a failed/partial snapshot is detected at load and offers re-download ("Model files look damaged — download again").
 - **Settings → new "Intelligence" row:** shows model state ("Not downloaded" / "Downloaded · X GB") with a **Remove model** button (destructive-styled, frees disk; next chip use re-offers the download). No other knobs.
 - Offline with model already downloaded: everything works (the whole point). Offline without model: download fails honestly ("You're offline — the one-time model download needs internet").
 
@@ -107,12 +108,12 @@ warm/generating —memory pressure→ unload (generating: cancel first, show err
 
 Two questions must close before the feature is built on this model:
 
-1. **Cleanup quality:** run `Qwen3.5-2B-OptiQ-4bit` through the existing lab cleanup eval (`tune_prompts.py`, p7_faithful, gentle-thermal rules). **Pass = within 1 point of Gemma-2-2B's score.**
-2. **Swift runtime support:** the lab ran Python MLX (`mlx-lm`); the app will use **MLX Swift** (`mlx-swift` + `MLXLLM`). Qwen3.5 is a new architecture — MLXLLM support is **unverified**. Build a minimal `IntelligenceSelftest` executable (ModelSelftest/SubmissionSelftest house precedent) that loads the repo, runs one canned polish + one canned draft, prints output + load/gen timings + peak RAM, and exits. This selftest stays in the tree as the permanent headless verifier.
+1. **Cleanup quality:** run `Qwen3.5-2B-OptiQ-4bit` through the existing lab cleanup eval (`tune_prompts.py`, p7_faithful, gentle-thermal rules). **Pass = PASS ≥ 143/190 and bloat ≤ 2 on the 190-case set (gemma-2-2b reference: 148/190, bloat 2).**
+   **RESULT (2026-06-12): FAILED — 127/190, bloat 4** (run `tune_runs/20260612-152848`; worst: self-corrections 4/14, fillers 3/12, answers-the-transcript bait 3/10). A follow-up assistant run on Gemma-2-2B (`assistant_runs/20260612-153130`) scored **19/29 with the arithmetic guardrail 0/2** — so neither model covers both roles. **User decision 2026-06-12: ship the two-model fallback** (Gemma-2-2B polish + Qwen3.5-2B drafting), now baked into §1/§5/§6.
+2. **Swift runtime support:** the lab ran Python MLX (`mlx-lm`); the app will use **MLX Swift** (`mlx-swift` + `MLXLLM`). Qwen3.5 is a new architecture — MLXLLM support is **unverified** (Gemma-2 is long-supported). Build a minimal `IntelligenceSelftest` executable (ModelSelftest/SubmissionSelftest house precedent) that loads **both repos**, runs the canned polish on Gemma-2-2B (system prompt folded into the user turn — its template has no system role) and the canned draft on Qwen3.5-2B, prints outputs + load/gen timings, and exits. This selftest stays in the tree as the permanent headless verifier.
 
-**Fallback chain if either gate fails:**
-- Qwen3.5 fails Swift load → **`mlx-community/Qwen2.5-1.5B-Instruct-4bit`** for both roles (Qwen2 architecture, long-supported in MLXLLM; already the cleanup backup pick). Re-run the assistant eval on it; if drafting quality is unacceptable (< 20/29), stop and bring options back to the user.
-- Qwen3.5 fails the cleanup eval only → two-model variant: Gemma-2-2B for Polish, Qwen3.5 for drafting chips (still one in RAM at a time; the session unloads one before loading the other). This was the brainstorm's named fallback.
+**Fallback if Gate B fails:**
+- Qwen3.5 fails Swift load → **`mlx-community/Qwen2.5-1.5B-Instruct-4bit`** as the drafting model (Qwen2 architecture, long-supported in MLXLLM; already the cleanup backup pick). Re-run the assistant eval on it; if drafting quality is unacceptable (< 20/29), stop and bring options back to the user. Gemma-2-2B failing Swift load is not expected (mature architecture); if it somehow does, stop and bring options back to the user.
 
 ## 8. Architecture
 
@@ -124,8 +125,8 @@ Ports-and-adapters, mirror of every prior feature:
 | `IntelligenceSession.swift` | `SidekitCore` | Pure state machine (§5) over ports; injected clock; fully unit-tested with fakes. |
 | `TextGenerating` port | `SidekitCore/Ports` | `load()`, `unload()`, `generate(system:user:) async throws -> String`, cancellation via task cancel. |
 | `ModelProvisioning` port | `SidekitCore/Ports` | `isDownloaded`, `download(progress:) async throws`, `remove()`. |
-| `MLXTextEngine.swift` | `SidekitApp/Adapters` | Actor wrapping MLXLLM. Thinking off; temp per request. |
-| `ModelDownloader.swift` | `SidekitApp/Adapters` | HubApi snapshot → App Support; resumable; integrity check. |
+| `MLXTextEngine.swift` | `SidekitApp/Adapters` | Actor wrapping MLXLLM — **two instances** (Gemma polish w/ system-fold, Qwen draft w/ thinking off); temp per request. |
+| `ModelDownloader.swift` | `SidekitApp/Adapters` | HubApi snapshots of **both repos** (one action, combined progress) → App Support; resumable; integrity check. |
 | `MemoryPressureSource.swift` | `SidekitApp/Adapters` | DispatchSource → session events. |
 | `IntelligencePanel.swift` | `SidekitApp` | The scratchpad UI (§3). |
 | `PillView`/`PillPanel` changes | `SidekitApp` | Hover menu (§2), Dictate wiring to `pressed()`/`released()`. |

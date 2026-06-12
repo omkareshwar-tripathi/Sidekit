@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** The floating pill grows a hover menu (Polish · Scratchpad · Dictate) backed by one on-device LLM that loads on demand and unloads after idle — per `docs/superpowers/specs/2026-06-12-sidekit-intelligence-v1-design.md`.
+**Goal:** The floating pill grows a hover menu (Polish · Scratchpad · Dictate) backed by two role-specific on-device LLMs (Gemma-2-2B polishes, Qwen3.5-2B drafts — only one ever warm) that load on demand and unload after idle — per `docs/superpowers/specs/2026-06-12-sidekit-intelligence-v1-design.md`.
 
-**Architecture:** Ports-and-adapters. Pure core: `IntelligencePrompt` (chip×tone → exact prompt strings, sanitation, input cap) + `IntelligenceSession` (the RAM-guest state machine over `TextGenerating`/`ModelProvisioning`/`IntelligenceIdleTimer` ports). App adapters: `MLXTextEngine` (MLX Swift), `ModelDownloader` (HF hub snapshot), `MemoryPressureSource`, plus the scratchpad panel (FeedbackBox pattern) and the pill hover menu. A headless `IntelligenceSelftest` executable is the Brick-0 gate and stays as the permanent live verifier.
+**Architecture:** Ports-and-adapters. Pure core: `IntelligencePrompt` (chip×tone → exact prompt strings, sanitation, input cap) + `IntelligenceSession` (the RAM-guest state machine over `TextGenerating`/`ModelProvisioning`/`IntelligenceIdleTimer` ports). App adapters: two `MLXTextEngine` instances (MLX Swift — Gemma with the system prompt folded into the user turn, Qwen with thinking off), `ModelDownloader` (both HF hub snapshots, one combined download), `MemoryPressureSource`, plus the scratchpad panel (FeedbackBox pattern) and the pill hover menu. A headless `IntelligenceSelftest` executable is the Brick-0 gate and stays as the permanent live verifier.
 
 **Tech Stack:** Swift 6 / SwiftPM, swift-testing (`@Test`/`#expect`), MLX Swift (`mlx-swift-examples`: MLXLLM + MLXLMCommon), Hugging Face hub via swift-transformers' `Hub`, lab gate via the existing Python MLX harness (`lab/whisper-compare`).
 
-**Verification baseline:** `swift test` currently passes **152/152** (run from `mac/`). This plan adds **25** core tests (12 prompt + 13 session) → **177** expected at the end.
+**Verification baseline:** `swift test` currently passes **152/152** (run from `mac/`). This plan adds **29** core tests (13 prompt + 16 session) → **181** expected at the end.
 
 **Third-party drift rule (Tasks 2 & 5 only):** `mlx-swift-examples` API names move between releases. The code below targets the current `main` API (`LLMModelFactory.loadContainer` / `ModelContainer.perform` / `UserInput(chat:)` / `Generation.chunk`). If the pinned revision's signatures differ, adapt the *call sites* to the pinned equivalents — the printed contract (load seconds, generation seconds, outputs free of `<think>`) and the port signatures (`TextGenerating` etc.) are fixed and must not change. This rule covers ONLY the MLX/Hub API surface; everything else in this plan is exact.
 
@@ -21,7 +21,7 @@ The shared model must polish as faithfully as the dedicated cleanup pick. `qwen3
 **Skill:** none (lab harness; gentle-thermal house rules — small batches, cooldowns, one model in RAM).
 
 **Files:**
-- No source changes. New generated results land in `lab/whisper-compare/tune_runs/` (committed, like prior runs).
+- No source changes. New generated results land in `lab/whisper-compare/tune_runs/` (NOTE: `/lab/` is gitignored — results live on disk only; the spec records the numbers durably).
 - Modify: `docs/superpowers/specs/2026-06-12-sidekit-intelligence-v1-design.md` (one line — see step 3).
 
 - [ ] **Step 1: Free RAM, then run the eval (default gentle settings)**
@@ -58,6 +58,8 @@ cd /Users/omkareshwartripathi/SpeakType
 git add lab/whisper-compare/tune_runs/ docs/superpowers/specs/2026-06-12-sidekit-intelligence-v1-design.md
 git commit -m "lab: Gate A — qwen3.5-2b passes p7_faithful cleanup eval (Intelligence v1 §7)"
 ```
+
+**OUTCOME (2026-06-12): GATE FAILED — two-model fallback adopted.** `qwen3.5-2b` scored **127/190, bloat 4** (run `tune_runs/20260612-152848`; worst categories: self-corrections 4/14, fillers 3/12, answers-the-transcript 3/10). A follow-up assistant run on `gemma-2-2b` (`assistant_runs/20260612-153130`) scored **19/29 with the arithmetic guardrail 0/2** — neither model covers both roles. **User decision: ship the two-model variant** — Gemma-2-2B polishes, Qwen3.5-2B drafts, one warm at a time. Steps 3–4 above were superseded: the controller recorded the failure + decision in the spec and committed it with both lab runs. **Every task below is already amended to the two-model variant.**
 
 ---
 
@@ -121,13 +123,16 @@ import MLX
 import MLXLMCommon
 import MLXLLM
 
-// Brick-0 gate + permanent headless verifier for the on-device LLM (spec 2026-06-12 §7).
-// Downloads the model on first run into the app's own Intelligence folder, then:
-// load → one canned polish → one canned draft → prints timings. Exits non-zero on failure.
-// Budgets (spec §5): warm-disk load ≤ 5 s; each generation ≤ 8 s. Task 5 rewires this to
-// drive the real MLXTextEngine adapter + IntelligencePrompt so the gate covers shipping code.
+// Brick-0 gate + permanent headless verifier for the on-device LLMs (spec 2026-06-12 §7).
+// Two-model variant (Gate A outcome): Gemma-2-2B polishes (its chat template has NO system
+// role — fold the system prompt into the user turn), Qwen3.5-2B drafts (thinking off).
+// Downloads on first run into the app's own Intelligence folder, then per model:
+// load → canned generation → unload, printing timings. Exits non-zero on any failure.
+// Budgets (spec §5): warm-disk load ≤ 5 s; each generation ≤ 8 s.
+// Task 5 rewires this to drive the real MLXTextEngine adapter + IntelligencePrompt.
 
-let repoID = "mlx-community/Qwen3.5-2B-OptiQ-4bit"
+let polishRepo = "mlx-community/gemma-2-2b-it-4bit"
+let draftRepo = "mlx-community/Qwen3.5-2B-OptiQ-4bit"
 let root = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Application Support/Sidekit/Intelligence", isDirectory: true)
 
@@ -143,12 +148,34 @@ as given; invent nothing. Output only the requested text — no preamble, no quo
 Write an email from these notes. Subject line first, then the body.
 """
 
-func generate(_ container: ModelContainer, system: String, user: String,
-              temperature: Float) async throws -> String {
-    try await container.perform { context in
+func fail(_ message: String) -> Never {
+    print("FAIL: \(message)")
+    exit(1)
+}
+
+let clock = ContinuousClock()
+
+func snapshot(_ repoID: String, hub: HubApi) async throws -> URL {
+    print("snapshot \(repoID)")
+    var lastPercent = -1
+    return try await hub.snapshot(
+        from: Hub.Repo(id: repoID),
+        matching: ["*.safetensors", "*.json", "*.txt", "*.model"]) { progress in
+        let percent = Int(progress.fractionCompleted * 100)
+        if percent / 10 != lastPercent / 10 { print("  download \(percent)%"); lastPercent = percent }
+    }
+}
+
+/// Load → generate once → free — the RAM-guest rule holds even in the gate.
+func runOnce(dir: URL, chat: [Chat.Message], temperature: Float, label: String) async throws -> String {
+    let loadStart = clock.now
+    let container = try await LLMModelFactory.shared.loadContainer(
+        configuration: ModelConfiguration(directory: dir))
+    print("\(label) load: \(loadStart.duration(to: clock.now))")
+    let genStart = clock.now
+    let out: String = try await container.perform { context in
         let input = try await context.processor.prepare(
-            input: UserInput(chat: [.system(system), .user(user)],
-                             additionalContext: ["enable_thinking": false]))
+            input: UserInput(chat: chat, additionalContext: ["enable_thinking": false]))
         var text = ""
         let stream = try MLXLMCommon.generate(
             input: input,
@@ -159,54 +186,42 @@ func generate(_ container: ModelContainer, system: String, user: String,
         }
         return text
     }
+    print("\(label) gen (\(genStart.duration(to: clock.now))):\n\(out)\n")
+    MLX.GPU.clearCache()
+    return out
 }
 
-func fail(_ message: String) -> Never {
-    print("FAIL: \(message)")
-    exit(1)
-}
-
-let clock = ContinuousClock()
 do {
-    print("snapshot \(repoID) → \(root.path)")
     let hub = HubApi(downloadBase: root)
-    var lastPercent = -1
-    let dir = try await hub.snapshot(
-        from: Hub.Repo(id: repoID),
-        matching: ["*.safetensors", "*.json", "*.txt", "*.model"]) { progress in
-        let percent = Int(progress.fractionCompleted * 100)
-        if percent / 10 != lastPercent / 10 { print("  download \(percent)%"); lastPercent = percent }
+    let gemmaDir = try await snapshot(polishRepo, hub: hub)
+    let qwenDir = try await snapshot(draftRepo, hub: hub)
+
+    var diskBytes = 0
+    if let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.fileSizeKey]) {
+        for case let url as URL in files {
+            diskBytes += (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        }
     }
-    let diskBytes = (try? FileManager.default.contentsOfDirectory(
-        at: dir, includingPropertiesForKeys: [.fileSizeKey]))?
-        .compactMap { try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize }
-        .reduce(0, +) ?? 0
-    print(String(format: "disk: %.2f GB", Double(diskBytes) / 1_073_741_824))
+    print(String(format: "disk: %.2f GB total", Double(diskBytes) / 1_073_741_824))
 
-    let loadStart = clock.now
-    let container = try await LLMModelFactory.shared.loadContainer(
-        configuration: ModelConfiguration(directory: dir))
-    print("load: \(loadStart.duration(to: clock.now))")
-
-    let polishStart = clock.now
-    let polished = try await generate(
-        container, system: polishSystem,
-        user: "um so basically i think we should uh ship it on tuesday actually no wednesday",
-        temperature: 0.2)
-    print("polish (\(polishStart.duration(to: clock.now))): \(polished)")
+    // Polish on Gemma — NO system role: the system prompt rides the user turn.
+    let polished = try await runOnce(
+        dir: gemmaDir,
+        chat: [.user(polishSystem + "\n\n" +
+                     "um so basically i think we should uh ship it on tuesday actually no wednesday")],
+        temperature: 0.2, label: "polish/gemma")
     if polished.isEmpty { fail("polish returned empty") }
-    if polished.contains("<think>") { fail("thinking mode leaked into polish output") }
     if !polished.localizedCaseInsensitiveContains("wednesday") { fail("polish lost the correction") }
 
-    let draftStart = clock.now
-    let draft = try await generate(
-        container, system: draftSystem,
-        user: "tell priya the invoice for 4500 dollars went out, ask her to cc me going forward",
-        temperature: 0.7)
-    print("draft (\(draftStart.duration(to: clock.now))):\n\(draft)")
-    if draft.isEmpty { fail("draft returned empty") }
-    if draft.contains("<think>") { fail("thinking mode leaked into draft output") }
-    if !draft.contains("4500") { fail("draft dropped the exact amount") }
+    // Draft on Qwen — native system role, thinking off.
+    let drafted = try await runOnce(
+        dir: qwenDir,
+        chat: [.system(draftSystem),
+               .user("tell priya the invoice for 4500 dollars went out, ask her to cc me going forward")],
+        temperature: 0.7, label: "draft/qwen")
+    if drafted.isEmpty { fail("draft returned empty") }
+    if drafted.contains("<think>") { fail("thinking mode leaked into draft output") }
+    if !drafted.contains("4500") { fail("draft dropped the exact amount") }
 
     print("gpu memory: \(GPU.snapshot())")
     print("PASS")
@@ -222,9 +237,9 @@ cd /Users/omkareshwartripathi/SpeakType/mac
 swift run -c release IntelligenceSelftest
 ```
 
-Expected: first run downloads (~1–2 GB, one time), then `load: …`, both outputs printed, `PASS`, exit 0. **Record from the output: disk GB, load seconds, polish seconds, draft seconds** — Task 6 bakes the disk size into the download-button string, and BRICKS.md gets the timings.
+Expected: first run downloads both models (~2.5–3 GB total, one time), then per model `load: …` + a generation, and `PASS`, exit 0. **Record from the output: total disk GB, each model's load seconds and generation seconds** — Task 6 bakes the disk size into the download-button string, and BRICKS.md gets the timings.
 
-**Budget check (spec §5):** re-run once (warm disk). Warm load ≤ 5 s, polish ≤ 5 s, draft ≤ 8 s. Any budget missed by >2× → STOP, report BLOCKED with the numbers (spec says revisit model choice with the user). **If the model architecture fails to load at all** (unsupported-architecture error) → STOP, report BLOCKED: spec §7 fallback swaps `repoID` to `mlx-community/Qwen2.5-1.5B-Instruct-4bit` — a decision the controller takes back to the user with the assistant-score caveat.
+**Budget check (spec §5):** re-run once (warm disk). Per model: warm load ≤ 5 s, generation ≤ 8 s. Any budget missed by >2× → STOP, report BLOCKED with the numbers (spec says revisit with the user). **If Qwen3.5's architecture fails to load** (unsupported-architecture error) → STOP, report BLOCKED: spec §7 swaps the DRAFT repo to `mlx-community/Qwen2.5-1.5B-Instruct-4bit` — a decision the controller takes back to the user. Gemma-2 failing to load is unexpected (mature architecture) — if it does, STOP and report BLOCKED.
 
 - [ ] **Step 5: Confirm the suite still passes, then commit**
 
@@ -262,6 +277,13 @@ struct IntelligencePromptTests {
                 ["Draft email", "Draft message", "Polish", "Summarize"])
         #expect(IntelligenceTone.allCases.map(\.label) ==
                 ["Keep tone", "Professional", "Friendly", "Concise"])
+    }
+
+    @Test func chipRolesSplitPolishFromDrafting() {
+        #expect(IntelligenceChip.polish.role == .polish)
+        for chip in [IntelligenceChip.draftEmail, .draftMessage, .summarize] {
+            #expect(chip.role == .draft)
+        }
     }
 
     // MARK: polish paths
@@ -383,6 +405,17 @@ public enum IntelligenceChip: CaseIterable, Sendable {
         case .summarize: return "Summarize"
         }
     }
+
+    /// Which model serves this chip (spec §1 two-model split): Polish runs on Gemma-2-2B,
+    /// every drafting chip on Qwen3.5-2B.
+    public var role: IntelligenceRole {
+        self == .polish ? .polish : .draft
+    }
+}
+
+/// The two engine roles of the two-model split (spec §1/§5). One is warm at a time.
+public enum IntelligenceRole: Sendable, Equatable {
+    case polish, draft
 }
 
 /// The global tone picker (spec §3). Applies to whatever chip runs; default Keep tone.
@@ -518,7 +551,7 @@ public enum IntelligencePrompt {
 swift test --filter IntelligencePromptTests 2>&1 | tail -5
 ```
 
-Expected: 12/12 PASS. Then the whole suite: `swift test 2>&1 | tail -3` → 164/164.
+Expected: 13/13 PASS. Then the whole suite: `swift test 2>&1 | tail -3` → 165/165.
 
 - [ ] **Step 5: Commit**
 
@@ -625,148 +658,177 @@ private struct TestError: Error {}
 
 @MainActor
 struct IntelligenceSessionTests {
-    private func make(downloaded: Bool = true)
-        -> (IntelligenceSession, FakeEngine, FakeProvisioner, FakeIdleTimer, Recorder) {
-        let engine = FakeEngine()
-        let provisioner = FakeProvisioner(downloaded: downloaded)
-        let idle = FakeIdleTimer()
-        let session = IntelligenceSession(engine: engine, provisioner: provisioner, idle: idle)
-        let rec = Recorder()
-        session.onStateChanged = { rec.states.append($0) }
-        session.onResult = { rec.results.append($0) }
-        session.onError = { rec.errors.append($0) }
-        return (session, engine, provisioner, idle, rec)
-    }
-
     final class Recorder {
         var states: [IntelligenceSession.State] = []
         var results: [String] = []
         var errors: [String] = []
     }
 
+    private struct Rig {
+        let session: IntelligenceSession
+        let polish: FakeEngine
+        let draft: FakeEngine
+        let provisioner: FakeProvisioner
+        let idle: FakeIdleTimer
+        let rec: Recorder
+    }
+
+    private func make(downloaded: Bool = true) -> Rig {
+        let polish = FakeEngine()
+        let draft = FakeEngine()
+        let provisioner = FakeProvisioner(downloaded: downloaded)
+        let idle = FakeIdleTimer()
+        let session = IntelligenceSession(polishEngine: polish, draftEngine: draft,
+                                          provisioner: provisioner, idle: idle)
+        let rec = Recorder()
+        session.onStateChanged = { rec.states.append($0) }
+        session.onResult = { rec.results.append($0) }
+        session.onError = { rec.errors.append($0) }
+        return Rig(session: session, polish: polish, draft: draft,
+                   provisioner: provisioner, idle: idle, rec: rec)
+    }
+
     @Test func initialStateReflectsDownload() {
-        #expect(make(downloaded: true).0.state == .ready)
-        #expect(make(downloaded: false).0.state == .needsModel)
+        #expect(make(downloaded: true).session.state == .ready)
+        #expect(make(downloaded: false).session.state == .needsModel)
     }
 
     @Test func downloadHappyPathReportsProgressThenReady() async {
-        let (session, _, _, _, rec) = make(downloaded: false)
-        await session.requestDownload()?.value
-        #expect(rec.states.contains(.downloading(0.0)))
-        #expect(rec.states.contains(.downloading(0.5)))
-        #expect(session.state == .ready)
+        let rig = make(downloaded: false)
+        await rig.session.requestDownload()?.value
+        #expect(rig.rec.states.contains(.downloading(0.0)))
+        #expect(rig.rec.states.contains(.downloading(0.5)))
+        #expect(rig.session.state == .ready)
     }
 
     @Test func downloadFailureStaysNeedsModelWithError() async {
-        let (session, _, provisioner, _, rec) = make(downloaded: false)
-        provisioner.downloadError = TestError()
-        await session.requestDownload()?.value
-        #expect(session.state == .needsModel)
-        #expect(rec.errors == ["Download interrupted — Retry"])
+        let rig = make(downloaded: false)
+        rig.provisioner.downloadError = TestError()
+        await rig.session.requestDownload()?.value
+        #expect(rig.session.state == .needsModel)
+        #expect(rig.rec.errors == ["Download interrupted — Retry"])
     }
 
     @Test func downloadOfflineShowsTheOfflineMessage() async {
-        let (session, _, provisioner, _, rec) = make(downloaded: false)
-        provisioner.downloadError = URLError(.notConnectedToInternet)
-        await session.requestDownload()?.value
-        #expect(session.state == .needsModel)
-        #expect(rec.errors == ["You're offline — the one-time model download needs internet."])
+        let rig = make(downloaded: false)
+        rig.provisioner.downloadError = URLError(.notConnectedToInternet)
+        await rig.session.requestDownload()?.value
+        #expect(rig.session.state == .needsModel)
+        #expect(rig.rec.errors == ["You're offline — the one-time model download needs internet."])
     }
 
-    @Test func runFromReadyLoadsGeneratesAndDeliversSanitizedResult() async {
-        let (session, engine, _, _, rec) = make()
-        engine.reply = "```\nHello.\n```"
-        await session.run(chip: .draftEmail, tone: .professional, input: " notes ")?.value
-        #expect(engine.loads == 1)
-        #expect(engine.generated.count == 1)
-        #expect(engine.generated[0].user == "notes") // trimmed by the input check
-        #expect(engine.generated[0].temperature == 0.7)
-        #expect(engine.generated[0].system ==
+    @Test func draftChipRunsOnTheDraftEngineOnly() async {
+        let rig = make()
+        rig.draft.reply = "```\nHello.\n```"
+        await rig.session.run(chip: .draftEmail, tone: .professional, input: " notes ")?.value
+        #expect(rig.draft.loads == 1)
+        #expect(rig.polish.loads == 0 && rig.polish.generated.isEmpty)
+        #expect(rig.draft.generated.count == 1)
+        #expect(rig.draft.generated[0].user == "notes") // trimmed by the input check
+        #expect(rig.draft.generated[0].temperature == 0.7)
+        #expect(rig.draft.generated[0].system ==
                 IntelligencePrompt.build(chip: .draftEmail, tone: .professional).system)
-        #expect(rec.results == ["Hello."])
-        #expect(session.state == .warm)
-        #expect(rec.states.contains(.loading) && rec.states.contains(.generating))
+        #expect(rig.rec.results == ["Hello."]) // sanitized
+        #expect(rig.session.state == .warm)
+        #expect(rig.rec.states.contains(.loading) && rig.rec.states.contains(.generating))
     }
 
-    @Test func runFromWarmSkipsLoadAndResetsIdleTimer() async {
-        let (session, engine, _, idle, _) = make()
-        await session.run(chip: .polish, tone: .keepTone, input: "x")?.value
-        await session.run(chip: .polish, tone: .keepTone, input: "y")?.value
-        #expect(engine.loads == 1)
-        #expect(idle.cancels >= 1)      // a new run cancels the pending unload
-        #expect(idle.pending != nil)    // …and re-arms it after finishing
+    @Test func polishChipRunsOnThePolishEngineOnly() async {
+        let rig = make()
+        await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
+        #expect(rig.polish.loads == 1 && rig.polish.generated.count == 1)
+        #expect(rig.draft.loads == 0 && rig.draft.generated.isEmpty)
+        #expect(rig.polish.generated[0].temperature == 0.2)
+    }
+
+    @Test func sameRoleTwiceSkipsReloadAndResetsIdleTimer() async {
+        let rig = make()
+        await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
+        await rig.session.run(chip: .polish, tone: .friendly, input: "y")?.value
+        #expect(rig.polish.loads == 1)
+        #expect(rig.idle.cancels >= 1)      // a new run cancels the pending unload
+        #expect(rig.idle.pending != nil)    // …and re-arms it after finishing
+    }
+
+    @Test func roleSwitchUnloadsTheWarmModelFirst() async {
+        let rig = make()
+        await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
+        await rig.session.run(chip: .draftEmail, tone: .keepTone, input: "y")?.value
+        #expect(rig.polish.unloads == 1)    // Gemma left before Qwen arrived
+        #expect(rig.draft.loads == 1)
+        #expect(rig.session.state == .warm)
     }
 
     @Test func emptyInputDoesNothingAndTooLongErrorsWithoutEngineCalls() async {
-        let (session, engine, _, _, rec) = make()
-        await session.run(chip: .summarize, tone: .keepTone, input: "   ")?.value
-        #expect(engine.generated.isEmpty && rec.errors.isEmpty)
-        await session.run(chip: .summarize, tone: .keepTone,
-                          input: String(repeating: "a", count: 6001))?.value
-        #expect(engine.generated.isEmpty)
-        #expect(rec.errors == [IntelligencePrompt.tooLongMessage])
-        #expect(session.state == .ready)
+        let rig = make()
+        await rig.session.run(chip: .summarize, tone: .keepTone, input: "   ")?.value
+        #expect(rig.draft.generated.isEmpty && rig.rec.errors.isEmpty)
+        await rig.session.run(chip: .summarize, tone: .keepTone,
+                              input: String(repeating: "a", count: 6001))?.value
+        #expect(rig.draft.generated.isEmpty)
+        #expect(rig.rec.errors == [IntelligencePrompt.tooLongMessage])
+        #expect(rig.session.state == .ready)
     }
 
     @Test func emptySanitizedOutputIsAnHonestError() async {
-        let (session, engine, _, _, rec) = make()
-        engine.reply = "  \n "
-        await session.run(chip: .draftMessage, tone: .keepTone, input: "x")?.value
-        #expect(rec.errors == ["Couldn't draft that — try again."])
-        #expect(rec.results.isEmpty)
-        #expect(session.state == .warm) // model stays warm; the input is preserved UI-side
+        let rig = make()
+        rig.draft.reply = "  \n "
+        await rig.session.run(chip: .draftMessage, tone: .keepTone, input: "x")?.value
+        #expect(rig.rec.errors == ["Couldn't draft that — try again."])
+        #expect(rig.rec.results.isEmpty)
+        #expect(rig.session.state == .warm) // model stays warm; the input is preserved UI-side
     }
 
     @Test func loadFailureReturnsToReadyWithDamageMessage() async {
-        let (session, engine, _, _, rec) = make()
-        engine.loadError = TestError()
-        await session.run(chip: .polish, tone: .keepTone, input: "x")?.value
-        #expect(session.state == .ready)
-        #expect(rec.errors == ["Model files look damaged — download again."])
+        let rig = make()
+        rig.polish.loadError = TestError()
+        await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
+        #expect(rig.session.state == .ready)
+        #expect(rig.rec.errors == ["Model files look damaged — download again."])
     }
 
     @Test func generationFailureStaysWarmWithRetryMessage() async {
-        let (session, engine, _, _, rec) = make()
-        engine.generateError = TestError()
-        await session.run(chip: .polish, tone: .keepTone, input: "x")?.value
-        #expect(session.state == .warm)
-        #expect(rec.errors == ["Couldn't draft that — try again."])
+        let rig = make()
+        rig.polish.generateError = TestError()
+        await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
+        #expect(rig.session.state == .warm)
+        #expect(rig.rec.errors == ["Couldn't draft that — try again."])
     }
 
     @Test func idleTimerFireUnloadsBackToReady() async {
-        let (session, engine, _, idle, _) = make()
-        await session.run(chip: .polish, tone: .keepTone, input: "x")?.value
-        idle.fire()
-        await session.settle()
-        #expect(engine.unloads == 1)
-        #expect(session.state == .ready)
+        let rig = make()
+        await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
+        rig.idle.fire()
+        await rig.session.settle()
+        #expect(rig.polish.unloads == 1)
+        #expect(rig.session.state == .ready)
     }
 
     @Test func cancelDuringGenerationReturnsWarmSilently() async {
-        let (session, engine, _, _, rec) = make()
-        engine.generateError = CancellationError()
-        await session.run(chip: .polish, tone: .keepTone, input: "x")?.value
-        #expect(session.state == .warm)
-        #expect(rec.errors.isEmpty && rec.results.isEmpty)
+        let rig = make()
+        rig.polish.generateError = CancellationError()
+        await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
+        #expect(rig.session.state == .warm)
+        #expect(rig.rec.errors.isEmpty && rig.rec.results.isEmpty)
     }
 
     @Test func memoryPressureWhenWarmUnloadsImmediately() async {
-        let (session, engine, _, _, _) = make()
-        await session.run(chip: .polish, tone: .keepTone, input: "x")?.value
-        session.memoryPressure()
-        await session.settle()
-        #expect(engine.unloads == 1)
-        #expect(session.state == .ready)
+        let rig = make()
+        await rig.session.run(chip: .draftEmail, tone: .keepTone, input: "x")?.value
+        rig.session.memoryPressure()
+        await rig.session.settle()
+        #expect(rig.draft.unloads == 1)
+        #expect(rig.session.state == .ready)
     }
 
     @Test func modelRemovedDropsToNeedsModel() async {
-        let (session, engine, provisioner, _, _) = make()
-        await session.run(chip: .polish, tone: .keepTone, input: "x")?.value
-        try? provisioner.remove()
-        session.modelRemoved()
-        await session.settle()
-        #expect(engine.unloads == 1)
-        #expect(session.state == .needsModel)
+        let rig = make()
+        await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
+        try? rig.provisioner.remove()
+        rig.session.modelRemoved()
+        await rig.session.settle()
+        #expect(rig.polish.unloads == 1)
+        #expect(rig.session.state == .needsModel)
     }
 }
 ```
@@ -784,18 +846,19 @@ Expected: compile failure (`IntelligenceSession` doesn't exist).
 ```swift
 import Foundation
 
-/// The RAM-guest state machine (spec 2026-06-12 §5): the model loads on demand, stays warm
-/// for an idle window, then unloads — never resident. Pure over the three ports; the UI
-/// mirrors `state` and the result/error callbacks. @MainActor like the app models it feeds;
-/// the engine itself runs its work off-main behind its async port.
+/// The RAM-guest state machine (spec 2026-06-12 §5): a model loads on demand, stays warm
+/// for an idle window, then unloads — never resident. Two role-specific engines (spec §1:
+/// Gemma polishes, Qwen drafts) but only ONE is ever warm — switching roles unloads the
+/// other first. Pure over the ports; the UI mirrors `state` + the result/error callbacks.
+/// @MainActor like the app models it feeds; engine work runs off-main behind the async port.
 @MainActor
 public final class IntelligenceSession {
     public enum State: Equatable, Sendable {
         case needsModel
         case downloading(Double)
-        case ready       // downloaded, weights not in RAM
+        case ready       // downloaded, no weights in RAM
         case loading
-        case warm        // weights in RAM, idle
+        case warm        // one model's weights in RAM, idle
         case generating
     }
 
@@ -806,25 +869,34 @@ public final class IntelligenceSession {
     public var onResult: ((String) -> Void)?
     public var onError: ((String) -> Void)?
 
-    private let engine: any TextGenerating
+    private let polishEngine: any TextGenerating
+    private let draftEngine: any TextGenerating
     private let provisioner: any ModelProvisioning
     private let idle: any IntelligenceIdleTimer
     private let idleSeconds: Double
+    /// Which engine is warm; nil ↔ state ready/needsModel.
+    private var warmRole: IntelligenceRole?
     private var generationTask: Task<Void, Never>?
     private var housekeepingTask: Task<Void, Never>?
 
-    public init(engine: any TextGenerating,
+    public init(polishEngine: any TextGenerating,
+                draftEngine: any TextGenerating,
                 provisioner: any ModelProvisioning,
                 idle: any IntelligenceIdleTimer,
                 idleSeconds: Double = 180) {
-        self.engine = engine
+        self.polishEngine = polishEngine
+        self.draftEngine = draftEngine
         self.provisioner = provisioner
         self.idle = idle
         self.idleSeconds = idleSeconds
         self.state = provisioner.isDownloaded ? .ready : .needsModel
     }
 
-    /// One-time model download (spec §6). Returns the task so callers/tests can await it.
+    private func engine(for role: IntelligenceRole) -> any TextGenerating {
+        role == .polish ? polishEngine : draftEngine
+    }
+
+    /// One-time download of BOTH models (spec §6). Returns the task so callers/tests can await it.
     @discardableResult
     public func requestDownload() -> Task<Void, Never>? {
         guard state == .needsModel else { return nil }
@@ -852,8 +924,8 @@ public final class IntelligenceSession {
         return task
     }
 
-    /// Run one chip (spec §3/§5): validate → (load if cold) → generate → sanitize → deliver.
-    /// Returns the task so callers/tests can await it.
+    /// Run one chip (spec §3/§5): validate → swap/load the chip's model if needed →
+    /// generate → sanitize → deliver. Returns the task so callers/tests can await it.
     @discardableResult
     public func run(chip: IntelligenceChip, tone: IntelligenceTone, input: String) -> Task<Void, Never>? {
         guard state == .ready || state == .warm else { return nil }
@@ -864,12 +936,22 @@ public final class IntelligenceSession {
         case .ok(let trimmed): text = trimmed
         }
         idle.cancel()
+        let role = chip.role
         let prompt = IntelligencePrompt.build(chip: chip, tone: tone)
         let task = Task { [weak self] in
             guard let self else { return }
-            if self.state == .ready {
+            if let warm = self.warmRole, warm != role {
+                // Role switch: the warm model leaves before the other arrives (spec §5).
                 self.state = .loading
-                do { try await self.engine.load() } catch {
+                self.warmRole = nil
+                await self.engine(for: warm).unload()
+            }
+            if self.warmRole == nil {
+                self.state = .loading
+                do {
+                    try await self.engine(for: role).load()
+                    self.warmRole = role
+                } catch {
                     self.state = .ready
                     self.onError?("Model files look damaged — download again.")
                     return
@@ -877,25 +959,27 @@ public final class IntelligenceSession {
             }
             self.state = .generating
             do {
-                let raw = try await self.engine.generate(
+                let raw = try await self.engine(for: role).generate(
                     system: prompt.system, user: text, temperature: prompt.temperature)
                 let clean = IntelligencePrompt.sanitize(raw)
                 self.state = .warm
                 if clean.isEmpty { self.onError?("Couldn't draft that — try again.") }
                 else { self.onResult?(clean) }
             } catch is CancellationError {
-                self.state = .warm   // silent: the user asked to stop
+                // The user (or memory pressure) asked to stop. If pressure already evicted
+                // the model, keep the state it set; otherwise stay warm, silently.
+                if self.warmRole != nil { self.state = .warm }
             } catch {
                 self.state = .warm
                 self.onError?("Couldn't draft that — try again.")
             }
-            self.scheduleIdleUnload()
+            if self.warmRole != nil { self.scheduleIdleUnload() }
         }
         generationTask = task
         return task
     }
 
-    /// Stop the in-flight generation; the model stays warm (spec §5).
+    /// Stop the in-flight generation; the warm model stays warm (spec §5).
     public func cancelGeneration() { generationTask?.cancel() }
 
     /// System memory pressure: the guest leaves immediately (spec §5).
@@ -933,8 +1017,18 @@ public final class IntelligenceSession {
     }
 
     private func unloadNow(to target: State) {
+        let warm = warmRole
+        warmRole = nil
         state = target
-        housekeepingTask = Task { [engine] in await engine.unload() }
+        housekeepingTask = Task { [polishEngine, draftEngine] in
+            switch warm {
+            case .polish: await polishEngine.unload()
+            case .draft: await draftEngine.unload()
+            case nil:    // belt & braces (e.g. modelRemoved while nothing is warm)
+                await polishEngine.unload()
+                await draftEngine.unload()
+            }
+        }
     }
 }
 ```
@@ -942,8 +1036,8 @@ public final class IntelligenceSession {
 - [ ] **Step 5: Run until green, then the whole suite**
 
 ```bash
-swift test --filter IntelligenceSessionTests 2>&1 | tail -5   # 13/13 PASS
-swift test 2>&1 | tail -3                                      # 177/177
+swift test --filter IntelligenceSessionTests 2>&1 | tail -5   # 16/16 PASS
+swift test 2>&1 | tail -3                                      # 181/181
 ```
 
 (One ordering nuance the tests pin down: `modelRemoved`/`memoryPressure` set the state *before* the async unload completes — `settle()` exists so tests await the unload side-effect.)
@@ -1002,15 +1096,19 @@ import SidekitCore
 public enum IntelligenceEngineError: Error { case notLoaded }
 
 /// MLXLLM-backed `TextGenerating` (spec §5/§8). An actor: one model in RAM, `load()`
-/// idempotent, `unload()` drops the container and clears the MLX cache. Thinking is
-/// disabled at the chat-template level (the lab scored the model with think off);
-/// `IntelligencePrompt.sanitize` strips any leak defensively.
+/// idempotent, `unload()` drops the container and clears the MLX cache. Two instances ship
+/// (spec §1): Gemma-2 polish — whose chat template has NO system role, so the system prompt
+/// is folded into the user turn — and Qwen3.5 draft with thinking disabled at the template
+/// level (the lab scored it with think off); `IntelligencePrompt.sanitize` strips any leak.
 public actor MLXTextEngine: TextGenerating {
     private let modelDirectory: @Sendable () -> URL
+    private let foldsSystemIntoUser: Bool
     private var container: ModelContainer?
 
-    public init(modelDirectory: @escaping @Sendable () -> URL) {
+    public init(modelDirectory: @escaping @Sendable () -> URL,
+                foldsSystemIntoUser: Bool = false) {
         self.modelDirectory = modelDirectory
+        self.foldsSystemIntoUser = foldsSystemIntoUser
     }
 
     public func load() async throws {
@@ -1026,10 +1124,12 @@ public actor MLXTextEngine: TextGenerating {
 
     public func generate(system: String, user: String, temperature: Float) async throws -> String {
         guard let container else { throw IntelligenceEngineError.notLoaded }
+        let chat: [Chat.Message] = foldsSystemIntoUser
+            ? [.user(system + "\n\n" + user)]
+            : [.system(system), .user(user)]
         return try await container.perform { context in
             let input = try await context.processor.prepare(
-                input: UserInput(chat: [.system(system), .user(user)],
-                                 additionalContext: ["enable_thinking": false]))
+                input: UserInput(chat: chat, additionalContext: ["enable_thinking": false]))
             var text = ""
             let stream = try MLXLMCommon.generate(
                 input: input,
@@ -1052,11 +1152,14 @@ import Foundation
 import Hub
 import SidekitCore
 
-/// Owns the model files (spec §6): HF hub snapshot into the app's own folder, presence
-/// check, and Settings removal. Separate from loading so consent/progress stay explicit.
-/// AppKit-free; the app injects its root (AppPaths) and logger (Diag).
+/// Owns the model files (spec §6): HF hub snapshots of BOTH models into the app's own
+/// folder, presence check, and Settings removal. One download action covers both, with
+/// combined progress — no second surprise download mid-flow. AppKit-free; the app injects
+/// its root (AppPaths) and logger (Diag).
 public final class ModelDownloader: ModelProvisioning, @unchecked Sendable {
-    public static let repoID = "mlx-community/Qwen3.5-2B-OptiQ-4bit"
+    public static let polishRepoID = "mlx-community/gemma-2-2b-it-4bit"
+    public static let draftRepoID = "mlx-community/Qwen3.5-2B-OptiQ-4bit"
+    private static let repoIDs = [polishRepoID, draftRepoID]
 
     /// `…/Application Support/Sidekit/Intelligence` in the app; the selftest uses the same.
     public let root: URL
@@ -1068,30 +1171,37 @@ public final class ModelDownloader: ModelProvisioning, @unchecked Sendable {
     }
 
     /// HubApi snapshot layout: `<root>/models/<org>/<name>`.
-    public var snapshotDirectory: URL {
-        root.appendingPathComponent("models/\(Self.repoID)", isDirectory: true)
+    public func snapshotDirectory(for repoID: String) -> URL {
+        root.appendingPathComponent("models/\(repoID)", isDirectory: true)
     }
 
-    /// The weights' config marks a complete snapshot; a partial download lacks it and the
-    /// load path then reports "damaged" → re-download (spec §6).
+    /// Both snapshots complete — each weights' config marks its snapshot; a partial
+    /// download lacks it and the load path then reports "damaged" → re-download (spec §6).
     public var isDownloaded: Bool {
-        FileManager.default.fileExists(atPath: snapshotDirectory
-            .appendingPathComponent("config.json").path)
+        Self.repoIDs.allSatisfy {
+            FileManager.default.fileExists(atPath: snapshotDirectory(for: $0)
+                .appendingPathComponent("config.json").path)
+        }
     }
 
+    /// ONE action downloads both models in sequence; combined progress 0…1 (spec §6).
     public func download(progress: @escaping @Sendable (Double) -> Void) async throws {
         let hub = HubApi(downloadBase: root)
-        _ = try await hub.snapshot(
-            from: Hub.Repo(id: Self.repoID),
-            matching: ["*.safetensors", "*.json", "*.txt", "*.model"]) { p in
-            progress(p.fractionCompleted)
+        let count = Double(Self.repoIDs.count)
+        for (index, repoID) in Self.repoIDs.enumerated() {
+            let base = Double(index) / count
+            _ = try await hub.snapshot(
+                from: Hub.Repo(id: repoID),
+                matching: ["*.safetensors", "*.json", "*.txt", "*.model"]) { p in
+                progress(base + p.fractionCompleted / count)
+            }
+            log("snapshot complete: \(repoID)")
         }
-        log("model snapshot complete")
     }
 
     public func remove() throws {
         try FileManager.default.removeItem(at: root)
-        log("model removed")
+        log("models removed")
     }
 }
 ```
@@ -1148,7 +1258,8 @@ import SidekitCore
 import SidekitIntelligence
 
 // Brick-0 gate + permanent headless verifier (spec 2026-06-12 §7) — now driving the REAL
-// shipping adapters (SidekitIntelligence) + the REAL prompts (IntelligencePrompt).
+// shipping adapters (SidekitIntelligence) + the REAL prompts (IntelligencePrompt), across
+// both models with an explicit role swap (the RAM-guest rule, spec §5).
 
 let root = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Application Support/Sidekit/Intelligence", isDirectory: true)
@@ -1162,41 +1273,50 @@ let clock = ContinuousClock()
 do {
     let downloader = ModelDownloader(root: root, log: { print("  \($0)") })
     if !downloader.isDownloaded {
-        print("downloading \(ModelDownloader.repoID)…")
+        print("downloading \(ModelDownloader.polishRepoID) + \(ModelDownloader.draftRepoID)…")
         var lastDecile = -1
         try await downloader.download { fraction in
             let decile = Int(fraction * 10)
             if decile != lastDecile { print("  download \(decile * 10)%"); lastDecile = decile }
         }
     }
-    let engine = MLXTextEngine(modelDirectory: { downloader.snapshotDirectory })
+    let polishEngine = MLXTextEngine(
+        modelDirectory: { downloader.snapshotDirectory(for: ModelDownloader.polishRepoID) },
+        foldsSystemIntoUser: true)   // Gemma-2 has no system role (spec §4)
+    let draftEngine = MLXTextEngine(
+        modelDirectory: { downloader.snapshotDirectory(for: ModelDownloader.draftRepoID) })
 
-    let loadStart = clock.now
-    try await engine.load()
-    print("load: \(loadStart.duration(to: clock.now))")
-
+    // Polish on Gemma via the real prompt.
     let polish = IntelligencePrompt.build(chip: .polish, tone: .keepTone)
-    let polishStart = clock.now
-    let polished = IntelligencePrompt.sanitize(try await engine.generate(
+    var loadStart = clock.now
+    try await polishEngine.load()
+    print("polish/gemma load: \(loadStart.duration(to: clock.now))")
+    var genStart = clock.now
+    let polished = IntelligencePrompt.sanitize(try await polishEngine.generate(
         system: polish.system,
         user: "um so basically i think we should uh ship it on tuesday actually no wednesday",
         temperature: polish.temperature))
-    print("polish (\(polishStart.duration(to: clock.now))): \(polished)")
+    print("polish/gemma gen (\(genStart.duration(to: clock.now))): \(polished)")
     if polished.isEmpty { fail("polish returned empty") }
-    if polished.contains("<think>") { fail("thinking leaked") }
     if !polished.localizedCaseInsensitiveContains("wednesday") { fail("polish lost the correction") }
+    await polishEngine.unload()   // role swap: the guest leaves before the next arrives
 
+    // Draft on Qwen via the real prompt.
     let draft = IntelligencePrompt.build(chip: .draftEmail, tone: .professional)
-    let draftStart = clock.now
-    let drafted = IntelligencePrompt.sanitize(try await engine.generate(
+    loadStart = clock.now
+    try await draftEngine.load()
+    print("draft/qwen load: \(loadStart.duration(to: clock.now))")
+    genStart = clock.now
+    let drafted = IntelligencePrompt.sanitize(try await draftEngine.generate(
         system: draft.system,
         user: "tell priya the invoice for 4500 dollars went out, ask her to cc me going forward",
         temperature: draft.temperature))
-    print("draft (\(draftStart.duration(to: clock.now))):\n\(drafted)")
+    print("draft/qwen gen (\(genStart.duration(to: clock.now))):\n\(drafted)")
     if drafted.isEmpty { fail("draft returned empty") }
+    if drafted.contains("<think>") { fail("thinking leaked") }
     if !drafted.contains("4500") { fail("draft dropped the exact amount") }
+    await draftEngine.unload()
 
-    await engine.unload()
     print("PASS")
 } catch {
     fail("\(error)")
@@ -1210,7 +1330,7 @@ cd /Users/omkareshwartripathi/SpeakType/mac
 swift build && swift run -c release IntelligenceSelftest && swift test 2>&1 | tail -3
 ```
 
-Expected: selftest PASS on the already-downloaded model (no re-download — same root as Task 2); suite 177/177.
+Expected: selftest PASS on the already-downloaded model (no re-download — same root as Task 2); suite 181/181.
 
 - [ ] **Step 7: Commit**
 
@@ -1448,7 +1568,7 @@ struct IntelligenceView: View {
                 }
                 Spacer()
                 // Disk size measured by the Task-2 gate run — update if the model changes.
-                Button(model.statusText == nil ? "Download model (≈1.2 GB, one time)" : "Retry") {
+                Button(model.statusText == nil ? "Download models (≈2.7 GB, one time)" : "Retry") {
                     model.download()
                 }
                 .buttonStyle(.borderedProminent)
@@ -1551,7 +1671,7 @@ cd /Users/omkareshwartripathi/SpeakType/mac
 swift build
 ```
 
-Expected: clean build (the panel isn't constructed anywhere yet — that's Task 7). `swift test 2>&1 | tail -3` → still 177/177.
+Expected: clean build (the panel isn't constructed anywhere yet — that's Task 7). `swift test 2>&1 | tail -3` → still 181/181.
 
 - [ ] **Step 3: Commit**
 
@@ -1686,13 +1806,17 @@ And an accessor for Settings (Task 8 uses it):
 In `init()`, right after the `welcomePanel` line, create the Intelligence stack:
 
 ```swift
-        // Sidekit Intelligence (spec 2026-06-12): one shared model, loaded on demand,
-        // unloaded after idle — the RAM-guest lifecycle lives in the core session.
+        // Sidekit Intelligence (spec 2026-06-12): two role-specific models, loaded on
+        // demand, one warm at a time — the RAM-guest lifecycle lives in the core session.
         let downloader = ModelDownloader(
             root: AppPaths.applicationSupport.appendingPathComponent("Intelligence", isDirectory: true),
             log: { Diag.log("intelligence: \($0)") })
         let intelligenceSession = IntelligenceSession(
-            engine: MLXTextEngine(modelDirectory: { downloader.snapshotDirectory }),
+            polishEngine: MLXTextEngine(
+                modelDirectory: { downloader.snapshotDirectory(for: ModelDownloader.polishRepoID) },
+                foldsSystemIntoUser: true),   // Gemma-2 has no system role (spec §4)
+            draftEngine: MLXTextEngine(
+                modelDirectory: { downloader.snapshotDirectory(for: ModelDownloader.draftRepoID) }),
             provisioner: downloader,
             idle: SystemIntelligenceIdleTimer())
         let intelligencePanel = IntelligencePanel(session: intelligenceSession,
@@ -1767,7 +1891,7 @@ cd /Users/omkareshwartripathi/SpeakType/mac
 swift build && swift test 2>&1 | tail -3
 ```
 
-Expected: clean, 177/177.
+Expected: clean, 181/181.
 
 - [ ] **Step 6: Manual verification (signed .app — the real surface)**
 
@@ -1778,7 +1902,7 @@ cd /Users/omkareshwartripathi/SpeakType/mac && ./Scripts/build-app.sh release &&
 Walk, in order (these become TESTING.md §11 in Task 8):
 1. Hover the idle dot → three buttons bloom; mouse away → collapses. (If hover never fires, bump the pad opacity 0.02 → 0.05 and rebuild — note the final value.)
 2. Click **Scratchpad** → panel opens above the pill, editor focused. Type rough notes → tap **Draft email** → first use offers the download → progress → "Warming up…" → "Drafting…" → an email appears. **Copy** → paste into TextEdit.
-3. Copy any sentence to the clipboard → pill → **Polish** → editor pre-filled, Polish chip highlighted → tap it (tone: Keep tone) → faithful cleanup appears.
+3. Copy any sentence to the clipboard → pill → **Polish** → editor pre-filled, Polish chip highlighted → tap it (tone: Keep tone) → faithful cleanup appears. (Coming right after the draft, this is the Qwen→Gemma model swap — expect “Warming up…” again.)
 4. Tone **Professional** + **Polish** → re-toned rewrite.
 5. With the panel key: hold **Fn**, speak → words land in the editor, not pasted elsewhere.
 6. Pill → **Dictate** → pill shows Listening without any key held → click the pill → text routes exactly like an Fn dictation.
@@ -1870,13 +1994,13 @@ In `App.swift`'s `Window` scene, add `intelligence: controller.intelligence` to 
 cd /Users/omkareshwartripathi/SpeakType/mac && swift build && swift test 2>&1 | tail -3
 ```
 
-Expected: clean, 177/177. Quick manual: open Settings → Intelligence shows "downloaded" (the dev machine has it from Task 2) — do NOT click Remove (keep the model for the M11 pass).
+Expected: clean, 181/181. Quick manual: open Settings → Intelligence shows "downloaded" (the dev machine has it from Task 2) — do NOT click Remove (keep the model for the M11 pass).
 
 - [ ] **Step 3: TESTING.md §11** — append a new section following §10's exact format, items:
-  - m11-1 hover expand/collapse; m11-2 scratchpad draft-email end-to-end (download → warm → draft → Copy → paste); m11-3 Polish clipboard pre-fill + faithful clean; m11-4 Polish + Professional re-tone; m11-5 Fn dictation into the focused scratchpad; m11-6 Dictate button hands-free cycle (click pill stops); m11-7 Esc keeps the draft; m11-8 RAM drops ~2 GB ≤ ~3 min after last generation (Activity Monitor); m11-9 dot click opens main window; m11-10 Settings Remove model → scratchpad re-offers download; m11-11 offline: downloaded model still drafts / undownloaded shows the offline message.
-  Mark machine-verifiable ones per the §10 convention; update the intro/§0 test counts (152 → 177) and add sign-off row 11.
+  - m11-1 hover expand/collapse; m11-2 scratchpad draft-email end-to-end (download → warm → draft → Copy → paste); m11-3 Polish clipboard pre-fill + faithful clean; m11-4 Polish + Professional re-tone run right after a draft chip (exercises the Gemma↔Qwen model swap — “Warming up…” shows again); m11-5 Fn dictation into the focused scratchpad; m11-6 Dictate button hands-free cycle (click pill stops); m11-7 Esc keeps the draft; m11-8 RAM drops ~2 GB ≤ ~3 min after last generation (Activity Monitor); m11-9 dot click opens main window; m11-10 Settings Remove model → scratchpad re-offers download; m11-11 offline: downloaded model still drafts / undownloaded shows the offline message.
+  Mark machine-verifiable ones per the §10 convention; update the intro/§0 test counts (152 → 181) and add sign-off row 11.
 
-- [ ] **Step 4: BRICKS.md** — per CLAUDE.md §2b: add the consolidated Done entry (top of Done (Mac)): what ships, files, `swift test` 177/177 + selftest timings (from Task 2/5 output) + M11 status, review fixes, decisions (RAM-guest, one shared model + gate results, hover-pad opacity if tuned), follow-ups (streaming output if budgets feel slow; auto-polish toggle still future; clipboard-capture question still open). Remove the **LLM-POLISH** bullet from "Next iterations" (SKILLS-FOR-SMALL-MODELS stays). Archive the oldest Done entry beyond 3 to `BRICKS-ARCHIVE.md` (prepend verbatim).
+- [ ] **Step 4: BRICKS.md** — per CLAUDE.md §2b: add the consolidated Done entry (top of Done (Mac)): what ships, files, `swift test` 181/181 + selftest timings (from Task 2/5 output) + M11 status, review fixes, decisions (RAM-guest, two-model split + Gate A results, hover-pad opacity if tuned), follow-ups (streaming output if budgets feel slow; auto-polish toggle still future; clipboard-capture question still open). Remove the **LLM-POLISH** bullet from "Next iterations" (SKILLS-FOR-SMALL-MODELS stays). Archive the oldest Done entry beyond 3 to `BRICKS-ARCHIVE.md` (prepend verbatim).
 
 - [ ] **Step 5: Commit**
 
@@ -1892,5 +2016,5 @@ git commit -m "feat(mac): Settings Intelligence row + TESTING §11 (M11) + BRICK
 
 - Tasks are strictly ordered: 1 and 2 are gates (each can return BLOCKED with a user decision); 3–4 are pure TDD; 5 depends on 2+3+4; 6 on 3–5; 7 on 6; 8 on 7.
 - Task 2 and 5 carry the third-party drift rule; if an implementer reports NEEDS_CONTEXT on MLX API names, point them at the resolved checkout under `mac/.build/checkouts/mlx-swift-examples/Libraries/MLXLMCommon/` — the source is the documentation.
-- Tasks 2 and 5 download/run a ~2 GB model — run them one at a time, never in parallel with anything heavy (gentle-thermal applies to the Mac, not just the lab).
+- Tasks 2 and 5 download/run ~2.7 GB of models (two snapshots) — run them one at a time, never in parallel with anything heavy (gentle-thermal applies to the Mac, not just the lab).
 - Manual steps in Task 7 step 6 need the human only if the controller cannot drive the UI via the established Accessibility-scripting harness; dictation (m11-5/6) and the visual taste check always need the human.
