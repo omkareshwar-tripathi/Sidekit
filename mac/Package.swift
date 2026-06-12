@@ -26,14 +26,26 @@ let package = Package(
         // The one network adapter (Supabase inserts), split out so SubmissionSelftest can
         // verify it headlessly (same pattern as ModelSelftest for the Whisper model).
         .target(name: "SidekitNet", dependencies: ["SidekitCore"]),
+        // The on-device LLM engine + model files, split out (like SidekitNet) so
+        // IntelligenceSelftest can verify the exact shipping adapters headlessly.
+        .target(
+            name: "SidekitIntelligence",
+            dependencies: [
+                "SidekitCore",
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "MLXHuggingFace", package: "mlx-swift-lm"),
+                .product(name: "HuggingFace", package: "swift-huggingface"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
+            ]
+        ),
         .executableTarget(
             name: "SidekitApp",
             dependencies: [
                 "SidekitCore",
                 "SidekitNet",
+                "SidekitIntelligence",
                 .product(name: "WhisperKit", package: "WhisperKit"),
-                .product(name: "MLXLLM", package: "mlx-swift-lm"),
-                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
             ]
         ),
         .testTarget(
@@ -57,13 +69,7 @@ let package = Package(
         // generate (spec 2026-06-12 §7). Usage: swift run -c release IntelligenceSelftest
         .executableTarget(
             name: "IntelligenceSelftest",
-            dependencies: [
-                .product(name: "MLXLLM", package: "mlx-swift-lm"),
-                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
-                .product(name: "MLXHuggingFace", package: "mlx-swift-lm"),
-                .product(name: "HuggingFace", package: "swift-huggingface"),
-                .product(name: "Tokenizers", package: "swift-transformers"),
-            ]
+            dependencies: ["SidekitCore", "SidekitIntelligence"]
         ),
     ]
 )
