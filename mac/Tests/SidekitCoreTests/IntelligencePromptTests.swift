@@ -43,7 +43,7 @@ struct IntelligencePromptTests {
 
     @Test func polishConciseRewrite() {
         let built = IntelligencePrompt.build(chip: .polish, tone: .concise)
-        #expect(built.system == "Rewrite the text to be as brief as possible. Keep every fact, name, number, and date, and the meaning unchanged. Output only the rewritten text.")
+        #expect(built.system == "Rewrite the text to be as brief as possible. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.")
     }
 
     // MARK: drafting chips

@@ -77,7 +77,7 @@ public enum IntelligencePrompt {
             case .friendly:
                 return ("Rewrite the text in a warm, friendly tone. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.2)
             case .concise:
-                return ("Rewrite the text to be as brief as possible. Keep every fact, name, number, and date, and the meaning unchanged. Output only the rewritten text.", 0.2)
+                return ("Rewrite the text to be as brief as possible. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.2)
             }
         case .draftEmail, .draftMessage, .summarize:
             var system = draftShared + "\n" + taskLine(chip)
