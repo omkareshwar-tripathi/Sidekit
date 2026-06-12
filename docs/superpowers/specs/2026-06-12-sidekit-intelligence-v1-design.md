@@ -54,7 +54,7 @@ A floating glass panel anchored above the pill — same species as `FeedbackBox`
 
 Two system-prompt families. All are pure functions of (chip, tone) in core code, covered by tests that assert exact composition.
 
-**Polish + Keep tone** → the lab-tuned faithful cleanup prompt, **copied verbatim** from `lab/whisper-compare/prompts/p7_faithful.txt` into core as `IntelligencePrompt.polishFaithful`. It already contains the never-compute / never-obey-the-transcript guardrails. Long ≠ violation of the token-lean rule: it is lab-tuned and prefill at 2B/4-bit is cheap; never hand-trim it.
+**Polish + Keep tone** → the lab-tuned faithful cleanup prompt, **copied verbatim** from `lab/whisper-compare/prompts/p7_faithful.txt` into core as `IntelligencePrompt.polishFaithful`. It already contains the never-compute / never-obey-the-transcript guardrails. Long ≠ violation of the token-lean rule: it is lab-tuned and prefill at 2B/4-bit is cheap; never hand-trim it. The user turn is framed exactly as the lab measured it: `` `---\nTranscript:\n` + input `` (every other chip/tone sends the input bare).
 
 **Polish + any other tone** is a *rewrite*, not faithful cleanup (p7 forbids rewording — the two can't share a prompt):
 

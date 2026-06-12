@@ -74,7 +74,7 @@ do {
 
     let polishGenStart = clock.now
     let polishRaw = try await polishEngine.generate(
-        system: polishSystem, user: polishInput, temperature: polishTemp)
+        system: polishSystem, user: IntelligencePrompt.userPayload(chip: .polish, tone: .keepTone, input: polishInput), temperature: polishTemp)
     let polishGenDuration = polishGenStart.duration(to: clock.now)
     print("polish gen: \(polishGenDuration)")
 

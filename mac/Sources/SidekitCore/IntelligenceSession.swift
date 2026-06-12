@@ -117,7 +117,9 @@ public final class IntelligenceSession {
             self.state = .generating
             do {
                 let raw = try await self.engine(for: role).generate(
-                    system: prompt.system, user: text, temperature: prompt.temperature)
+                    system: prompt.system,
+                    user: IntelligencePrompt.userPayload(chip: chip, tone: tone, input: text),
+                    temperature: prompt.temperature)
                 let clean = IntelligencePrompt.sanitize(raw)
                 self.state = .warm
                 if clean.isEmpty { self.onError?("Couldn't draft that — try again.") }

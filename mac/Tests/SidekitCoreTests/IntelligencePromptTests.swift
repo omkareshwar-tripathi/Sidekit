@@ -108,4 +108,18 @@ struct IntelligencePromptTests {
         #expect(IntelligencePrompt.sanitize("She said \"hi\" twice.") == "She said \"hi\" twice.")
         #expect(IntelligencePrompt.sanitize("Run ```ls``` now.") == "Run ```ls``` now.")
     }
+
+    // MARK: user payload framing
+
+    @Test func faithfulPolishFramesTheUserTurnLikeTheLab() {
+        #expect(IntelligencePrompt.userPayload(chip: .polish, tone: .keepTone, input: "hi there")
+                == "---\nTranscript:\nhi there")
+    }
+
+    @Test func everyOtherPathSendsTheInputBare() {
+        #expect(IntelligencePrompt.userPayload(chip: .polish, tone: .professional, input: "x") == "x")
+        for chip in [IntelligenceChip.draftEmail, .draftMessage, .summarize] {
+            #expect(IntelligencePrompt.userPayload(chip: chip, tone: .keepTone, input: "x") == "x")
+        }
+    }
 }

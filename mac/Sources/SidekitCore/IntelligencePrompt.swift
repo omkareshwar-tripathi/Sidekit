@@ -63,6 +63,15 @@ public enum IntelligencePrompt {
         return .ok(trimmed)
     }
 
+    /// The user-turn payload for a chip (spec §4). The faithful-polish path frames the input
+    /// exactly as the lab measured it: "---\nTranscript:\n" + text — byte-identical
+    /// to lab/whisper-compare/server.py's no_system fold); every other path sends the text bare.
+    public static func userPayload(chip: IntelligenceChip, tone: IntelligenceTone,
+                                   input: String) -> String {
+        if chip == .polish && tone == .keepTone { return "---\nTranscript:\n" + input }
+        return input
+    }
+
     /// (system prompt, sampling temperature) per spec §4: 0.2 for Polish (both paths),
     /// 0.7 for the drafting chips.
     public static func build(chip: IntelligenceChip, tone: IntelligenceTone)
