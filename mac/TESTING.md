@@ -222,8 +222,6 @@ or the Settings UI.
 
 ---
 
----
-
 ## 11. Intelligence v1  _(spec 2026-06-12 — pill hover menu, scratchpad, on-device model)_  _(M11)_
 
 **AMENDED items (from single-model round-3 decision):** m11-4 and m11-8 reflect that ONE Qwen2.5-1.5B-Instruct-4bit model serves both polish and draft roles; the two-model wording is retired.
