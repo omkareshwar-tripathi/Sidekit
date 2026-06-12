@@ -60,7 +60,7 @@ A floating glass panel anchored above the pill — same species as `FeedbackBox`
 2. **Chip row** — `Draft email` · `Draft message` · `Polish` · `Summarize`. Chips are run buttons: tapping one with text present runs that action with the current tone (no separate Run button). With no text, taps do nothing.
 3. **Tone picker** — `Keep tone` · `Professional` · `Friendly` · `Concise` (segmented; default Keep tone; the choice persists across opens and relaunches via UserDefaults).
 4. **Result area** — appears below once a generation finishes: the output text (read-only, selectable) with **Copy** (puts result on clipboard, shows "Copied ✓" ~1.5 s) and **Use as input** (replaces the editor text with the result, for iterating). The input editor is never overwritten by a generation.
-5. **Status line** — the honest engine state (§5): "Download model (≈1.7 GB, one time)" / "Warming up…" / "Drafting…" + **Cancel** / error text.
+5. **Status line** — the honest engine state (§5): "Download model (≈0.9 GB, one time)" / "Warming up…" / "Drafting…" + **Cancel** / error text.
 
 **Persistence:** the editor text survives close/reopen (in-memory is fine; not saved to disk, not a Note). **Clear** affordance empties editor + result. Results are never auto-saved anywhere.
 
