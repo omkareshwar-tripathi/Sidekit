@@ -144,6 +144,16 @@ struct IntelligenceView: View {
                     Button("Clear") { model.clear() }.buttonStyle(.plain)
                         .font(DS.Typography.caption).foregroundStyle(.tertiary)
                 }
+                // Visible close affordance (user M11 feedback — Esc alone is undiscoverable).
+                Button { onClose() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(DS.Palette.textSecondary)
+                        .frame(width: 18, height: 18)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Close")
             }
 
             ZStack(alignment: .topLeading) {
