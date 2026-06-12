@@ -165,7 +165,7 @@ struct IntelligenceView: View {
                 TextEditor(text: $model.input)
                     .scrollContentBackground(.hidden)
                     .focused($editorFocused)
-                    .frame(height: 110)
+                    .frame(height: 130)
             }
             .padding(DS.Space.sm)
             .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
@@ -186,11 +186,14 @@ struct IntelligenceView: View {
 
             if let result = model.result {
                 VStack(alignment: .leading, spacing: DS.Space.sm) {
-                    ScrollView {
-                        Text(result).textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    // Sizes to the text until the cap, then scrolls — the panel grows with the
+                    // result and the Copy row below stays visible (user M11 feedback: the old
+                    // fixed 160 pt strip in a fixed 420 pt window clipped long output).
+                    ViewThatFits(in: .vertical) {
+                        resultText(result)
+                        ScrollView { resultText(result) }
                     }
-                    .frame(maxHeight: 160)
+                    .frame(maxHeight: 300)
                     HStack {
                         Button(model.copied ? "Copied ✓" : "Copy") { model.copyResult() }
                             .buttonStyle(.borderedProminent)
@@ -205,13 +208,22 @@ struct IntelligenceView: View {
             statusLine
         }
         .padding(DS.Space.lg)
-        .frame(width: 460)
+        .frame(width: 500)
         .glassCard()
         .background(IntelligenceKeyCatcher(onEscape: onClose))
         .onAppear { editorFocused = true }
         .onChange(of: model.focusToken) { editorFocused = true }
         .tint(DS.Palette.accent)
         .preferredColorScheme(.dark)
+        // Hug the bottom of the tall transparent canvas: the card sits just above the pill
+        // and grows UPWARD as content grows; the rest of the window is fully transparent,
+        // so per-pixel hit testing passes clicks through it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+    }
+
+    private func resultText(_ result: String) -> some View {
+        Text(result).textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder private var statusLine: some View {
@@ -280,7 +292,10 @@ final class IntelligencePanel {
 
     init(session: IntelligenceSession, provisioner: any ModelProvisioning) {
         model = IntelligencePanelModel(session: session, provisioner: provisioner)
-        let canvas = NSRect(x: 0, y: 0, width: 480, height: 420)
+        // Tall transparent canvas — the card bottom-aligns inside it and grows upward with
+        // content (the old 480×420 clipped the result card's Copy row). Unused area is fully
+        // transparent and click-through.
+        let canvas = NSRect(x: 0, y: 0, width: 560, height: 760)
         panel = KeyablePanel(contentRect: canvas, styleMask: [.borderless],
                              backing: .buffered, defer: false)
         let hosting = NSHostingView(rootView:
