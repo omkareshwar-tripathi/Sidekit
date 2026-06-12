@@ -5,6 +5,9 @@ import Foundation
 /// Gemma polishes, Qwen drafts) but only ONE is ever warm — switching roles unloads the
 /// other first. Pure over the ports; the UI mirrors `state` + the result/error callbacks.
 /// @MainActor like the app models it feeds; engine work runs off-main behind the async port.
+/// Owned for the app's lifetime by the Intelligence feature — not designed to be created
+/// per-use (dropping the only reference mid-cycle would strand a loaded engine until
+/// memory pressure evicts it).
 @MainActor
 public final class IntelligenceSession {
     public enum State: Equatable, Sendable {
