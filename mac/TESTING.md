@@ -21,7 +21,7 @@ cd mac
 open Sidekit.app
 ```
 
-- Automated baseline (optional, fast): `swift test` → expect **140 tests passed**.
+- Automated baseline (optional, fast): `swift test` → expect **152 tests passed**.
 - This is a **self-signed local dev** build. On first open, if macOS Gatekeeper blocks it
   ("unidentified developer"), right-click the app → **Open**, or approve it in
   **System Settings → Privacy & Security**. Expected for a dev build — not a bug.
