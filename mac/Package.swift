@@ -14,8 +14,8 @@ let package = Package(
         .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "1.0.0"),
         // On-device LLM (Sidekit Intelligence, spec 2026-06-12). Pinned by the committed
         // Package.resolved; MLXLLM/MLXLMCommon run the two role models.
-        // Note: MLXLLM/MLXLMCommon moved from mlx-swift-examples to mlx-swift-lm as of
-        // mlx-swift-examples commit 0db7c5d ("split out mlx-swift-lm #441").
+        // Note: upstream split MLXLLM/MLXLMCommon out of mlx-swift-examples into the
+        // standalone mlx-swift-lm package (upstream PR #441).
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
         // HuggingFace hub downloader + transformers tokenizer (needed by MLXHuggingFace macros).
         .package(url: "https://github.com/huggingface/swift-huggingface", from: "0.9.0"),

@@ -9,11 +9,17 @@ import MLXHuggingFace
 
 // Brick-0 gate + permanent headless verifier for the on-device LLMs (spec 2026-06-12 §7).
 // Two-model variant (Gate A outcome): Gemma-2-2B polishes (its chat template has NO system
-// role — fold the system prompt into the user turn), Qwen3.5-2B drafts (thinking off).
+// role — fold the system prompt into the user turn), Qwen3-1.7B drafts (thinking off).
 // Downloads on first run into the app's own Intelligence folder, then per model:
 // load → canned generation → unload, printing timings. Exits non-zero on any failure.
 // Budgets (spec §5): warm-disk load ≤ 5 s; each generation ≤ 8 s.
 // Task 5 rewires this to drive the real MLXTextEngine adapter + IntelligencePrompt.
+//
+// RUNTIME PREREQ: mlx-swift ships no precompiled Metal library under SwiftPM — `mlx.metallib`
+// must sit beside the binary (e.g. .build/release/mlx.metallib) or generation crashes at
+// runtime. A clean `swift build -c release` clobbers it; re-place the metallib before running.
+// The shipped .app needs the same file beside its executable (Task 7 / build-app.sh).
+// See the GATE-B entry in BRICKS.md for how it was compiled.
 //
 // API drift note (mlx-swift-lm 3.31.3):
 //   - MLXLLM/MLXLMCommon moved from mlx-swift-examples to mlx-swift-lm (PR #441).
