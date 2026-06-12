@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** The floating pill grows a hover menu (Polish · Scratchpad · Dictate) backed by two role-specific on-device LLMs (Gemma-2-2B polishes, Qwen3.5-2B drafts — only one ever warm) that load on demand and unload after idle — per `docs/superpowers/specs/2026-06-12-sidekit-intelligence-v1-design.md`.
+**Goal:** The floating pill grows a hover menu (Polish · Scratchpad · Dictate) backed by two role-specific on-device LLMs (Gemma-2-2B polishes, Qwen3-1.7B drafts — only one ever warm) that load on demand and unload after idle — per `docs/superpowers/specs/2026-06-12-sidekit-intelligence-v1-design.md`.
 
 **Architecture:** Ports-and-adapters. Pure core: `IntelligencePrompt` (chip×tone → exact prompt strings, sanitation, input cap) + `IntelligenceSession` (the RAM-guest state machine over `TextGenerating`/`ModelProvisioning`/`IntelligenceIdleTimer` ports). App adapters: two `MLXTextEngine` instances (MLX Swift — Gemma with the system prompt folded into the user turn, Qwen with thinking off), `ModelDownloader` (both HF hub snapshots, one combined download), `MemoryPressureSource`, plus the scratchpad panel (FeedbackBox pattern) and the pill hover menu. A headless `IntelligenceSelftest` executable is the Brick-0 gate and stays as the permanent live verifier.
 
@@ -125,14 +125,14 @@ import MLXLLM
 
 // Brick-0 gate + permanent headless verifier for the on-device LLMs (spec 2026-06-12 §7).
 // Two-model variant (Gate A outcome): Gemma-2-2B polishes (its chat template has NO system
-// role — fold the system prompt into the user turn), Qwen3.5-2B drafts (thinking off).
+// role — fold the system prompt into the user turn), Qwen3-1.7B drafts (thinking off).
 // Downloads on first run into the app's own Intelligence folder, then per model:
 // load → canned generation → unload, printing timings. Exits non-zero on any failure.
 // Budgets (spec §5): warm-disk load ≤ 5 s; each generation ≤ 8 s.
 // Task 5 rewires this to drive the real MLXTextEngine adapter + IntelligencePrompt.
 
 let polishRepo = "mlx-community/gemma-2-2b-it-4bit"
-let draftRepo = "mlx-community/Qwen3.5-2B-OptiQ-4bit"
+let draftRepo = "mlx-community/Qwen3-1.7B-4bit"
 let root = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Application Support/Sidekit/Intelligence", isDirectory: true)
 
@@ -249,6 +249,8 @@ cd /Users/omkareshwartripathi/SpeakType
 git add mac/Package.swift mac/Package.resolved mac/Sources/IntelligenceSelftest/
 git commit -m "feat(mac): Gate B — MLX Swift deps + IntelligenceSelftest proves Qwen3.5-2B loads & generates"
 ```
+
+**OUTCOME (2026-06-12): PASSED, with the draft model swapped under the §7 fallback rule.** Shipped as `e69d05e` + review nits `1848a11`. Qwen3.5-2B-OptiQ failed Swift load (VLM architecture); the implementer substituted **Qwen3-1.7B-4bit**, which the controller then lab-validated: **22/29 assistant, guardrail 2/2** (≥ the 20/29 bar) — adopted, recorded in spec §1/§7. Warm numbers: Gemma load 1.19 s / gen 0.48 s; Qwen3-1.7B load 0.75 s / gen 0.64 s. Library reality: MLXLLM lives in `mlx-swift-lm` 3.31.3 (pinned via committed Package.resolved); WhisperKit bumped to 1.0.0 (drops its swift-transformers, resolving the conflict — dictation needs a sanity check at Task 7 UAT). **`mlx.metallib` must sit beside any binary that loads a model** (no SwiftPM Metal pipeline) — Task 7 must make build-app.sh place it in the .app, and Task 5's selftest re-run needs it re-placed after a clean release build. Before Task 5's disk measurement, delete the stale `models--mlx-community--Qwen3.5-2B-OptiQ-4bit` snapshot from `~/Library/Application Support/Sidekit/Intelligence/` so the printed size reflects the two shipping models.
 
 ---
 
@@ -1158,7 +1160,7 @@ import SidekitCore
 /// its root (AppPaths) and logger (Diag).
 public final class ModelDownloader: ModelProvisioning, @unchecked Sendable {
     public static let polishRepoID = "mlx-community/gemma-2-2b-it-4bit"
-    public static let draftRepoID = "mlx-community/Qwen3.5-2B-OptiQ-4bit"
+    public static let draftRepoID = "mlx-community/Qwen3-1.7B-4bit"
     private static let repoIDs = [polishRepoID, draftRepoID]
 
     /// `…/Application Support/Sidekit/Intelligence` in the app; the selftest uses the same.
