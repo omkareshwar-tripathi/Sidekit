@@ -1,7 +1,7 @@
 # TESTING.md (Mac)
 
 Manual test plan for the **Sidekit Mac app** (the native Swift fork on `feat/mac-app`).
-The pure logic is covered by `swift test` (140 automated tests); this file covers everything
+The pure logic is covered by `swift test` (152 automated tests); this file covers everything
 that only a human in front of a running Mac can verify — the floating pill, the Fn hotkey,
 real audio, paste, the scratchpad window, settings, permissions, and app lifecycle.
 
@@ -184,6 +184,40 @@ Reset first: `rm -f ~/Library/Application\ Support/Sidekit/identity.json ~/Libra
 
 ---
 
+## 10. Shelf for agents + auto-screenshots  _(spec 2026-06-12)_
+
+Several checks were **machine-walked on 2026-06-12** (marked ✅·machine, with the evidence);
+the unmarked ones need a human — mostly because they involve the one-time macOS consent click
+or the Settings UI.
+
+- [x] **m10-1 · Screenshot lands (pipeline)** ✅·machine: a real `screencapture -x` into a home
+      folder appeared on the Shelf exactly once via Spotlight → gate → 1.5 s stability check →
+      the drag-in copy path, and showed up in `manifest.json`. Human remainder: one real ⌘⇧3
+      to the **Desktop** (covered by m10-8's consent click) → tile appears with a thumbnail.
+- [ ] **m10-2 · Toggle OFF:** Settings → Shelf → turn "Auto-add screenshots to Shelf" off →
+      ⌘⇧3 → nothing lands.
+- [ ] **m10-3 · Toggle back ON:** flip it back on → ⌘⇧3 → lands again. (This exercises the
+      watcher's stop→start restart — the one path automation didn't cover; review 2026-06-12.)
+- [x] **m10-4 · Agent path** ✅·machine: `ls -la ~/.sidekit/` shows `shelf →
+      …/Application Support/Sidekit/Shelf`; `manifest.json` + `AGENTS.md` readable through it.
+- [ ] **m10-5 · Removal syncs:** remove a tile (or Clear all) → the entry disappears from
+      `manifest.json`. (The add→manifest sync and the startup heal are machine-proven; this
+      checks the same save funnel from the UI remove.)
+- [ ] **m10-6 · Retention syncs:** change Settings → "Keep items for" → every `expiresAt` in
+      `manifest.json` shifts to match (cat it before/after).
+- [x] **m10-7 · ANY agent can read the Shelf (acceptance)** ✅·machine: the footer prompt was
+      handed cold to a fresh agent (smallest model, no other context) — it listed the items
+      from the manifest with all fields and read the newest file's actual content, and called
+      the instructions "complete and sufficient". Human remainder (~30 s, optional): click
+      **For agents** in the Shelf footer → "Copied ✓" → paste into your own Claude Code /
+      Antigravity session for the same result.
+- [ ] **m10-8 · Desktop consent:** first ⌘⇧3 that saves to the Desktop → macOS asks
+      "Sidekit would like to access files in your Desktop folder" **once** (our usage string
+      visible). Allow → tile appears. (If you deny: no tile, no crash — re-enable later in
+      System Settings → Privacy & Security → Files & Folders.)
+
+---
+
 ## Sign-off
 
 Fill this in as you go — it's the record of a pass.
@@ -199,6 +233,7 @@ Fill this in as you go — it's the record of a pass.
 | 7  | Menu bar & lifecycle                  |                |       |
 | 8  | Reduced motion (optional)             |                |       |
 | 9  | Sign-up & feedback                    |                |       |
+| 10 | Shelf for agents + auto-screenshots   |                |       |
 
 **Tester:** ____________  **Date:** ____________  **Build:** `build-app.sh release` @ commit ________
 
