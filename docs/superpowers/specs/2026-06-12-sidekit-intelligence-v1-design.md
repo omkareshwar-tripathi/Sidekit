@@ -12,11 +12,27 @@
 |---|---|
 | Where does LLM polish run? | **On-demand only**, behind the pill. The dictation pipeline is untouched — no auto-polish in v1 (future settings toggle, out of scope). |
 | RAM posture | **The model is a guest in RAM, not a resident.** Load on first use, stay warm for an idle window, then unload. Never two models in memory. Unload immediately on system memory pressure. |
-| One model or two? | **Two role-specific models (Gate A outcome, decided by the user 2026-06-12):** `mlx-community/gemma-2-2b-it-4bit` runs **Polish** (148/190 faithful-cleanup PASS; its chat template has **no system role** — the engine folds the system prompt into the user turn) and `mlx-community/Qwen3-1.7B-4bit` runs the **drafting chips** (22/29 assistant, arithmetic guardrail 2/2, 1.25 GB peak; thinking **disabled** — Qwen3.5-2B-OptiQ scored 24/29 but its architecture is a VLM that MLX Swift cannot load as text; Qwen3-1.7B was adopted 2026-06-12 per the §7 fallback rule). The one-shared-model hope died at Gate A — see §7 for the recorded results. Still only ONE model ever in RAM: switching roles unloads one, loads the other. |
+| One model or two? | **SUPERSEDED (round 3, same day) — ONE model, `mlx-community/Qwen2.5-1.5B-Instruct-4bit` for BOTH roles; see the round-3 note below this table.** Round-2 record kept for history: Two role-specific models (Gate A outcome, decided by the user 2026-06-12): `mlx-community/gemma-2-2b-it-4bit` runs **Polish** (148/190 faithful-cleanup PASS; its chat template has **no system role** — the engine folds the system prompt into the user turn) and `mlx-community/Qwen3-1.7B-4bit` runs the **drafting chips** (22/29 assistant, arithmetic guardrail 2/2, 1.25 GB peak; thinking **disabled** — Qwen3.5-2B-OptiQ scored 24/29 but its architecture is a VLM that MLX Swift cannot load as text; Qwen3-1.7B was adopted 2026-06-12 per the §7 fallback rule). The one-shared-model hope died at Gate A — see §7 for the recorded results. Still only ONE model ever in RAM: switching roles unloads one, loads the other. |
 | Drafting UX | **Preset chips + tones.** No free-form instruction field in v1. |
 | Polish entry point | Opens the scratchpad **pre-loaded with clipboard text**, Polish chip pre-selected. Nothing ever silently rewrites the clipboard. |
 | Tone selector | **Global in the panel** — applies to whatever chip runs, Polish included. Default **Keep tone**. |
 | Prompt strings | Token-lean (standing user rule). The lab-tuned `p7_faithful` polish prompt is the one deliberate exception — it's tuned, copied verbatim, never hand-trimmed. |
+
+**ROUND 3 (2026-06-12, user decision — ship on what works):** live verification
+(IntelligenceSelftest) exposed a **Gemma-2 forward-pass defect in mlx-swift-lm 3.31.3**:
+at greedy decoding on the long polish prompt, every input derails into meta-commentary,
+and the output changes with `prefillStepSize` — while Python (mlx_lm) on the *identical*
+snapshot, prompt bytes, and argmax sampler cleans correctly. Qwen3-1.7B on the same Swift
+stack matches Python, so the stack is exonerated; the bug is Gemma-2-specific and
+upstream (no fixed release as of 2026-06-12). Qwen3-1.7B was then scored on the polish
+harness and **disqualified for polish: 75/190** (over-edits names/casing/homophones;
+run 20260612-195916). Decision: **one model, `mlx-community/Qwen2.5-1.5B-Instruct-4bit`,
+serves BOTH roles** — polish **134/190** (best working Swift port; run 20260608-235816),
+assistant **23/29 with arithmetic guardrail 2/2 and draft 2/2** (run 20260608-204509,
+*better* than Qwen3-1.7B's 22/29), peak RAM 1.12 GB, ~0.84 GB on disk. Consequences:
+ONE download (was 2.3 GB), polish<->draft switch keeps the same weights warm (no
+unload/reload pause), and the Gemma fold path goes unused. Gemma-2 (148/190) returns
+only if upstream fixes its port; prompt fine-tuning for Qwen2.5 is a later lab task.
 
 ## 2. The pill hover menu
 
@@ -76,6 +92,13 @@ The arithmetic guardrail is the lean adaptation of the lab's `ASSISTANT_SYSTEM` 
 
 **Output sanitation (pure, tested):** trim whitespace; strip one wrapping pair of triple-backtick fences or quotes if the model added them; strip `<think>` blocks defensively.
 
+> **ROUND-3 NOTE (single model):** both roles run on Qwen2.5-1.5B-Instruct, whose chat
+> template HAS a system role — the Gemma fold (system+user concatenated into one user
+> turn) ships unused. `enable_thinking: false` stays in `additionalContext` (Qwen3
+> leftover; Qwen2.5's template ignores it — harmless). Prompt text, greedy temperature
+> 0.0, and the `---\nTranscript:\n` polish payload framing are unchanged — byte-identical
+> to the measured 134/190 lab config.
+
 ## 5. Engine lifecycle — the RAM-guest state machine
 
 One pure state machine in core (`IntelligenceSession`), engine + downloader behind ports, clock injected for tests:
@@ -97,12 +120,21 @@ warm/generating —memory pressure→ unload (generating: cancel first, show err
 
 **Latency budgets (targets, verified at Brick 0 — lab numbers are Python-MLX and may not transfer):** warm-disk load ≤ 5 s; Polish of 200 words ≤ 5 s; Draft email from 100 words of notes ≤ 8 s. If Brick 0 misses a budget by >2×, stop and revisit model choice with the user.
 
+> **ROUND-3 NOTE (single model):** both roles share ONE `MLXTextEngine` instance, so a
+> polish<->draft "switch" is a relabel, not a swap — `IntelligenceSession` detects
+> identical engine objects and skips the unload/reload. The RAM-guest lifecycle (load on
+> demand, 180 s idle unload, memory-pressure evict) is unchanged.
+
 ## 6. Model download, storage, settings
 
 - **Not bundled in the DMG.** First chip-tap with no models offers ONE one-time download covering **both** models in sequence with combined progress (no second surprise download mid-flow; total size stated up front; exact figure measured at Brick 0 and baked into the string).
 - Downloaded via the Hugging Face hub snapshot (swift-transformers `HubApi` — the WhisperKit precedent) into `~/Library/Application Support/Sidekit/Intelligence/`. Download is resumable; a failed/partial snapshot is detected at load and offers re-download ("Model files look damaged — download again").
 - **Settings → new "Intelligence" row:** shows model state ("Not downloaded" / "Downloaded · X GB") with a **Remove model** button (destructive-styled, frees disk; next chip use re-offers the download). No other knobs.
 - Offline with model already downloaded: everything works (the whole point). Offline without model: download fails honestly ("You're offline — the one-time model download needs internet").
+
+> **ROUND-3 NOTE (single model):** the one-time download is a single repo
+> (`mlx-community/Qwen2.5-1.5B-Instruct-4bit`, ~0.84 GB on disk). The combined-progress
+> machinery stays; it simply iterates one repo. Settings wording unchanged.
 
 ## 7. Brick 0 — the lab + runtime gate (hard gate, before any UI work)
 
@@ -115,6 +147,15 @@ Two questions must close before the feature is built on this model:
 
 **Fallback if Gate B fails:**
 - Qwen3.5 fails Swift load → **`mlx-community/Qwen2.5-1.5B-Instruct-4bit`** as the drafting model (Qwen2 architecture, long-supported in MLXLLM; already the cleanup backup pick). Re-run the assistant eval on it; if drafting quality is unacceptable (< 20/29), stop and bring options back to the user. Gemma-2-2B failing Swift load is not expected (mature architecture); if it somehow does, stop and bring options back to the user.
+
+> **RESULT (2026-06-12, post-Gate-B field finding):** IntelligenceSelftest caught a
+> systematic Gemma-2 derailment in mlx-swift-lm 3.31.3 (greedy; output varies with
+> prefill chunk size; Python correct on identical snapshot+prompt; Qwen3 Swift matches
+> Python — stack exonerated; upstream Gemma-2-specific bug, unfixed as of today).
+> Follow-up polish scores at greedy on the same 190-case harness: Qwen3-1.7B **75/190**
+> (disqualified), Qwen2.5-1.5B **134/190** (adopted, both roles — user decision; see §1
+> round 3). Deterministic selftest polish case: `sc-8` (`lets meet on tuesday no wait
+> wednesday at three` -> `Let's meet on Wednesday at three.`, measured PASS at greedy).
 
 ## 8. Architecture
 

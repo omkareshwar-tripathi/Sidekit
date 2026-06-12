@@ -1346,6 +1346,17 @@ git commit -m "feat(mac): SidekitIntelligence adapters (MLX engine, downloader, 
 
 ---
 
+> **OUTCOME ADDENDUM (round 3 — single-model swap):** live selftest verification caught
+> an upstream mlx-swift-lm 3.31.3 Gemma-2 forward-pass defect (Swift derails at greedy
+> where Python is correct on the identical snapshot + prompt bytes; Qwen3 Swift matches
+> Python). Qwen3-1.7B then scored 75/190 on the polish harness — disqualified. User
+> decision: ship ONE model, `mlx-community/Qwen2.5-1.5B-Instruct-4bit`, for BOTH roles
+> (polish 134/190, assistant 23/29, guardrail 2/2). Code deltas: ModelDownloader single
+> repo; IntelligenceSession same-engine relabel on role switch (object-identity check,
+> +1 test); selftest single engine, polish case = measured `sc-8`, draft amount assert
+> comma-tolerant; MLXTextEngine fold path retained but unused (documented). Stale Gemma +
+> Qwen3 snapshots deleted from the app cache before the disk measure.
+
 ## Task 6 — UI: the scratchpad panel
 
 `IntelligencePanel.swift` — model + view + floating window, the FeedbackBox pattern exactly (KeyablePanel, KeyCatcher Esc, focusToken re-focus, glassCard dark). No AppController changes yet (Task 7 wires it); the file must compile standalone.
