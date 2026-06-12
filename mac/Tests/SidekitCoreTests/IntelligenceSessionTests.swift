@@ -118,7 +118,7 @@ struct IntelligenceSessionTests {
         #expect(rig.polish.loads == 0 && rig.polish.generated.isEmpty)
         #expect(rig.draft.generated.count == 1)
         #expect(rig.draft.generated[0].user == "notes") // trimmed by the input check
-        #expect(rig.draft.generated[0].temperature == 0.7)
+        #expect(rig.draft.generated[0].temperature == 0.0)
         #expect(rig.draft.generated[0].system ==
                 IntelligencePrompt.build(chip: .draftEmail, tone: .professional).system)
         #expect(rig.rec.results == ["Hello."]) // sanitized
@@ -131,7 +131,7 @@ struct IntelligenceSessionTests {
         await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
         #expect(rig.polish.loads == 1 && rig.polish.generated.count == 1)
         #expect(rig.draft.loads == 0 && rig.draft.generated.isEmpty)
-        #expect(rig.polish.generated[0].temperature == 0.2)
+        #expect(rig.polish.generated[0].temperature == 0.0)
         #expect(rig.polish.generated[0].user == "---\nTranscript:\nx") // lab-exact framing
     }
 

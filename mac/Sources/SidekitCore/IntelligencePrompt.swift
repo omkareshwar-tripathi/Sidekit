@@ -72,26 +72,28 @@ public enum IntelligencePrompt {
         return input
     }
 
-    /// (system prompt, sampling temperature) per spec §4: 0.2 for Polish (both paths),
-    /// 0.7 for the drafting chips.
+    /// (system prompt, sampling temperature) per spec §4. Temperature is 0.0 — greedy
+    /// decoding — for every chip: all the lab quality numbers we trust were measured at
+    /// mlx_lm's default temp 0.0, and shipping a sampled config would be unmeasured AND
+    /// nondeterministic. Revisit per-chip only with a new lab measurement.
     public static func build(chip: IntelligenceChip, tone: IntelligenceTone)
         -> (system: String, temperature: Float) {
         switch chip {
         case .polish:
             switch tone {
             case .keepTone:
-                return (polishFaithful, 0.2)
+                return (polishFaithful, 0.0)
             case .professional:
-                return ("Rewrite the text in a professional, courteous tone. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.2)
+                return ("Rewrite the text in a professional, courteous tone. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.0)
             case .friendly:
-                return ("Rewrite the text in a warm, friendly tone. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.2)
+                return ("Rewrite the text in a warm, friendly tone. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.0)
             case .concise:
-                return ("Rewrite the text to be as brief as possible. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.2)
+                return ("Rewrite the text to be as brief as possible. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.0)
             }
         case .draftEmail, .draftMessage, .summarize:
             var system = draftShared + "\n" + taskLine(chip)
             if let tone = toneLine(tone) { system += "\n" + tone }
-            return (system, 0.7)
+            return (system, 0.0)
         }
     }
 

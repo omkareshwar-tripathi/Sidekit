@@ -209,7 +209,7 @@ do {
         dir: gemmaDir,
         chat: [.user(polishSystem + "\n\n" +
                      "um so basically i think we should uh ship it on tuesday actually no wednesday")],
-        temperature: 0.2, label: "polish/gemma")
+        temperature: 0.0, label: "polish/gemma")
     if polished.isEmpty { fail("polish returned empty") }
     if !polished.localizedCaseInsensitiveContains("wednesday") { fail("polish lost the correction") }
 
@@ -218,7 +218,7 @@ do {
         dir: qwenDir,
         chat: [.system(draftSystem),
                .user("tell priya the invoice for 4500 dollars went out, ask her to cc me going forward")],
-        temperature: 0.7, label: "draft/qwen")
+        temperature: 0.0, label: "draft/qwen")
     if drafted.isEmpty { fail("draft returned empty") }
     if drafted.contains("<think>") { fail("thinking mode leaked into draft output") }
     if !drafted.contains("4500") { fail("draft dropped the exact amount") }
@@ -343,10 +343,10 @@ struct IntelligencePromptTests {
     }
 
     @Test func temperaturesPerSpec() {
-        #expect(IntelligencePrompt.build(chip: .polish, tone: .keepTone).temperature == 0.2)
-        #expect(IntelligencePrompt.build(chip: .polish, tone: .friendly).temperature == 0.2)
-        #expect(IntelligencePrompt.build(chip: .draftEmail, tone: .keepTone).temperature == 0.7)
-        #expect(IntelligencePrompt.build(chip: .summarize, tone: .concise).temperature == 0.7)
+        #expect(IntelligencePrompt.build(chip: .polish, tone: .keepTone).temperature == 0.0)
+        #expect(IntelligencePrompt.build(chip: .polish, tone: .friendly).temperature == 0.0)
+        #expect(IntelligencePrompt.build(chip: .draftEmail, tone: .keepTone).temperature == 0.0)
+        #expect(IntelligencePrompt.build(chip: .summarize, tone: .concise).temperature == 0.0)
     }
 
     // MARK: input check
@@ -457,26 +457,28 @@ public enum IntelligencePrompt {
         return .ok(trimmed)
     }
 
-    /// (system prompt, sampling temperature) per spec §4: 0.2 for Polish (both paths),
-    /// 0.7 for the drafting chips.
+    /// (system prompt, sampling temperature) per spec §4. Temperature is 0.0 — greedy
+    /// decoding — for every chip: all the lab quality numbers we trust were measured at
+    /// mlx_lm's default temp 0.0, and shipping a sampled config would be unmeasured AND
+    /// nondeterministic. Revisit per-chip only with a new lab measurement.
     public static func build(chip: IntelligenceChip, tone: IntelligenceTone)
         -> (system: String, temperature: Float) {
         switch chip {
         case .polish:
             switch tone {
             case .keepTone:
-                return (polishFaithful, 0.2)
+                return (polishFaithful, 0.0)
             case .professional:
-                return ("Rewrite the text in a professional, courteous tone. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.2)
+                return ("Rewrite the text in a professional, courteous tone. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.0)
             case .friendly:
-                return ("Rewrite the text in a warm, friendly tone. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.2)
+                return ("Rewrite the text in a warm, friendly tone. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.0)
             case .concise:
-                return ("Rewrite the text to be as brief as possible. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.2)
+                return ("Rewrite the text to be as brief as possible. Keep every fact, name, number, date, and the meaning unchanged. Output only the rewritten text.", 0.0)
             }
         case .draftEmail, .draftMessage, .summarize:
             var system = draftShared + "\n" + taskLine(chip)
             if let tone = toneLine(tone) { system += "\n" + tone }
-            return (system, 0.7)
+            return (system, 0.0)
         }
     }
 
@@ -727,7 +729,7 @@ struct IntelligenceSessionTests {
         #expect(rig.polish.loads == 0 && rig.polish.generated.isEmpty)
         #expect(rig.draft.generated.count == 1)
         #expect(rig.draft.generated[0].user == "notes") // trimmed by the input check
-        #expect(rig.draft.generated[0].temperature == 0.7)
+        #expect(rig.draft.generated[0].temperature == 0.0)
         #expect(rig.draft.generated[0].system ==
                 IntelligencePrompt.build(chip: .draftEmail, tone: .professional).system)
         #expect(rig.rec.results == ["Hello."]) // sanitized
@@ -740,7 +742,7 @@ struct IntelligenceSessionTests {
         await rig.session.run(chip: .polish, tone: .keepTone, input: "x")?.value
         #expect(rig.polish.loads == 1 && rig.polish.generated.count == 1)
         #expect(rig.draft.loads == 0 && rig.draft.generated.isEmpty)
-        #expect(rig.polish.generated[0].temperature == 0.2)
+        #expect(rig.polish.generated[0].temperature == 0.0)
     }
 
     @Test func sameRoleTwiceSkipsReloadAndResetsIdleTimer() async {

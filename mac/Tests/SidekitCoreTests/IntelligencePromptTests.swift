@@ -74,10 +74,10 @@ struct IntelligencePromptTests {
     }
 
     @Test func temperaturesPerSpec() {
-        #expect(IntelligencePrompt.build(chip: .polish, tone: .keepTone).temperature == 0.2)
-        #expect(IntelligencePrompt.build(chip: .polish, tone: .friendly).temperature == 0.2)
-        #expect(IntelligencePrompt.build(chip: .draftEmail, tone: .keepTone).temperature == 0.7)
-        #expect(IntelligencePrompt.build(chip: .summarize, tone: .concise).temperature == 0.7)
+        #expect(IntelligencePrompt.build(chip: .polish, tone: .keepTone).temperature == 0.0)
+        #expect(IntelligencePrompt.build(chip: .polish, tone: .friendly).temperature == 0.0)
+        #expect(IntelligencePrompt.build(chip: .draftEmail, tone: .keepTone).temperature == 0.0)
+        #expect(IntelligencePrompt.build(chip: .summarize, tone: .concise).temperature == 0.0)
     }
 
     // MARK: input check
