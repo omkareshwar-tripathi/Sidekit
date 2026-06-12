@@ -45,6 +45,7 @@ struct PillView: View {
     @State private var showSuccess = false
     @State private var breathing = false
     @State private var collapseTask: Task<Void, Never>?
+    @State private var hovering = false
 
     /// The state to render: the raw state, except a finished outcome whose hold has elapsed reads
     /// as idle (so the pill returns to the dot rather than parking on "Pasted ✓").
@@ -64,14 +65,36 @@ struct PillView: View {
     @ViewBuilder private var content: some View {
         switch pill {
         case .idle:
-            Capsule()
-                .fill(.white.opacity(0.35))
-                .frame(width: 28, height: 5)
-                .scaleEffect(breathing ? 1.0 : 0.85)
-                .opacity(breathing ? 0.55 : 0.3)
-                .animation(
-                    reduceMotion ? nil : .easeInOut(duration: 1.4).repeatForever(autoreverses: true),
-                    value: breathing)
+            ZStack {
+                // A near-invisible pad widens the hover/click target beyond the 28×5 dot
+                // (spec §2: ≥80×30). Live-tune the opacity upward only if hover fails to
+                // register (per-pixel hit testing ignores fully transparent pixels).
+                Capsule().fill(.white.opacity(0.02)).frame(width: 120, height: 32)
+                if hovering {
+                    HStack(spacing: DS.Space.sm) {
+                        pillMenuButton("sparkles", "Polish") { controller.pillPolish() }
+                        pillMenuButton("square.and.pencil", "Scratchpad") { controller.pillScratchpad() }
+                        pillMenuButton("mic.fill", "Dictate") { controller.pillDictate() }
+                    }
+                    .padding(.horizontal, DS.Space.md)
+                    .padding(.vertical, DS.Space.sm)
+                    .glassCard(cornerRadius: DS.Radius.pill)
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                } else {
+                    Capsule()
+                        .fill(.white.opacity(0.35))
+                        .frame(width: 28, height: 5)
+                        .scaleEffect(breathing ? 1.0 : 0.85)
+                        .opacity(breathing ? 0.55 : 0.3)
+                        .animation(
+                            reduceMotion ? nil : .easeInOut(duration: 1.4).repeatForever(autoreverses: true),
+                            value: breathing)
+                        .contentShape(Capsule().scale(2))
+                        .onTapGesture { controller.pillOpenWindow() }
+                }
+            }
+            .onHover { hovering = $0 }
+            .animation(morph, value: hovering)
         case .recording:
             glassPill(label: "Listening…") {
                 HStack(spacing: DS.Space.sm) {
@@ -80,6 +103,8 @@ struct PillView: View {
                 }
             }
             .transition(.scale.combined(with: .opacity))
+            .contentShape(Capsule())
+            .onTapGesture { controller.pillStopDictate() }   // hands-free only; Fn-held ignores it
         case .transcribing:
             glassPill(label: "Transcribing…") {
                 ProgressView().controlSize(.small).tint(DS.Palette.accent)
@@ -104,6 +129,7 @@ struct PillView: View {
         switch newState {
         case .recording:
             showSuccess = false // a fresh cycle clears any lingering outcome
+            hovering = false
         case .idle where controller.lastOutcome != nil:
             showSuccess = true
             collapseTask = Task { @MainActor in
@@ -113,6 +139,18 @@ struct PillView: View {
         default:
             break
         }
+    }
+
+    private func pillMenuButton(_ symbol: String, _ label: String,
+                                action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: symbol).font(.system(size: 11))
+                Text(label).font(DS.Typography.caption)
+            }
+            .foregroundStyle(DS.Palette.textPrimary)
+        }
+        .buttonStyle(.plain)
     }
 
     private func glassPill(label: String, @ViewBuilder leading: () -> some View) -> some View {

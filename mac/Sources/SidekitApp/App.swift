@@ -5,6 +5,7 @@ import ApplicationServices
 import ServiceManagement
 import SidekitCore
 import SidekitNet
+import SidekitIntelligence
 
 /// Posted when the app should bring its main window forward — on launch and whenever the user
 /// re-activates the app (clicks it in Launchpad / Finder / Dock). `MenuBarLabel` (always alive in
@@ -159,12 +160,19 @@ final class AppController: ObservableObject {
     private var pill: PillPanel?
     private var feedbackBox: FeedbackBox?
     private var welcomePanel: WelcomePanel?
+    private var intelligencePanel: IntelligencePanel?
+    private var memoryPressure: MemoryPressureSource?
+    /// True while a pill-button (hands-free) dictation is running — pill click stops it;
+    /// Fn-held cycles never set it (spec §2).
+    private var handsFreeActive = false
     private var shelfPanel: ShelfPanel?
     private var shelfStatusItem: ShelfStatusItem?
     private var shelfDragMonitor: ShelfDragStartMonitor?
     private let screenshotWatcher: ScreenshotWatcher
     /// Hourly expiry sweep (spec §4) — lives as long as the controller (the whole app).
     private var shelfPruneTask: Task<Void, Never>?
+
+    var intelligence: IntelligencePanelModel? { intelligencePanel?.model }
 
     init() {
         let clipboard = MacClipboard()
@@ -194,6 +202,27 @@ final class AppController: ObservableObject {
         let feedbackBox = FeedbackBox(identity: identity, spool: spool)
         let welcomePanel = WelcomePanel(identity: identity)
 
+        // Sidekit Intelligence (spec 2026-06-12, §1 round 3): ONE shared model serves
+        // polish + draft, loaded on demand — the RAM-guest lifecycle lives in the core
+        // session, which detects the shared engine and relabels role switches.
+        let downloader = ModelDownloader(
+            root: AppPaths.applicationSupport.appendingPathComponent("Intelligence", isDirectory: true),
+            log: { Diag.log("intelligence: \($0)") })
+        let modelDirectory: @Sendable () -> URL = {
+            // Resolved at load time (post-download). A missing snapshot yields a path whose
+            // load fails -> the session shows "Model files look damaged — download again."
+            downloader.snapshotDirectory(for: ModelDownloader.modelRepoID)
+                ?? downloader.root.appendingPathComponent("missing-snapshot", isDirectory: true)
+        }
+        let intelligenceEngine = MLXTextEngine(modelDirectory: modelDirectory)
+        let intelligenceSession = IntelligenceSession(
+            polishEngine: intelligenceEngine,
+            draftEngine: intelligenceEngine,
+            provisioner: downloader,
+            idle: SystemIntelligenceIdleTimer())
+        let intelligencePanel = IntelligencePanel(session: intelligenceSession,
+                                                  provisioner: downloader)
+
         // Route the cleaned transcript: into the active note when Sidekit is the focused app
         // (creating one if the list is empty), otherwise paste at the cursor as before (spec §3).
         // The sink's `deliver` is invoked on the main actor by the coordinator, so the AppKit /
@@ -206,6 +235,9 @@ final class AppController: ObservableObject {
                     // it's the key window — "hold Fn and just say it".
                     if feedbackBox.isKey {
                         feedbackBox.model.appendDictated(text)
+                    } else if intelligencePanel.isKey {
+                        // Spec §3: the scratchpad outranks the notes while it's key.
+                        intelligencePanel.model.appendDictated(text)
                     } else {
                         let id = notes.activeID ?? notes.newNote().id
                         notes.append(text, to: id)
@@ -242,6 +274,7 @@ final class AppController: ObservableObject {
         self.spool = spool
         self.feedbackBox = feedbackBox
         self.welcomePanel = welcomePanel
+        self.intelligencePanel = intelligencePanel
         self.coordinator = coordinator
         self.hotkey = hotkey
         self.screenshotWatcher = screenshots
@@ -262,6 +295,7 @@ final class AppController: ObservableObject {
                 self?.level = 0              // settle the waveform once recording ends
                 self?.recordingMenuIcon = nil // menu glyph returns to the static idle equalizer
             }
+            if newState == .idle { self?.handsFreeActive = false }
         }
         coordinator.onCompleted = { [weak self] outcome in self?.lastOutcome = outcome }
         // NSEvent monitor callbacks arrive on the main thread. press/cancel run
@@ -286,6 +320,10 @@ final class AppController: ObservableObject {
         // Show the always-present floating pill (binds to `self.state`). Created last, once all
         // stored properties are initialized, so it can capture a fully-formed controller.
         pill = PillPanel(controller: self)
+        // The guest leaves the moment the house is full (spec §5).
+        memoryPressure = MemoryPressureSource { [weak self] in
+            self?.intelligencePanel?.model.session.memoryPressure()
+        }
         // The Shelf panel starts hidden; a dedicated menu-bar icon click toggles it.
         shelfPanel = ShelfPanel(
             model: shelf,
@@ -373,6 +411,29 @@ final class AppController: ObservableObject {
     }
 
     func showFeedbackBox() { feedbackBox?.show() }
+
+    // MARK: Pill menu (spec 2026-06-12 §2)
+
+    func pillPolish() { intelligencePanel?.show(prefillFromClipboard: true, preselect: .polish) }
+    func pillScratchpad() { intelligencePanel?.show() }
+
+    /// Hands-free dictation: Fn without the holding. Click the pill to stop.
+    func pillDictate() {
+        guard state == .idle else { return }
+        handsFreeActive = true
+        coordinator.pressed()
+    }
+
+    /// Stops a hands-free recording only — Fn-held cycles end on Fn release as always.
+    func pillStopDictate() {
+        guard handsFreeActive else { return }
+        handsFreeActive = false
+        Task { @MainActor in await coordinator.released() }
+    }
+
+    func pillOpenWindow() {
+        NotificationCenter.default.post(name: .openMainWindow, object: nil)
+    }
 
     /// Loads the bundled menu-bar template glyph (`Resources/MenuBarIcon.pdf`), sized for the menu
     /// bar and marked as a template so macOS tints it for light/dark. nil if absent (un-bundled run).

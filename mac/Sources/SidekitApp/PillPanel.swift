@@ -3,8 +3,8 @@ import SwiftUI
 
 /// The floating recording pill's window: a borderless, non-activating, always-on-top panel
 /// pinned to the bottom-center of the active screen and present on every Space (spec §2.2). It
-/// hosts the SwiftUI `PillView` bound to the coordinator state. Click-through for now
-/// (informational only) — click-to-open-window arrives with the window-interaction work.
+/// hosts the SwiftUI `PillView` bound to the coordinator state. Interactive: hover expands the
+/// Intelligence menu (spec 2026-06-12 §2).
 @MainActor
 final class PillPanel {
     private let panel: NSPanel
@@ -29,7 +29,10 @@ final class PillPanel {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false           // the glass card draws its own shadow
-        panel.ignoresMouseEvents = true   // informational; non-interactive in this version
+        // Interactive since Intelligence v1 (spec 2026-06-12 §2): hover expands the menu,
+        // the dot click opens the window. Clicks on fully transparent canvas pixels still
+        // pass through to whatever is beneath (per-pixel hit testing on non-opaque windows).
+        panel.ignoresMouseEvents = false
         panel.hidesOnDeactivate = false
 
         reposition()

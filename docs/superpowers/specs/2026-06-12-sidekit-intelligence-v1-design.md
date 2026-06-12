@@ -41,7 +41,7 @@ Today the pill is a passive status light (idle breathing dot → Listening → T
 - **Hover** over the idle dot expands it into three glass buttons: **Polish · Scratchpad · Dictate** (left to right). Mouse-out collapses back to the dot. Spring morph; Reduce Motion degrades to a fade (house rule, UI-redesign spec §9).
 - The **hover hitbox is larger than the dot** (the dot is 28×5 pt — hovering a 5 pt target is misery). The panel's tracking area is at least 80×30 pt centred on the dot.
 - The menu only appears from the **idle** state. While recording / transcribing / showing an outcome, hover does nothing — the pill is busy being a status light, and the existing state morphs are unchanged.
-- **Clicking the dot itself** still opens the main window (existing behavior, kept).
+- **Clicking the dot itself** opens the main window (the behavior the UI-redesign spec promised; the pill was click-through until now — this task makes it interactive).
 - The pill panel stays non-activating and focus-stealing-free. Button clicks must work without activating the app (`NSPanel` + `.nonactivatingPanel` already proven; the scratchpad panel is the only surface that takes key focus).
 
 **Button actions:**

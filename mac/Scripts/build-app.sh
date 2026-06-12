@@ -29,6 +29,11 @@ cp "$BIN_DIR/SidekitApp" "$CONTENTS/MacOS/Sidekit"
 cp "AppBundle/Info.plist" "$CONTENTS/Info.plist"
 cp "AppBundle/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 cp "AppBundle/MenuBarIcon.pdf" "$CONTENTS/Resources/MenuBarIcon.pdf"
+# MLX runtime kernel library — must sit beside the executable or the on-device LLM
+# crashes at first generation (mlx-swift ships no precompiled metallib under SwiftPM).
+# Regenerate AppBundle/mlx.metallib if the pinned mlx-swift version changes (see the
+# GATE-B entry in BRICKS-ARCHIVE.md / the IntelligenceSelftest header).
+cp "AppBundle/mlx.metallib" "$CONTENTS/MacOS/mlx.metallib"
 cp -R "Models" "$CONTENTS/Resources/Models"
 
 # Sign with a STABLE self-signed identity so macOS TCC permissions (Accessibility,
