@@ -66,13 +66,13 @@ struct PillView: View {
         switch pill {
         case .idle:
             ZStack {
-                // A near-invisible pad widens the hover/click target beyond the 28×5 dot
-                // (spec §2: ≥80×30) AND covers the bloomed menu's footprint, so the hover
-                // tracking region is identical collapsed/expanded — a narrower pad makes the
-                // region churn at the menu's edges (flicker, failed re-expand). Live-tune the
-                // opacity upward only if hover fails to register (per-pixel hit testing
-                // ignores fully transparent pixels).
-                Capsule().fill(.white.opacity(0.02)).frame(width: 260, height: 36)
+                // A near-invisible pad widens the hover trigger to the spec floor (§2 ≥80×30)
+                // and no further — the user's M11 feedback: a big pad claims too much screen.
+                // While EXPANDED the bloomed menu's own glass card hit-tests, so it keeps the
+                // hover region alive beyond the pad; the pad only governs the collapsed state.
+                // Live-tune the opacity upward only if hover fails to register (per-pixel hit
+                // testing ignores fully transparent pixels).
+                Capsule().fill(.white.opacity(0.02)).frame(width: 80, height: 30)
                 if hovering {
                     HStack(spacing: DS.Space.sm) {
                         pillMenuButton("sparkles", "Polish") { controller.pillPolish() }
