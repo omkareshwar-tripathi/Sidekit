@@ -4,17 +4,16 @@ An always-on-top, **fully on-device** desktop surface you summon mid-task and le
 
 Sidekit is the product; SpeakType, Shelf, and Mirror are features inside it.
 
+**Website & download:** <https://sidekit.app> · **License:** [MIT](LICENSE)
+
+> **New here?** [`STRUCTURE.md`](STRUCTURE.md) is a guided tour of the whole repo — read that one
+> file to understand how everything fits together. Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Repository layout
 
-This repo holds the two native apps (one per OS) plus shared planning docs:
-
-| Path | What |
-|---|---|
-| `mac/` | The macOS app — native Swift / SwiftUI, on-device Whisper via WhisperKit (Apple Neural Engine). **The lead platform** (shipped). |
-| `windows/` | The Windows app — C# / .NET 8, on-device Whisper via Whisper.net. Mirrors the Mac app. |
-| `vision/` | Product vision, roadmap, and website brief. |
-| `docs/` | Design specs and plans. |
-| `lab/`, `scripts/` | Offline model experiments and export tooling (not shipped). |
+Two native apps (one per OS) — `mac/` (Swift, the lead platform, shipped) and `windows/`
+(C# / .NET 8, mirrors the Mac app) — plus shared planning docs in `vision/` and `docs/`. The full
+annotated map and a "where do I start?" guide is in **[STRUCTURE.md](STRUCTURE.md)**.
 
 `Sidekit-v1-spec.md` is the decision-resolved spec; `BRICKS.md` is the session-by-session build log.
 
