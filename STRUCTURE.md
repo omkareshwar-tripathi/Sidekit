@@ -13,51 +13,54 @@ the whole project, read this one.**
 
 | You are… | Start with |
 |---|---|
-| **A user** who just wants the app | [README → the Download sections](README.md) — Mac DMG or Windows build, no compiling needed |
-| **A curious developer** reading to learn | This file, then [`vision/README.md`](vision/README.md) for the "why", then the platform you care about — [`mac/`](mac/README.md) or [`windows/`](windows/STATUS.md) |
+| **A user** who just wants the app | [README → Download](README.md) — the Mac DMG, no compiling needed |
+| **A curious developer** reading to learn | This file, then [`vision/README.md`](vision/README.md) for the "why", then the shipped app in [`mac/`](mac/README.md) |
 | **A contributor** | [CONTRIBUTING.md](CONTRIBUTING.md) — how to build, test, and the brick-by-brick workflow we use |
 
 ## The big picture
 
-Sidekit is **two native apps that share one design** — not one cross-platform codebase:
+Sidekit ships today as a **native macOS app**; Windows is a **planned** future platform:
 
-- **`mac/`** — Swift / SwiftUI, the **lead** platform (shipped). On-device speech via
+- **`mac/`** — Swift / SwiftUI, the shipped app. On-device speech via
   [WhisperKit](https://github.com/argmaxinc/WhisperKit) on the Apple Neural Engine; on-device
   drafting via a small local LLM (MLX).
-- **`windows/`** — C# / .NET 8, mirrors the Mac app's behavior. On-device speech via Whisper.net.
+- **Windows** — on the roadmap (see [`vision/ROADMAP.md`](vision/ROADMAP.md)): a native C# / .NET app
+  that will mirror the Mac one. An earlier prototype was removed to be rebuilt, so there is **no
+  Windows code in the repo yet.**
 
-They are deliberate **forks** that evolve independently — same product, native on each OS. The
-Mac app leads; Windows follows it to parity.
+When it lands, the two will be deliberate **forks** — same product, native on each OS — with Mac
+leading and Windows following it to parity.
 
 ## Repository map
 
 | Path | What it is | Start file |
 |---|---|---|
-| `mac/` | The macOS app (Swift / SwiftUI). Lead platform, shipped. | [`mac/README.md`](mac/README.md) |
-| `windows/` | The Windows app (C# / .NET 8). Mirrors the Mac app. | [`windows/STATUS.md`](windows/STATUS.md) |
+| `mac/` | The macOS app (Swift / SwiftUI). The shipped product. | [`mac/README.md`](mac/README.md) |
 | `vision/` | Where the product is going and why — north star, roadmap, per-capability intent, website brief. | [`vision/README.md`](vision/README.md) |
 | `docs/` | Design specs (`superpowers/specs/`) and implementation plans (`superpowers/plans/`) for things actually being built, plus backend setup. | `docs/superpowers/specs/` |
-| `.github/` | Continuous-integration workflow (GitHub Actions). | `.github/workflows/ci.yml` |
 | `.claude/` | The AI-assisted dev setup — project skills, hooks, and settings used while building. | `.claude/settings.json` |
+
+(There's no CI workflow today — the old Windows-only `.github/workflows/ci.yml` was removed with the
+Windows prototype; a macOS CI can be added when needed.)
 
 **Root files worth knowing:**
 
 - [`README.md`](README.md) — the front door: what Sidekit is, and how to download or build it.
-- [`Sidekit-v1-spec.md`](Sidekit-v1-spec.md) — the decision-resolved v1 spec (what "done" meant for launch).
+- [`Sidekit-v1-spec.md`](Sidekit-v1-spec.md) — the original **Windows** v1 spec (parked; kept for the future Windows rebuild). The shipped macOS app's design lives in `docs/superpowers/specs/`.
 - [`BRICKS.md`](BRICKS.md) — the session-by-session build log (see "How we build" below).
   [`BRICKS-ARCHIVE.md`](BRICKS-ARCHIVE.md) holds the older entries.
-- [`TESTING.md`](TESTING.md) — the manual test pass run before shipping.
+- [`TESTING.md`](TESTING.md) — the original **Windows** v1 manual test plan (parked). The shipped macOS app's tests are in [`mac/TESTING.md`](mac/TESTING.md).
 - [`CLAUDE.md`](CLAUDE.md) — the working agreement for development on this repo (our engineering rules).
 - `LICENSE` — MIT.
 
 > **Not in the repo:** `lab/` (multi-gigabyte local model-evaluation scratch) and `bip-posts/`
 > (build-in-public drafts) are gitignored — they live only on the maintainer's machine.
 
-## Inside each app (the short version)
+## Inside the app (the short version)
 
-Both apps follow **ports-and-adapters**: a pure, fully-tested core that knows nothing about the
+The macOS app follows **ports-and-adapters**: a pure, fully-tested core that knows nothing about the
 OS, plus thin "adapter" layers that plug it into real hardware (mic, hotkey, clipboard, camera).
-That is why the core is testable without a Mac or PC actually attached.
+That is why the core is testable without the hardware actually attached.
 
 **`mac/Sources/`**
 - `SidekitCore/` — pure, unit-tested logic: the dictation state machine, transcript cleaner,
@@ -67,12 +70,6 @@ That is why the core is testable without a Mac or PC actually attached.
 - `SidekitIntelligence/` — the on-device LLM (MLX): text engine + model downloader.
 - `SidekitNet/` — the sign-up / feedback client (Supabase, insert-only by design).
 - `*Selftest/` — headless dev tools that exercise the speech/LLM models end-to-end.
-
-**`windows/`**
-- `Sidekit.Core/` — the cross-platform pure logic (mirrors `SidekitCore`).
-- `Sidekit.Whisper/` — local transcription (Whisper.net).
-- `Sidekit.WinApp/` — the Windows-only UI: tray, global hotkey, audio, clipboard.
-- `Sidekit.Tests` / `Sidekit.Whisper.Tests` — the test suites (the core ones run on macOS/Linux too).
 
 Deeper architecture lives in the design specs under `docs/superpowers/specs/`
 (e.g. `2026-06-04-speaktype-mac-design.md`).
@@ -85,15 +82,14 @@ across them:
 
 ```
 vision/             →   docs/superpowers/specs/    →   BRICKS.md        →   shipped
-(where we're going)     (decision-resolved design)     (the build log)      (in mac/ or windows/)
+(where we're going)     (decision-resolved design)     (the build log)      (in mac/)
 ```
 
 1. **Vision** — a capability is described in `vision/` (the "what and why").
 2. **Spec** — when we commit to building it, it gets a decision-resolved design in
    `docs/superpowers/specs/` and a plan in `docs/superpowers/plans/`.
 3. **Bricks** — the work is logged brick-by-brick in `BRICKS.md` as it's built and tested.
-4. **Shipped** — the code lands in `mac/` or `windows/`, and the status tables in
-   `vision/README.md` move to 🟢.
+4. **Shipped** — the code lands in `mac/`, and the status tables in `vision/README.md` move to 🟢.
 
 The full rules of this loop are in [`CLAUDE.md`](CLAUDE.md). `BRICKS.md` is the best place to see
 **what's happening right now**; `vision/` is the best place to see **where it's all going**.

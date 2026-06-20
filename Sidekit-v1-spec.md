@@ -1,5 +1,7 @@
 # Sidekit — Product Spec (v1)
 
+> **Historical (Windows v1).** This is the original **Windows** product spec. The Windows .NET prototype was **removed 2026-06-20**; Windows is now a [planned future rebuild](vision/ROADMAP.md). The **shipped product is the macOS app** (`mac/`) — its design lives in `docs/superpowers/specs/`. This spec is kept as the reference for the eventual Windows rebuild.
+
 **What it is:** A Windows app that turns your voice into clean, formatted text. Hold a hotkey, speak, release — your words appear at your cursor, anywhere you can type.
 
 **Who it's for:** Professionals who send a high volume of messages (Slack, email, chat) and want to talk instead of type.

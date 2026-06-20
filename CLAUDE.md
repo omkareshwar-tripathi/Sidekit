@@ -116,9 +116,9 @@ When writing a brick plan, a /simplify follow-up, or any multi-step task list, e
 
 ### 6. Skills for this project
 
-The installed skills below are the ones suited to Sidekit (a **C# / .NET Windows desktop** app). Use them per §5 — name the relevant one on each plan step's `Skill:` line.
+The shipped Sidekit app is **Swift / SwiftUI on macOS** (in `mac/`). There is no Swift-specific domain skill, so Swift bricks use `Skill: none` (the process skills below still apply). Use the skills per §5 — name the relevant one on each plan step's `Skill:` line.
 
-**Domain (C#/.NET) — use these for the actual app:**
+**Domain (C#/.NET) — for the _planned_ Windows app (not in the repo yet; dormant until the Windows rebuild):**
 
 - **`dotnet-best-practices`** — modern C#/.NET code quality. Use when writing or reviewing any production code.
 - **`dotnet-xunit`** — writing xUnit tests (Fact/Theory, fixtures, async lifetime). Use for the test-first step of every brick (pairs with §2a TDD).

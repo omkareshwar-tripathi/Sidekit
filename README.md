@@ -11,9 +11,9 @@ Sidekit is the product; SpeakType, Shelf, and Mirror are features inside it.
 
 ## Repository layout
 
-Two native apps (one per OS) — `mac/` (Swift, the lead platform, shipped) and `windows/`
-(C# / .NET 8, mirrors the Mac app) — plus shared planning docs in `vision/` and `docs/`. The full
-annotated map and a "where do I start?" guide is in **[STRUCTURE.md](STRUCTURE.md)**.
+The shipped app lives in `mac/` (Swift, macOS), plus shared planning docs in `vision/` and `docs/`.
+Windows is a **planned** future platform (see [`vision/`](vision/README.md)) — not yet in the repo.
+The full annotated map and a "where do I start?" guide is in **[STRUCTURE.md](STRUCTURE.md)**.
 
 `Sidekit-v1-spec.md` is the decision-resolved spec; `BRICKS.md` is the session-by-session build log.
 
@@ -35,36 +35,7 @@ open Sidekit.app
 
 ---
 
-## Windows (`windows/`)
+## Windows — planned
 
-Push-to-talk voice typing. Hold the hotkey (default **Right Ctrl**), speak, release — a local Whisper model transcribes and types into whatever has focus.
-
-**Requirements:** Windows 10/11 x64; an internet connection on **first run only**, to download the speech model.
-
-### Install (download, no build)
-
-Every green CI run attaches a finished, self-contained `Sidekit.exe` as a downloadable artifact — no .NET SDK or build needed:
-
-1. Open the repo's **Actions** tab → click the latest green **CI** run on `main`.
-2. Under **Artifacts**, download **`Sidekit-win-x64`** (a `.zip`).
-3. Unzip it, then double-click **`Sidekit.exe`** (see the SmartScreen note below on first launch).
-
-Artifacts are kept for 90 days.
-
-### Run / test / build from source
-
-```sh
-dotnet run    --project windows/Sidekit.WinApp
-dotnet test   windows/Sidekit.sln
-dotnet publish windows/Sidekit.WinApp/Sidekit.WinApp.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
-```
-
-The cross-platform `Sidekit.Core` / `Sidekit.Tests` suites also run on macOS/Linux; the `Sidekit.WinApp` UI layer (hotkey hook, audio, tray, clipboard) is **Windows-only**. The published single-file exe lands at `windows/Sidekit.WinApp/bin/Release/net8.0-windows/win-x64/publish/Sidekit.exe`.
-
-### SmartScreen warning (expected)
-
-The v1 executable is **unsigned**, so on first launch Windows SmartScreen shows *"Windows protected your PC."* This is expected — click **More info → Run anyway**. (Code signing is out of scope for v1.)
-
-### First run
-
-On first launch Sidekit opens a Welcome window and downloads the default speech model (`base.en`), then turns on **Start with Windows**. After that it lives in the system tray — right-click for Settings (hotkey, model, overlay, filler removal), Pause, and Quit.
+Windows is on the roadmap: Sidekit comes to Windows **after** Mac (see [`vision/ROADMAP.md`](vision/ROADMAP.md)).
+An earlier .NET prototype was removed to be rebuilt — **there is no Windows build in the repo yet.**

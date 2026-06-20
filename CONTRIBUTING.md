@@ -6,23 +6,19 @@ repo and tells you where to start.
 
 ## Build & run
 
-Each platform builds independently — full instructions live in its own README:
+The shipped app is macOS — full instructions are in its README:
 
 - **macOS** — [`mac/README.md`](mac/README.md). One command: `cd mac && ./Scripts/build-app.sh`.
   Needs an Apple Silicon Mac, macOS 14+, and Xcode command-line tools.
-- **Windows** — [`windows/STATUS.md`](windows/STATUS.md). `dotnet run --project windows/Sidekit.WinApp`.
-  Needs the .NET 8 SDK. The cross-platform `Sidekit.Core` builds and tests on macOS/Linux too.
+
+Windows is a [planned](vision/ROADMAP.md) future platform — there's no Windows code in the repo yet.
 
 ## Run the tests
 
 Every change ships with tests. Run them before opening a pull request:
 
 ```sh
-# macOS
 cd mac && swift test
-
-# Windows / cross-platform core
-dotnet test windows/Sidekit.sln
 ```
 
 ## How we work: bricks

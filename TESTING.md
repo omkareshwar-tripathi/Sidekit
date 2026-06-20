@@ -1,5 +1,7 @@
 # TESTING.md
 
+> **Historical (Windows v1).** This is the original **Windows** v1 manual test plan, for the prototype that was **removed 2026-06-20**. The **shipped macOS app's tests are in [`mac/TESTING.md`](mac/TESTING.md)**. Kept as reference for the future Windows rebuild (see [`vision/`](vision/ROADMAP.md)).
+
 Test plan for Sidekit's Windows dictation app (v1). Derived from `Sidekit-v1-spec.md`.
 
 Two layers:
