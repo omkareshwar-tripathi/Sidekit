@@ -7,7 +7,7 @@ Ship the next **${1:-1}** brick(s) from `BRICKS.md`, fully autonomously, one bri
 
 ## Operating principles (non-negotiable)
 - Obey `CLAUDE.md` throughout: brick-led (§2a), surgical scope (§3), TDD, verify-before-done (§4), plain-language summaries (§5).
-- **Pick recommended options yourself — do NOT grill the user.** Every design decision should be resolved from `SpeakType-v1-spec.md` (it has a fully resolved "Resolved Decisions" appendix) and sensible defaults. Only **HALT** (see below) if you hit a genuinely blocking ambiguity with no answer in the spec — never guess on something irreversible.
+- **Pick recommended options yourself — do NOT grill the user.** Every design decision should be resolved from `Sidekit-v1-spec.md` (it has a fully resolved "Resolved Decisions" appendix) and sensible defaults. Only **HALT** (see below) if you hit a genuinely blocking ambiguity with no answer in the spec — never guess on something irreversible.
 - Use **sub-agents (Agent tool)** for the implementation work so the orchestrator's context stays lean. The orchestrator (you) owns planning, the verify loop, docs, and git.
 - One brick = one logical unit = its own commit(s) + push. Never work ahead of the current brick.
 
@@ -21,7 +21,7 @@ Ship the next **${1:-1}** brick(s) from `BRICKS.md`, fully autonomously, one bri
 ## Per-brick loop (repeat ${1:-1} times, sequential)
 
 ### Phase A — Plan (orchestrator; Skill: brainstorming, writing-plans)
-- Read the current brick in `BRICKS.md` + the matching `SpeakType-v1-spec.md` section + its `TESTING.md` M# items.
+- Read the current brick in `BRICKS.md` + the matching `Sidekit-v1-spec.md` section + its `TESTING.md` M# items.
 - Lock a concrete plan: the exact files to add/edit, the tests to write first (TDD), and the acceptance check. Resolve every option from the spec's decisions appendix.
 - **Peer-mirror check (§2a):** if a near-identical sibling exists (e.g. a second adapter mirroring one you're touching), include it in this brick.
 - **Platform routing — decide where this brick can be verified:**

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sidekit — Sign-up &amp; Feedback UAT (M9)</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #171a21; --card2: #1d212a; --line: #2a2f3a;
+    --txt: #e6e9ef; --dim: #9aa3b2; --accent: #4c8dff; --green: #2ecc71;
+    --red: #ff5d5d; --amber: #f5a623; --bot: #6ee7b7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    background: var(--bg); color: var(--txt); padding: 0 0 120px;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10; background: rgba(15,17,21,.92);
+    backdrop-filter: blur(12px); border-bottom: 1px solid var(--line);
+    padding: 18px 28px;
+  }
+  h1 { margin: 0; font-size: 20px; letter-spacing: -.2px; }
+  h1 small { color: var(--dim); font-weight: 400; font-size: 13px; margin-left: 8px; }
+  .bar { height: 7px; background: var(--card2); border-radius: 6px; margin-top: 12px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,var(--accent),var(--green)); transition: width .3s; }
+  .stat { color: var(--dim); font-size: 13px; margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .stat b { color: var(--txt); }
+  .stat .p { color: var(--green); } .stat .f { color: var(--red); } .stat .bot { color: var(--bot); }
+  main { max-width: 920px; margin: 0 auto; padding: 24px 28px; }
+  .pre {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 24px; color: var(--dim); font-size: 13.5px;
+  }
+  .pre code { background: var(--card2); padding: 2px 7px; border-radius: 5px; color: var(--accent); font-size: 12.5px; }
+  .pre b { color: var(--amber); }
+  .pre .green { color: var(--green); font-weight: 600; }
+  .pre a { color: var(--accent); }
+  .grouphead { margin: 26px 0 12px; font-size: 13px; letter-spacing: .8px; text-transform: uppercase; color: var(--dim); display: flex; align-items: center; gap: 10px; }
+  .grouphead::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .grouphead.you { color: var(--amber); }
+  .grouphead.bot { color: var(--bot); }
+  section { margin-bottom: 14px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); }
+  section > h2 {
+    margin: 0; padding: 14px 18px; font-size: 15px; cursor: pointer; user-select: none;
+    display: flex; align-items: center; gap: 10px; background: var(--card2);
+  }
+  section > h2 .tag { font-size: 11px; color: var(--dim); font-weight: 400; border: 1px solid var(--line); padding: 2px 7px; border-radius: 20px; }
+  section > h2 .cnt { margin-left: auto; font-size: 12px; color: var(--dim); font-weight: 400; }
+  .items { padding: 6px 0; }
+  .row { display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; padding: 11px 18px; border-top: 1px solid var(--line); align-items: start; }
+  .row:first-child { border-top: none; }
+  .row .box { width: 20px; height: 20px; margin-top: 1px; cursor: pointer; accent-color: var(--green); }
+  .row .body { min-width: 0; }
+  .row .do { color: var(--txt); }
+  .row .exp { color: var(--dim); font-size: 13px; margin-top: 3px; }
+  .row .exp::before { content: "Expect: "; color: var(--accent); font-weight: 600; }
+  .row .bot-evidence { color: var(--bot); font-size: 12.5px; margin-top: 4px; }
+  .row .bot-evidence::before { content: "🤖 Claude verified — "; font-weight: 600; }
+  .row.done .do { text-decoration: line-through; color: var(--dim); }
+  .verdict { display: flex; gap: 4px; }
+  .verdict button {
+    border: 1px solid var(--line); background: transparent; color: var(--dim);
+    border-radius: 7px; padding: 3px 9px; font-size: 12px; cursor: pointer;
+  }
+  .verdict button.on.pass { background: var(--green); color: #08130b; border-color: var(--green); }
+  .verdict button.on.fail { background: var(--red); color: #1a0606; border-color: var(--red); }
+  .note { grid-column: 2 / 4; margin-top: 8px; }
+  .note textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--txt); padding: 8px 10px; font: inherit; font-size: 13px; resize: vertical; min-height: 0; height: 34px;
+  }
+  .note textarea:focus { outline: 1px solid var(--accent); height: 64px; }
+  footer { max-width: 920px; margin: 0 auto; padding: 8px 28px; display: flex; gap: 12px; }
+  footer button {
+    background: var(--card2); border: 1px solid var(--line); color: var(--dim);
+    border-radius: 9px; padding: 9px 16px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  footer button:hover { color: var(--txt); border-color: var(--accent); }
+  .collapsed .items { display: none; }
+  .chev { transition: transform .2s; } .collapsed .chev { transform: rotate(-90deg); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sidekit — Sign-up &amp; Feedback UAT <small>M9 · machine pass done 2026-06-12 · your turn: ~3 min</small></h1>
+  <div class="bar"><i id="fill"></i></div>
+  <div class="stat">
+    <span>👤 your checks: <b id="done">0</b>/<b id="total">0</b></span>
+    <span class="p">✓ <b id="pass">0</b> pass</span>
+    <span class="f">✗ <b id="fail">0</b> fail</span>
+    <span class="bot">🤖 machine-verified: <b id="autocount">0</b></span>
+    <span id="remain"></span>
+  </div>
+</header>
+
+<main>
+  <div class="pre">
+    <b>Where things stand (2026-06-12).</b><br>
+    Claude drove the real app via Accessibility scripting + screenshots and walked most of this sheet:
+    <span class="green">19 checks passed, 0 failed</span> — they're pre-marked green below with the evidence on each row
+    (open the collapsed sections to read; flip any to Fail if you ever see otherwise).<br><br>
+    <b>What's actually left for you</b> is the first group: mainly <b>dictating into the feedback box</b> (Claude has no voice)
+    and a couple of 10-second eyeball checks. Your app is currently signed in as <code>feelfreeforever1999@gmail.com</code>,
+    the backend is <span class="green">LIVE</span>, and the dashboard is clean (your signup is the only row):
+    <a href="https://supabase.com/dashboard/project/ubqdjvbhanhnxlonqrii/editor" target="_blank">Supabase → Table Editor</a>.<br><br>
+    Tick + Pass/Fail as you go (state persists in this browser), then <b>⤓ Export</b> and paste the results back to Claude.
+  </div>
+  <div id="app"></div>
+</main>
+
+<footer>
+  <button onclick="exportResults()">⤓ Export results</button>
+  <button onclick="expandAll(true)">Expand all</button>
+  <button onclick="expandAll(false)">Collapse all</button>
+  <button onclick="resetAll()">Reset</button>
+</footer>
+
+<script>
+const SUITE = [
+  // ───────────────────────── group: YOU ─────────────────────────
+  { id: "dic", group: "you", title: "Dictate your feedback — needs your voice", tag: "the headline · ~2 min", items: [
+    { id:"d1", do:"Menu bar → “Send Feedback…”, then hold Fn (🌐), speak a sentence, release.", exp:"The transcript lands IN the feedback box — not in a scratchpad note, not pasted elsewhere." },
+    { id:"d2", do:"⌘↩ the dictated feedback.", exp:"“Thanks! 🙌” toast; the row appears in the dashboard with your spoken words." },
+    { id:"d3", do:"Close the box. Focus the main Sidekit window with a note active, hold Fn and speak.", exp:"Dictation still lands in the active note (old M5 behavior untouched)." },
+    { id:"d4", do:"Click into another app (e.g. TextEdit), hold Fn and speak.", exp:"Transcript pastes at the cursor as always." },
+  ]},
+  { id: "eye", group: "you", title: "Eyeball checks — taste, not function", tag: "~1 min", items: [
+    { id:"e1", do:"Look at the feedback box (menu → Send Feedback…): glass style, spacing, placeholder, footer line.", exp:"Looks like a Sidekit-family panel — nothing clipped, misaligned, or ugly. (Claude saw it render correctly but can’t judge taste.)" },
+    { id:"e2", do:"Main window → ⚙︎ Settings → Account section.", exp:"Shows “Signed up as feelfreeforever1999@gmail.com”, field pre-filled, red “Remove email” button present. (Don’t click Remove unless testing e4 — it clears your local sign-in.)" },
+    { id:"e3", do:"(Optional) Reset state (<code>rm -f ~/Library/Application\\ Support/Sidekit/identity.json</code>, quit first), relaunch, and look at the welcome panel with fresh eyes.", exp:"Copy reads right, layout feels good. Re-enter your email after, or it re-asks at the 5th launch." },
+    { id:"e4", do:"(Optional) In Settings: press Return on the UNCHANGED email, then clear the field and press Return; then click “Remove email” and re-add yours.", exp:"Both Returns are no-ops (no dup row, nothing wiped); only the explicit button clears — then re-adding shows “Signed up as …” again." },
+    { id:"e5", do:"(Optional, launch-at-login edge) Enable Settings → “Launch Sidekit at login”, reset state, log out & back in.", exp:"Welcome panel appears at login even though the main window stays closed." },
+  ]},
+  // ─────────────────── group: machine-verified ───────────────────
+  { id: "wel", group: "auto", title: "Welcome lifecycle — the soft gate", tag: "SHIP-1 / SHIP-5 / I1", items: [
+    { id:"w1", do:"Fresh first launch shows the floating welcome panel.", exp:"Glass panel near center: logo, copy, email field, Skip + disabled Continue, privacy line — independent of the main window.", auto:"screenshot of launch #1: panel rendered with correct copy; Continue dimmed while empty." },
+    { id:"w2", do:"Junk email (“abc”) can’t be submitted.", exp:"Enter does nothing; clicking Continue does nothing; nothing saved or sent.", auto:"typed “abc”, pressed Enter and clicked Continue — panel stayed, identity.json unchanged, no network row." },
+    { id:"w3", do:"Skip → launches 2–4 are quiet.", exp:"No welcome panel on launches 2, 3, 4.", auto:"walked 6 real launches; welcomeAutoShows stayed 1 across launches 2–4 (the counter increments only when the panel shows)." },
+    { id:"w4", do:"5th launch re-asks exactly once.", exp:"Panel appears once more on launch 5.", auto:"launch #5 → welcomeAutoShows 1→2: the re-ask fired." },
+    { id:"w5", do:"Never again after the re-ask.", exp:"Launch 6+ quiet forever.", auto:"launch #6 → counters frozen at {6, 2}; shouldShowWelcome permanently false." },
+  ]},
+  { id: "sig", group: "auto", title: "Sign up → row in your dashboard", tag: "SHIP-5 / live backend", items: [
+    { id:"g1", do:"Valid email + Continue closes the panel and stores it.", exp:"Panel closes; identity.json holds the normalized email.", auto:"submitted m9-uat@example.com via the real UI — panel closed, file updated. (And your own real signup from 18:38 worked the same way.)" },
+    { id:"g2", do:"Row appears in the signups table.", exp:"email + app_version + platform “mac”.", auto:"row observed in Supabase seconds after submit; duplicate-email dedup separately proven (409 → one row)." },
+  ]},
+  { id: "fb", group: "auto", title: "Quick-feedback box", tag: "SHIP-6", items: [
+    { id:"b1", do:"Menu → “Send Feedback…” opens the box, field focused, placeholder shows.", exp:"“Type — or hold Fn and just say it.” with the cursor ready.", auto:"opened via the real menu; keystrokes landed with no click (focus-on-open works); placeholder on screen." },
+    { id:"b2", do:"Footer discloses exactly what's sent.", exp:"“Sends with: ‹email› · Sidekit ‹ver› · macOS ‹ver›”.", auto:"footer visible in screenshots with email + versions; wire bodies contain exactly those fields (verified server-side)." },
+    { id:"b3", do:"⌘↩ sends: toast, close, dashboard row.", exp:"“Thanks! 🙌”, box closes ~1s, row lands.", auto:"sent “M9 automated UAT…” — toast screenshotted, row appeared with type/email/versions." },
+    { id:"b4", do:"Chips tag the row; untagged = other.", exp:"🐞→bug, untagged→other, second click untags.", auto:"untagged send → type “other”; 🐞-tagged send → type “bug” (both observed in the table). 💡→feature is the same code path (unit-tested)." },
+    { id:"b5", do:"Esc closes without sending; draft survives.", exp:"No row sent; reopening shows the draft.", auto:"typed a draft, Esc, reopened — draft intact, no new row in the table." },
+    { id:"b6", do:"Send disabled while the message is empty.", exp:"Button dimmed until real content.", auto:"screenshot: dimmed on open; enabled after typing." },
+  ]},
+  { id: "off", group: "auto", title: "Offline → outbox → auto-retry", tag: "SHIP-3 / SHIP-4", items: [
+    { id:"o1", do:"Send feedback with Wi-Fi off.", exp:"“Saved — will send when you’re online.” toast; entry parked in outbox.json.", auto:"Wi-Fi was actually turned off; toast screenshotted verbatim; outbox.json held the full queued entry." },
+    { id:"o2", do:"Back online + relaunch flushes the queue.", exp:"Row appears; outbox.json empty.", auto:"Wi-Fi restored, app relaunched — “M9 offline queue test” row landed, outbox now []." },
+  ]},
+  { id: "key", group: "auto", title: "Key safety — insert-only", tag: "SHIP-7 / RLS", items: [
+    { id:"k1", do:"The shipped anon key cannot read data.", exp:"select returns [] / denied.", auto:"curl select with the shipped key → [] (HTTP 200, zero rows) — verified twice against the live project." },
+  ]},
+];
+
+const KEY = "sidekit-signup-feedback-uat-v2";
+let state = JSON.parse(localStorage.getItem(KEY) || "{}");
+// Machine-verified items default to checked+pass (still overridable by you).
+SUITE.forEach(sec=> sec.items.forEach(it=>{
+  const k = sec.id+"."+it.id;
+  if(it.auto && !(k in state)) state[k] = { checked:true, verdict:"pass" };
+}));
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); render(); }
+
+function render(){
+  const app = document.getElementById("app");
+  if(!app.dataset.built){ build(app); app.dataset.built = "1"; }
+  let total=0, done=0, pass=0, fail=0, auto=0;
+  SUITE.forEach(sec=>{
+    let sd=0;
+    sec.items.forEach(it=>{
+      const st = state[sec.id+"."+it.id] || {};
+      if(it.auto){ auto++; if(st.checked) sd++; if(st.verdict==="fail") fail++; return; }
+      total++;
+      if(st.checked){ done++; sd++; }
+      if(st.verdict==="pass") pass++;
+      if(st.verdict==="fail") fail++;
+    });
+    const cnt = document.getElementById("cnt-"+sec.id);
+    if(cnt) cnt.textContent = sd+"/"+sec.items.length;
+  });
+  document.getElementById("total").textContent = total;
+  document.getElementById("done").textContent = done;
+  document.getElementById("pass").textContent = pass;
+  document.getElementById("fail").textContent = fail;
+  document.getElementById("autocount").textContent = auto;
+  document.getElementById("fill").style.width = (total? (done/total*100):0)+"%";
+  document.getElementById("remain").textContent = (total-done)+" of your checks left";
+}
+
+function build(app){
+  let lastGroup = null;
+  SUITE.forEach(sec=>{
+    if(sec.group !== lastGroup){
+      const gh = document.createElement("div");
+      gh.className = "grouphead " + (sec.group==="you" ? "you" : "bot");
+      gh.textContent = sec.group==="you" ? "👤 What's left for you" : "🤖 Machine-verified by Claude · 2026-06-12 (open to read the evidence)";
+      app.appendChild(gh);
+      lastGroup = sec.group;
+    }
+    const s = document.createElement("section");
+    if(sec.group==="auto") s.classList.add("collapsed");
+    s.innerHTML = `<h2><span class="chev">▾</span>${sec.title}<span class="tag">${sec.tag}</span><span class="cnt" id="cnt-${sec.id}"></span></h2><div class="items"></div>`;
+    s.querySelector("h2").onclick = ()=> s.classList.toggle("collapsed");
+    const box = s.querySelector(".items");
+    sec.items.forEach(it=>{
+      const k = sec.id+"."+it.id;
+      const st = state[k] || {};
+      const row = document.createElement("div");
+      row.className = "row" + (st.checked?" done":"");
+      row.innerHTML = `
+        <input type="checkbox" class="box" ${st.checked?"checked":""}>
+        <div class="body"><div class="do">${it.do}</div><div class="exp">${it.exp}</div>
+          ${it.auto?`<div class="bot-evidence">${it.auto}</div>`:""}
+          <div class="note"><textarea placeholder="notes (optional)…">${st.note||""}</textarea></div></div>
+        <div class="verdict">
+          <button class="pass ${st.verdict==="pass"?"on":""}">Pass</button>
+          <button class="fail ${st.verdict==="fail"?"on":""}">Fail</button>
+        </div>`;
+      const cb = row.querySelector(".box");
+      cb.onchange = ()=>{ state[k]={...state[k], checked:cb.checked}; save(); row.classList.toggle("done", cb.checked); };
+      const [pB,fB] = row.querySelectorAll(".verdict button");
+      pB.onclick = ()=>{ const v=state[k]?.verdict==="pass"?null:"pass"; state[k]={...state[k],verdict:v,checked:true}; save(); rebuildRow(); };
+      fB.onclick = ()=>{ const v=state[k]?.verdict==="fail"?null:"fail"; state[k]={...state[k],verdict:v,checked:true}; save(); rebuildRow(); };
+      row.querySelector("textarea").oninput = (e)=>{ state[k]={...state[k], note:e.target.value}; localStorage.setItem(KEY, JSON.stringify(state)); };
+      function rebuildRow(){ pB.classList.toggle("on", state[k]?.verdict==="pass"); fB.classList.toggle("on", state[k]?.verdict==="fail"); cb.checked = !!state[k]?.checked; row.classList.toggle("done", !!state[k]?.checked); }
+      box.appendChild(row);
+    });
+    app.appendChild(s);
+  });
+}
+
+function expandAll(open){ document.querySelectorAll("section").forEach(s=> s.classList.toggle("collapsed", !open)); }
+function resetAll(){ if(confirm("Clear all Sign-up & Feedback UAT results? (Machine-verified marks will re-seed.)")){ state={}; localStorage.removeItem(KEY); location.reload(); } }
+function exportResults(){
+  let out = "# Sidekit Sign-up & Feedback UAT (M9) — results\n\n";
+  SUITE.forEach(sec=>{
+    out += `## ${sec.group==="auto"?"🤖 ":"👤 "}${sec.title} (${sec.tag})\n`;
+    sec.items.forEach(it=>{
+      const st = state[sec.id+"."+it.id]||{};
+      const mark = st.verdict==="pass"?(it.auto?"✅ PASS (machine)":"✅ PASS"):st.verdict==="fail"?"❌ FAIL":st.checked?"⬜ walked":"· not run";
+      out += `- ${mark} — ${it.do.replace(/<[^>]+>/g,"")}`;
+      if(st.note) out += `\n    note: ${st.note}`;
+      out += "\n";
+    });
+    out += "\n";
+  });
+  navigator.clipboard.writeText(out).then(
+    ()=>alert("Results copied to clipboard — paste them back to Claude."),
+    ()=>{ const w=window.open(); w.document.write("<pre>"+out.replace(/</g,"&lt;")+"</pre>"); }
+  );
+}
+render();
+</script>
+</body>
+</html>

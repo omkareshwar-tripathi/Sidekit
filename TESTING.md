@@ -1,13 +1,15 @@
 # TESTING.md
 
-Test plan for SpeakType v1. Derived from `SpeakType-v1-spec.md`.
+Test plan for Sidekit's Windows dictation app (v1). Derived from `Sidekit-v1-spec.md`.
 
 Two layers:
 
-1. **Automated** (in `SpeakType.Tests`, xUnit) — covers all pure/core logic and one gated real-Whisper check. Run with `dotnet test`.
+1. **Automated** (in `Sidekit.Tests`, xUnit) — covers all pure/core logic and one gated real-Whisper check. Run with `dotnet test`.
 2. **Manual** (`M#` checklist below) — covers the OS-bound adapters that can't be unit-tested (global hook, real audio, clipboard, paste, tray, overlay, lifecycle). Each brick's `BRICKS.md` "Verified" line cites the `M#` items it exercised.
 
 > **Status:** stub. Items are written against intended v1 behavior; check them off as each brick lands. An item for unbuilt behavior stays unchecked.
+
+> **Shelf drag-tests (Mac): never drag repo files.** Use the disposable samples in `~/SpeakType-TestFiles/` (sample.txt / sample.sh / sample.png / sample-folder). A fumbled Finder drag of a repo file/folder silently *moves* it — keep them clear. (The Windows UI project was renamed `Sidekit.App`→`Sidekit.WinApp` to end the macOS `.App`/`.app`-bundle collision that used to make it vanish from the worktree; the `restore-windows-baseline.sh` hook that guarded it is now redundant.)
 
 ---
 
@@ -69,12 +71,12 @@ Default hotkey below is **Right Ctrl**. Reset to a clean user profile where a te
 
 ### M6 — Settings persistence & autostart _(Bricks 11, 12)_
 - [ ] Change each setting (hotkey, model, filler toggle, overlay toggle, autostart, debug logging) → each takes effect **immediately** (no Save button).
-- [ ] Restart the app → all settings **persisted** (`%APPDATA%\SpeakType\settings.json`).
+- [ ] Restart the app → all settings **persisted** (`%APPDATA%\Sidekit\settings.json`).
 - [ ] Toggle **Start with Windows** off then on → `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry is **removed then re-added**.
 - [ ] Turn **Remove filler words** off → dictate "um I think" → fillers are **retained**.
 
 ### M7 — App lifecycle _(Brick 9)_
-- [ ] With the app running, launch a **second instance** → **"SpeakType is already running"** balloon, second instance exits; the first keeps working (no double paste).
+- [ ] With the app running, launch a **second instance** → **"Sidekit is already running"** balloon, second instance exits; the first keeps working (no double paste).
 - [ ] Pause listening from the tray → hotkey does nothing; restart the app → it comes back **active** (pause does not persist).
 - [ ] _(If reproducible)_ Force an error during a dictation → app **logs it, shows a balloon, and recovers to Idle** rather than crashing.
 

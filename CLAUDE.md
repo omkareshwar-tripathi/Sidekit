@@ -116,7 +116,7 @@ When writing a brick plan, a /simplify follow-up, or any multi-step task list, e
 
 ### 6. Skills for this project
 
-The installed skills below are the ones suited to SpeakType (a **C# / .NET Windows desktop** app). Use them per §5 — name the relevant one on each plan step's `Skill:` line.
+The installed skills below are the ones suited to Sidekit (a **C# / .NET Windows desktop** app). Use them per §5 — name the relevant one on each plan step's `Skill:` line.
 
 **Domain (C#/.NET) — use these for the actual app:**
 
@@ -129,3 +129,12 @@ The installed skills below are the ones suited to SpeakType (a **C# / .NET Windo
 - Superpowers skills (`brainstorming`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, `writing-plans` / `executing-plans`, `requesting-code-review` / `receiving-code-review`, `using-git-worktrees`, `finishing-a-development-branch`). Plus `grill-me` to stress-test a design before committing to it.
 
 **Known gap — transcription/audio has NO suitable skill.** Every speech-to-text skill in the ecosystem is a cloud-API wrapper, which violates the §"fully on-device" constraint. There is no skill for running **Whisper locally in C#** (e.g. Whisper.NET / whisper.cpp) or for audio capture. For those bricks, write `Skill: none` and work against the library's own docs.
+
+### 7. Build in the Open (public repo)
+
+**Sidekit is a public, MIT-licensed repository. Every change should leave the repo understandable to a stranger reading it cold.** Treat the documentation as part of the deliverable, not an afterthought.
+
+- **Every shipped feature lands documented.** A capability isn't done until (1) its docs are reachable from `STRUCTURE.md`, (2) it has a named place in the structure map, and (3) a newcomer can read a plain-language description of what it does and how to use it (a platform README section, or a doc it links to).
+- **Keep `STRUCTURE.md` true.** When you add, move, or rename a top-level folder or a major component, update `STRUCTURE.md` in the same brick. It is the one file a visitor reads to understand the whole project — stale structure docs are worse than none.
+- **Write for a stranger, not just the next session.** Per §5, lead with what / why / what-the-user-sees in plain language. Assume the reader has never seen the codebase and isn't on the team.
+- **Process/marketing files stay local.** Build-in-public drafts (`bip-posts/`) and the model-eval scratch (`lab/`) are gitignored — never commit them.

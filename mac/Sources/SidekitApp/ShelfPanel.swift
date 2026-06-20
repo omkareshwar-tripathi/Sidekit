@@ -1,0 +1,162 @@
+import AppKit
+import SwiftUI
+
+/// The Shelf's floating window: a borderless, **non-activating** (so dropping/clicking never steals
+/// focus from the app you're working in), always-on-top panel present on every Space (spec §2.5).
+/// Unlike `PillPanel` it is **interactive** (receives clicks/drops) and **summoned** — it starts
+/// hidden and is shown via `toggle()` at a **fixed top-center** spot (user decision 2026-06-11: the
+/// Shelf must not wander to the cursor or a remembered position). It's dragged by its header
+/// (`WindowDragHandle`), closed by its × button, and fades+rises in/out (Reduce-Motion aware).
+@MainActor
+final class ShelfPanel {
+    private let panel: NSPanel
+
+    /// The Mirror strip's model, owned here (not in `ShelfView`) so the panel can collapse it and stop
+    /// the camera on hide and on app-deactivate, and reset it to collapsed on each summon (no size
+    /// memory — spec decision #6). The model enforces "camera runs iff not collapsed".
+    private let mirror = MirrorModel()
+
+    /// Token for the app-deactivate observer that releases the camera; removed in `deinit`. Marked
+    /// `nonisolated(unsafe)` only so the `deinit` may read it to deregister — `removeObserver(_:)` is
+    /// thread-safe and the token is set once in `init`, so the read is race-free.
+    private nonisolated(unsafe) var deactivateObserver: NSObjectProtocol?
+
+    init(model: ShelfModel,
+         onClose: @escaping () -> Void) {
+        // Canvas slightly larger than the 280×360 card so its soft glass shadow never clips; the
+        // fixed-size card centers within.
+        let canvas = NSRect(x: 0, y: 0, width: 300, height: 384)
+        panel = NSPanel(
+            contentRect: canvas,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false)
+
+        let hosting = NSHostingView(rootView:
+            ShelfView(model: model, mirror: mirror, onClose: onClose))
+        hosting.frame = canvas
+        panel.contentView = hosting
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false      // the glass card draws its own shadow
+        panel.hidesOnDeactivate = false
+        // Dragged via the header's `WindowDragHandle`, not `isMovableByWindowBackground` (which
+        // SwiftUI hit-testing swallows). Starts hidden — summoned via `toggle()`.
+
+        // When the app loses focus, release the camera (spec decision #1). The block is `@Sendable`;
+        // it runs on the main queue, so hop to the main actor to touch the main-actor model.
+        deactivateObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.mirror.dismiss() }
+            }
+    }
+
+    deinit {
+        // `removeObserver(_:)` is thread-safe and the token is a plain captured value, so this is safe
+        // from a `@MainActor` class's deinit; we do NOT touch `mirror` (main-actor state) here.
+        if let deactivateObserver {
+            NotificationCenter.default.removeObserver(deactivateObserver)
+        }
+    }
+
+    var isVisible: Bool { panel.isVisible }
+
+    /// True while the current placement came from a drag auto-summon — marks the panel as transient so
+    /// `dragEnded()` slips it away again if the drop didn't land on it. (It no longer affects placement:
+    /// every show pins to the same top-center home.)
+    private var autoSummoned = false
+
+    /// Show if hidden, hide if visible.
+    func toggle() { panel.isVisible ? hide() : show() }
+
+    func show() {
+        mirror.dismiss() // always reappear collapsed — no size memory (spec decision #6)
+        autoSummoned = false
+        repositionTopCenter()
+        orderFrontAnimated()
+    }
+
+    /// Auto-summon for an in-flight system file drag (spec decisions #4/#6): appear at the fixed
+    /// top-center home so the drag can continue onto the card. No-op if already visible.
+    func showForDrag() {
+        guard !panel.isVisible else { return }
+        mirror.dismiss() // always reappear collapsed — no size memory (spec decision #6)
+        autoSummoned = true
+        repositionTopCenter()
+        orderFrontAnimated()
+    }
+
+    /// The system drag ended. An auto-summoned panel slips away again unless the cursor is over it —
+    /// i.e. the drop landed here or the user is engaging it (spec §2: "dismisses shortly after the
+    /// drag ends if nothing was dropped").
+    func dragEnded() {
+        guard autoSummoned, panel.isVisible else { return }
+        if panel.frame.contains(NSEvent.mouseLocation) {
+            // The drop landed here / the user engaged it — it's theirs now; a later drag ending
+            // elsewhere must not yank it away mid-use.
+            autoSummoned = false
+        } else {
+            hide()
+        }
+    }
+
+    private func orderFrontAnimated() {
+        let settled = panel.frame
+        if reduceMotion {
+            panel.alphaValue = 1
+            panel.orderFrontRegardless()
+            return
+        }
+        // Fade in while rising 8pt into place.
+        panel.alphaValue = 0
+        panel.setFrame(settled.offsetBy(dx: 0, dy: -8), display: false)
+        panel.orderFrontRegardless() // show without activating/stealing focus
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.18
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1
+            panel.animator().setFrame(settled, display: true)
+        }
+    }
+
+    func hide() {
+        guard panel.isVisible else { return }
+        mirror.dismiss() // stop the camera when the panel actually hides
+        if reduceMotion {
+            panel.orderOut(nil)
+            return
+        }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.14
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            // The completion runs on the main thread; assert isolation to touch the main-actor panel.
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.panel.orderOut(nil)
+                self.panel.alphaValue = 1 // reset for the next show
+            }
+        })
+    }
+
+    private var reduceMotion: Bool {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+
+    /// Pin the panel to the top-center of the main screen — its single fixed home. Every show (menu
+    /// toggle or drag auto-summon) lands here, so the Shelf never wanders to the cursor or a
+    /// remembered spot (user decision 2026-06-11). 12pt below the menu bar.
+    private func repositionTopCenter() {
+        guard let screen = NSScreen.main else { return }
+        let area = screen.visibleFrame
+        let size = panel.frame.size
+        panel.setFrameOrigin(NSPoint(x: area.midX - size.width / 2,
+                                     y: area.maxY - size.height - 12))
+    }
+}

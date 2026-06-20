@@ -62,7 +62,7 @@ PROJ_CHANGED=$(git diff --name-only HEAD -- '*.csproj' '*.sln' 'Directory.Build.
 [ -n "$PROJ_CHANGED" ] && NEED_SPEC=1
 
 [ "$NEED_TESTING" -eq 1 ] && add_target "TESTING.md — record new/changed automated tests or manual M# steps"
-[ "$NEED_SPEC" -eq 1 ] && add_target "SpeakType-v1-spec.md — update the Technology Stack / project-structure section for the build/dependency change"
+[ "$NEED_SPEC" -eq 1 ] && add_target "Sidekit-v1-spec.md — update the Technology Stack / project-structure section for the build/dependency change"
 
 # ---- Block stop with a directive message ----
 {

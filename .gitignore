@@ -43,3 +43,9 @@ logs/
 # Python bytecode (export tooling)
 __pycache__/
 *.pyc
+
+# Local model/whisper eval scratch (multi-GB, never commit)
+/lab/
+
+# Build-in-public drafts — kept local, not part of the public repo
+/bip-posts/

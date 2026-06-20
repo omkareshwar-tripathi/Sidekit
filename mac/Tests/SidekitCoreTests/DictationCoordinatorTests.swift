@@ -1,0 +1,235 @@
+import Testing
+@testable import SidekitCore
+
+@MainActor
+struct DictationCoordinatorTests {
+
+    // Builds a coordinator over fresh fakes and returns them all for assertions.
+    private func makeSUT() -> (
+        DictationCoordinator, FakeAudioCapture, FakeTranscriber, FakePaste, FakeClock, FakeAutoStopTimer
+    ) {
+        let audio = FakeAudioCapture()
+        let transcriber = FakeTranscriber()
+        let paste = FakePaste()
+        let clock = FakeClock()
+        let timer = FakeAutoStopTimer()
+        // Drive the coordinator through the real PasteSink so the existing `paste.*`
+        // assertions keep exercising the default paste-at-cursor destination.
+        let sut = DictationCoordinator(
+            audio: audio, transcriber: transcriber, sink: PasteSink(paste: paste),
+            clock: clock, autoStop: timer
+        )
+        return (sut, audio, transcriber, paste, clock, timer)
+    }
+
+    @Test func pressedStartsRecordingAndArmsAutoStop() {
+        let (sut, audio, _, _, _, timer) = makeSUT()
+        sut.pressed()
+        #expect(sut.currentState == .recording)
+        #expect(audio.startCount == 1)
+        #expect(timer.startedDelay == .seconds(180))
+    }
+
+    @Test func pressedWhileBusyIsIgnored() {
+        let (sut, audio, _, _, _, _) = makeSUT()
+        sut.pressed()
+        sut.pressed() // second press while recording
+        #expect(audio.startCount == 1)
+    }
+
+    @Test func shortHoldIsDiscardedWithoutOutcome() async {
+        let (sut, audio, transcriber, _, clock, timer) = makeSUT()
+        var completions: [DictationOutcome] = []
+        sut.onCompleted = { completions.append($0) }
+
+        clock.ticksMs = 0
+        sut.pressed()
+        clock.ticksMs = 200 // held 200 ms < 300 ms guard
+        await sut.released()
+
+        #expect(sut.currentState == .idle)
+        #expect(audio.stopCount == 1)        // mic released
+        #expect(transcriber.callCount == 0)  // never transcribed
+        #expect(completions.isEmpty)         // no outcome for a tap
+        #expect(timer.cancelCount == 1)
+    }
+
+    @Test func normalHoldTranscribesCleansAndPastes() async {
+        let (sut, _, transcriber, paste, clock, _) = makeSUT()
+        transcriber.result = "  hello   world  "
+        var outcome: DictationOutcome?
+        sut.onCompleted = { outcome = $0 }
+
+        clock.ticksMs = 0
+        sut.pressed()
+        clock.ticksMs = 500 // held 500 ms
+        await sut.released()
+
+        #expect(outcome == .pasted)
+        #expect(paste.pasted == ["hello world "]) // cleaned + trailing space
+        #expect(transcriber.callCount == 1)
+        #expect(sut.currentState == .idle)
+    }
+
+    @Test func noSpeechSkipsTranscriptionAndReportsNoSpeech() async {
+        let (sut, audio, transcriber, _, clock, _) = makeSUT()
+        audio.nextCapture = CapturedAudio(samples: [], hasSpeech: false)
+        var outcome: DictationOutcome?
+        sut.onCompleted = { outcome = $0 }
+
+        sut.pressed()
+        clock.ticksMs = 500
+        await sut.released()
+
+        #expect(outcome == .noSpeech)
+        #expect(transcriber.callCount == 0)
+    }
+
+    @Test func emptyTranscriptIsNoSpeech() async {
+        let (sut, _, transcriber, paste, clock, _) = makeSUT()
+        transcriber.result = "   " // cleans to ""
+        var outcome: DictationOutcome?
+        sut.onCompleted = { outcome = $0 }
+
+        sut.pressed()
+        clock.ticksMs = 500
+        await sut.released()
+
+        #expect(outcome == .noSpeech)
+        #expect(paste.pasted.isEmpty)
+    }
+
+    @Test func blockedPasteLeavesTextOnClipboard() async {
+        let (sut, _, _, paste, clock, _) = makeSUT()
+        paste.outcome = .leftOnClipboard
+        var outcome: DictationOutcome?
+        sut.onCompleted = { outcome = $0 }
+
+        sut.pressed()
+        clock.ticksMs = 500
+        await sut.released()
+
+        #expect(outcome == .leftOnClipboard)
+        #expect(paste.pasted.count == 1)
+    }
+
+    @Test func autoStopRunsTheCycle() async {
+        let (sut, _, transcriber, _, clock, _) = makeSUT()
+        var outcome: DictationOutcome?
+        sut.onCompleted = { outcome = $0 }
+
+        clock.ticksMs = 0
+        sut.pressed()
+        clock.ticksMs = 60_000
+        await sut.autoStopFired()
+
+        #expect(outcome == .pasted)
+        #expect(transcriber.callCount == 1)
+        #expect(sut.currentState == .idle)
+    }
+
+    @Test func releasedWhenNotRecordingIsNoop() async {
+        let (sut, audio, _, _, _, _) = makeSUT()
+        await sut.released() // idle — lost the race / never pressed
+        #expect(audio.stopCount == 0)
+        #expect(sut.currentState == .idle)
+    }
+
+    @Test func settingsFillerRemovalFlagFlowsToCleaner() async {
+        let audio = FakeAudioCapture()
+        let transcriber = FakeTranscriber()
+        let paste = FakePaste()
+        let clock = FakeClock()
+        let timer = FakeAutoStopTimer()
+        transcriber.result = "Um, we should ship it."
+        let sut = DictationCoordinator(
+            audio: audio, transcriber: transcriber, sink: PasteSink(paste: paste),
+            clock: clock, autoStop: timer, settings: Settings(fillerRemoval: false)
+        )
+
+        sut.pressed()
+        clock.ticksMs = 500
+        await sut.released()
+
+        #expect(paste.pasted == ["Um, we should ship it. "]) // filler kept when removal is off
+    }
+
+    @Test func updatingSettingsLiveAffectsTheNextCycle() async {
+        let audio = FakeAudioCapture()
+        let transcriber = FakeTranscriber()
+        let paste = FakePaste()
+        let clock = FakeClock()
+        let timer = FakeAutoStopTimer()
+        transcriber.result = "Um, we should ship it."
+        let sut = DictationCoordinator( // default settings: filler removal ON
+            audio: audio, transcriber: transcriber, sink: PasteSink(paste: paste),
+            clock: clock, autoStop: timer
+        )
+
+        sut.settings = Settings(fillerRemoval: false) // flip it like the settings UI would
+
+        sut.pressed()
+        clock.ticksMs = 500
+        await sut.released()
+
+        #expect(paste.pasted == ["Um, we should ship it. "]) // live change took effect → filler kept
+    }
+
+    // The sink is the coordinator's only destination: it receives the cleaned transcript and
+    // its outcome (here .addedToNote, the new in-app destination) is reported verbatim.
+    @Test func deliversCleanedTranscriptToSinkAndReportsItsOutcome() async {
+        let audio = FakeAudioCapture()
+        let transcriber = FakeTranscriber()
+        transcriber.result = "  hello   world  "
+        let sink = FakeSink()
+        sink.outcome = .addedToNote
+        let clock = FakeClock()
+        let sut = DictationCoordinator(
+            audio: audio, transcriber: transcriber, sink: sink,
+            clock: clock, autoStop: FakeAutoStopTimer()
+        )
+        var outcome: DictationOutcome?
+        sut.onCompleted = { outcome = $0 }
+
+        clock.ticksMs = 0
+        sut.pressed()
+        clock.ticksMs = 500 // held 500 ms > 300 ms guard
+        await sut.released()
+
+        #expect(sink.delivered == ["hello world "]) // cleaned text reaches the sink
+        #expect(outcome == .addedToNote)             // sink's outcome reported verbatim
+    }
+
+    @Test func cancelWhileRecordingDiscardsAndReturnsToIdle() {
+        let (sut, audio, _, _, _, timer) = makeSUT()
+        var completions: [DictationOutcome] = []
+        sut.onCompleted = { completions.append($0) }
+
+        sut.pressed()
+        sut.cancel()
+
+        #expect(sut.currentState == .idle)
+        #expect(audio.stopCount == 1)   // mic released, audio discarded
+        #expect(completions.isEmpty)    // no outcome for a cancel
+        #expect(timer.cancelCount == 1)
+    }
+
+    @Test func cancelWhenIdleIsNoop() {
+        let (sut, audio, _, _, _, _) = makeSUT()
+        sut.cancel()
+        #expect(audio.stopCount == 0)
+        #expect(sut.currentState == .idle)
+    }
+
+    @Test func emitsStateSequenceForANormalCycle() async {
+        let (sut, _, _, _, clock, _) = makeSUT()
+        var states: [DictationState] = []
+        sut.onStateChanged = { states.append($0) }
+
+        sut.pressed()
+        clock.ticksMs = 500
+        await sut.released()
+
+        #expect(states == [.recording, .transcribing, .pasting, .idle])
+    }
+}

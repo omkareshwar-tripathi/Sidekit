@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>Sidekit</string>
+	<key>CFBundleDisplayName</key>
+	<string>Sidekit</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.sidekit.mac</string>
+	<key>CFBundleVersion</key>
+	<string>0.1.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleExecutable</key>
+	<string>Sidekit</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<!-- Menu-bar-only: no Dock icon, no main window. -->
+	<key>LSUIElement</key>
+	<true/>
+	<!-- Shown in the microphone permission prompt (wired up in MAC-5). -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Sidekit uses SpeakType to transcribe your speech on-device and type for you.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Sidekit shows a live self-view mirror; video is never recorded or saved.</string>
+	<!-- Needed so NSMetadataQuery can watch ~/Desktop for new screenshots. -->
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Sidekit adds new screenshots to the Shelf.</string>
+</dict>
+</plist>
