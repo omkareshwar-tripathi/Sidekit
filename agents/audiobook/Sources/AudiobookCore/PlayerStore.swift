@@ -64,10 +64,57 @@ public final class PlayerStore {
         return .applied
     }
 
+    @discardableResult public func setSpeed(_ rate: Double) -> ActionResult {
+        guard (0.5...3.0).contains(rate) else { return .rejected("speed \(rate) outside 0.5...3.0") }
+        state.speed = rate
+        audio.setRate(rate)
+        return .applied
+    }
+
+    @discardableResult public func setSleepTimer(minutes: Int) -> ActionResult {
+        guard minutes > 0 else { return .rejected("minutes must be positive") }
+        state.sleepTimer = SleepTimer(mode: .minutes(minutes),
+                                      fireAt: state.position + Double(minutes) * 60)
+        return .applied
+    }
+
+    @discardableResult public func setSleepTimerEndOfChapter() -> ActionResult {
+        let chapters = state.currentBook.chapters
+        let next = state.currentChapter + 1
+        let fireAt = next < chapters.count ? chapters[next].startTime : state.currentBook.duration
+        state.sleepTimer = SleepTimer(mode: .endOfChapter, fireAt: fireAt)
+        return .applied
+    }
+
+    @discardableResult public func cancelSleepTimer() -> ActionResult {
+        state.sleepTimer = nil
+        return .applied
+    }
+
+    @discardableResult public func switchBook(title: String) -> ActionResult {
+        let q = title.lowercased()
+        let matches = SampleLibrary.books.filter {
+            $0.title.lowercased() == q || $0.title.lowercased().contains(q)
+        }
+        guard matches.count == 1, let book = matches.first else {
+            return .rejected("no unique book matches \"\(title)\"")
+        }
+        let wasPlaying = state.isPlaying
+        if wasPlaying { pause() }
+        state = .initial(book: book)
+        audio.load(book.audioFileName)
+        return .applied
+    }
+
     // MARK: - internals
 
     private func advance(by delta: TimeInterval) {
         setPosition(state.position + delta * state.speed)
+        if let timer = state.sleepTimer, state.position >= timer.fireAt {
+            state.sleepTimer = nil
+            pause()
+            return
+        }
         if state.position >= state.currentBook.duration { pause() }
     }
 
