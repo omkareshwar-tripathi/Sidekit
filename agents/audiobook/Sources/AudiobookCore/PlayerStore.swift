@@ -99,8 +99,7 @@ public final class PlayerStore {
         guard matches.count == 1, let book = matches.first else {
             return .rejected("no unique book matches \"\(title)\"")
         }
-        let wasPlaying = state.isPlaying
-        if wasPlaying { pause() }
+        if state.isPlaying { pause() }
         state = .initial(book: book)
         audio.load(book.audioFileName)
         return .applied
