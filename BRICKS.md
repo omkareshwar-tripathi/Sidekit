@@ -8,6 +8,21 @@ Plan derived from `Sidekit-v1-spec.md` (the complete, decision-resolved spec). M
 
 ---
 
+## Voice Agent Framework — on `feat/audiobook-agent`
+
+_New direction (2026-06-22): now that the repo is open source, build reusable voice-driven **task agents** on top of Sidekit — each a `listen → decide → act → verify` pipeline (small Whisper → task-tuned LLM → tool/verify harness). Strategy: build ONE agent end-to-end as a real app, then extract the framework. First agent = an **audiobook player** (the "Hey Audible" example). Decomposition: **A** app shell + action schema → **B** harness + decide loop (prompt-steered baseline, then) → **D** fine-tune the task model; **C** always-on wake-word listening. Specs/plans in `docs/superpowers/`. Code lives in `agents/audiobook/` (new SwiftPM package; see `STRUCTURE.md`)._
+
+### Next up (Voice Agent)
+
+- [ ] **SCHEMA-CONSISTENCY — tighten the schema↔methods drift test (first brick of B).** `ActionSchemaTests` currently checks the 11 names/count/one param shape but does NOT verify each `ActionSchema` entry maps to a real `PlayerStore` method with matching params (the drift-catcher the spec's Testing § describes). The intentional `setSleepTimer` 1-action↔2-methods split is where future drift will hide. Add a reflection-free table test. Flagged by the final whole-branch review.
+  - Skill: none (no Swift skill, per §6); TDD + verification apply.
+- [ ] **AUDIOBOOK-MANUAL-UAT — user's manual Mac pass on the audiobook app.** Build & run `agents/audiobook` (`swift run AudiobookApp`); confirm: window + library render, Play plays real audio, all 11 controls move state correctly (incl. the goToChapter picker), sleep-timer "end of chapter" shows the right fire time, switchBook resets to 0:00 and loads the other title. Code/build/27 unit tests are green; only the visual+audio taste check is pending a human.
+  - Skill: none (verification-before-completion).
+- [ ] **Sub-project B — harness + decide loop (prompt-steered baseline).** Brainstorm → spec → plan before any brick. Wire transcript → function pick → execute → verify against the `ActionSchema`, using an off-the-shelf small model; this produces the labeled data + accuracy bar for the later fine-tune (D).
+  - Skill: none (brainstorm first).
+
+---
+
 ## Mac (Swift) — on `main` (trunk)
 
 _Native Swift macOS dictation app (a deliberate **fork** — Windows stays C#, they evolve independently). Spec: `docs/superpowers/specs/2026-06-04-speaktype-mac-design.md`. Lives in `mac/` (SwiftPM). Decisions: SwiftUI `MenuBarExtra`, WhisperKit (Neural Engine), hold-Fn (🌐) push-to-talk, SwiftPM + `build-app.sh`, local-dev ad-hoc-signed arm64. Ports-and-adapters with a pure tested `DictationCoordinator`. Domain `Skill:` lines are `none` (the `dotnet-*` skills don't apply to Swift, per CLAUDE.md §6); TDD + verification still apply._
