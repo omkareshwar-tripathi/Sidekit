@@ -9,6 +9,11 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         .target(name: "AudiobookCore"),
+        .executableTarget(
+            name: "AudiobookApp",
+            dependencies: ["AudiobookCore"],
+            resources: [.copy("Resources")]   // Sources/AudiobookApp/Resources
+        ),
         .testTarget(name: "AudiobookCoreTests", dependencies: ["AudiobookCore"]),
     ]
 )
