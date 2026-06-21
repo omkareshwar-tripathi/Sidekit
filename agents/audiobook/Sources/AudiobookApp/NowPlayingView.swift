@@ -22,6 +22,15 @@ struct NowPlayingView: View {
                 Button("⏮ Chapter") { vm.previousChapter() }
                 Button("Chapter ⏭") { vm.nextChapter() }
             }
+            Picker("Go to chapter", selection: Binding(
+                get: { s.currentChapter + 1 },
+                set: { vm.goToChapter($0) }
+            )) {
+                ForEach(1...s.currentBook.chapters.count, id: \.self) { n in
+                    Text("Chapter \(n)").tag(n)
+                }
+            }
+            .pickerStyle(.menu)
             HStack(spacing: 8) {
                 Text("Speed \(String(format: "%.1f×", s.speed))")
                 ForEach([0.75, 1.0, 1.5, 2.0], id: \.self) { r in

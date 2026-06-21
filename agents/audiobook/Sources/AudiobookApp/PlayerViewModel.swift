@@ -31,6 +31,7 @@ final class PlayerViewModel: ObservableObject {
     func switchBook(_ title: String) { store.switchBook(title: title); sync() }
 
     private func startRefresh() {
+        guard refresh == nil else { return }
         refresh = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.sync() }
         }
