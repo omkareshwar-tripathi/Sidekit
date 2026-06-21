@@ -23,7 +23,37 @@ The full annotated map and a "where do I start?" guide is in **[STRUCTURE.md](ST
 
 Native menu-bar app. **Hold the 🌐 (Fn) key, speak, release** — transcribed on-device and pasted into whatever app you're typing in.
 
-**Requirements:** Apple Silicon Mac, macOS 14+, Xcode command-line tools (`xcode-select --install`).
+**Requirements:** Apple Silicon Mac, macOS 14+.
+
+### Install (no build needed)
+
+**Homebrew (recommended):**
+
+```sh
+brew tap omkareshwar-tripathi/sidekit
+brew trust --cask omkareshwar-tripathi/sidekit/sidekit
+brew install --cask sidekit
+```
+
+`brew trust` is a one-time step Homebrew requires for any third-party cask. After it,
+Sidekit installs and opens with **no Gatekeeper warning**.
+
+**Or download directly:** grab `Sidekit.dmg` from <https://sidekit.app> and drag Sidekit to Applications.
+
+> **First launch after a direct download:** Sidekit isn't notarized by Apple yet, so macOS
+> blocks the first open with *"Apple could not verify…"* (offering only Done / Move to Bin).
+> To allow it — you only do this once:
+> 1. Click **Done** (not *Move to Bin*).
+> 2. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to Sidekit.
+> 3. Open Sidekit again and confirm.
+>
+> Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/Sidekit.app`
+>
+> The Homebrew install above handles this for you automatically. A notarized build is coming.
+
+### Build from source
+
+For developers — needs Xcode command-line tools (`xcode-select --install`):
 
 ```sh
 cd mac
