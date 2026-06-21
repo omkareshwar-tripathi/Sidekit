@@ -38,6 +38,32 @@ public final class PlayerStore {
         return .applied
     }
 
+    @discardableResult public func nextChapter() -> ActionResult {
+        let chapters = state.currentBook.chapters
+        let next = state.currentChapter + 1
+        guard next < chapters.count else { return .applied }   // already last → no-op
+        setPosition(chapters[next].startTime)
+        return .applied
+    }
+
+    @discardableResult public func previousChapter() -> ActionResult {
+        let prev = state.currentChapter - 1
+        guard prev >= 0 else { return .applied }               // already first → no-op
+        setPosition(state.currentBook.chapters[prev].startTime)
+        return .applied
+    }
+
+    /// `number` is 1-based (natural language "chapter 3").
+    @discardableResult public func goToChapter(_ number: Int) -> ActionResult {
+        let chapters = state.currentBook.chapters
+        let index = number - 1
+        guard chapters.indices.contains(index) else {
+            return .rejected("chapter \(number) out of range (1...\(chapters.count))")
+        }
+        setPosition(chapters[index].startTime)
+        return .applied
+    }
+
     // MARK: - internals
 
     private func advance(by delta: TimeInterval) {
