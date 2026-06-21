@@ -36,9 +36,16 @@ leading and Windows following it to parity.
 | Path | What it is | Start file |
 |---|---|---|
 | `mac/` | The macOS app (Swift / SwiftUI). The shipped product. | [`mac/README.md`](mac/README.md) |
+| `agents/` | Voice-driven **task agents** built on Sidekit (listen→decide→act→verify). First: `agents/audiobook/`. | `agents/audiobook/` |
 | `vision/` | Where the product is going and why — north star, roadmap, per-capability intent, website brief. | [`vision/README.md`](vision/README.md) |
 | `docs/` | Design specs (`superpowers/specs/`) and implementation plans (`superpowers/plans/`) for things actually being built, plus backend setup. | `docs/superpowers/specs/` |
 | `.claude/` | The AI-assisted dev setup — project skills, hooks, and settings used while building. | `.claude/settings.json` |
+
+**`agents/`** holds the new voice-agent framework work: standalone SwiftPM packages that prove
+the listen→decide→act→verify loop end-to-end. The first agent is a functional audiobook player;
+its action schema (play, pause, skip chapter, set speed, set sleep timer) is the harness the
+voice layer targets. Architecture details and the full design are in
+`docs/superpowers/specs/2026-06-22-voice-agent-audiobook-shell-design.md`.
 
 (There's no CI workflow today — the old Windows-only `.github/workflows/ci.yml` was removed with the
 Windows prototype; a macOS CI can be added when needed.)
