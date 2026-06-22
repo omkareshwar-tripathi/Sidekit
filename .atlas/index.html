@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Project Atlas — Sidekit</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Welcome-back ribbon -->
+  <header id="ribbon" class="ribbon"><div class="ribbon-inner" id="ribbon-inner"></div></header>
+
+  <!-- Jump nav + search -->
+  <nav id="nav" class="nav">
+    <ol class="nav-list">
+      <li><a href="#vision">Vision</a></li>
+      <li><a href="#progress">Progress</a></li>
+      <li><a href="#decisions">Decisions</a></li>
+      <li><a href="#learning">Learning</a></li>
+      <li><a href="#environment">AI&nbsp;Context</a></li>
+    </ol>
+    <input id="search" class="search" type="search" placeholder="Filter cards…" aria-label="Filter cards" />
+  </nav>
+
+  <main id="atlas">
+    <section id="vision" class="layer" data-layer="vision">
+      <h2 class="layer-title">Vision</h2>
+      <div class="layer-body" id="vision-body"></div>
+    </section>
+
+    <section id="progress" class="layer" data-layer="progress">
+      <h2 class="layer-title">Progress</h2>
+      <div class="layer-body" id="progress-body"></div>
+    </section>
+
+    <section id="decisions" class="layer" data-layer="decisions">
+      <h2 class="layer-title">Decisions</h2>
+      <div class="layer-body" id="decisions-body"></div>
+    </section>
+
+    <section id="learning" class="layer" data-layer="learning">
+      <h2 class="layer-title">Learning</h2>
+      <div class="layer-body" id="learning-body"></div>
+    </section>
+
+    <section id="environment" class="layer" data-layer="environment">
+      <h2 class="layer-title">AI Operating Context</h2>
+      <p class="layer-sub" id="environment-sub"></p>
+      <div class="layer-body" id="environment-body"></div>
+    </section>
+  </main>
+
+  <footer class="foot" id="foot"></footer>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -8,6 +8,14 @@
             "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start-bricks.sh"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/atlas-cloud-session.sh"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -34,6 +42,14 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/run-simplify-on-stop.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/atlas-sync.sh"
           }
         ]
       }

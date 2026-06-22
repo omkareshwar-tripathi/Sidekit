@@ -1,0 +1,84 @@
+{
+  "decisions": [
+    {
+      "decision": "Language / approach",
+      "choice": "Native Swift",
+      "why": "Flagship-native quality; removes all C# P/Invoke interop risk.",
+      "source": "specs/2026-06-04-speaktype-mac-design.md"
+    },
+    {
+      "decision": "UI framework",
+      "choice": "SwiftUI (MenuBarExtra)",
+      "why": "Modern, minimal code for a menu-bar app; drop to AppKit/CoreGraphics only where needed.",
+      "source": "specs/2026-06-04-speaktype-mac-design.md"
+    },
+    {
+      "decision": "Speech engine",
+      "choice": "WhisperKit (CoreML / Neural Engine)",
+      "why": "Fastest on-device option on Apple Silicon; pure-Swift package; manages its own models.",
+      "source": "specs/2026-06-04-speaktype-mac-design.md"
+    },
+    {
+      "decision": "Build setup",
+      "choice": "SwiftPM executable + build-app.sh",
+      "why": "All plain text (Package.swift) — clean for git and brick-by-brick edits. No binary project file.",
+      "source": "specs/2026-06-04-speaktype-mac-design.md"
+    },
+    {
+      "decision": "Push-to-talk key",
+      "choice": "Hold Fn (🌐), hard-coded",
+      "why": "Ergonomic, matches premium dictation apps. Configurable hotkey is a later brick.",
+      "source": "specs/2026-06-04-speaktype-mac-design.md"
+    },
+    {
+      "decision": "Distribution",
+      "choice": "Local dev, ad-hoc signed, arm64",
+      "why": "Run on the developer's Mac; grant permissions manually. Notarization/.dmg is later.",
+      "source": "specs/2026-06-04-speaktype-mac-design.md"
+    },
+    {
+      "decision": "Scope",
+      "choice": "Core dictation MVP",
+      "why": "Prove the native plumbing end-to-end before polish features.",
+      "source": "specs/2026-06-04-speaktype-mac-design.md"
+    }
+  ],
+  "notes": [
+    {
+      "context": "Brick 18 — CI publishes a downloadable SpeakType.exe (2026-06-03)",
+      "text": "Artifact, not a tagged Release: every green run yields a downloadable exe (simplest, always-on) — no tagging step. A versioned GitHub Release (attach the exe on a v tag) is the natural next step if/when we want stable, non-expiring download links.",
+      "source": "BRICKS.md"
+    },
+    {
+      "context": "Brick 18 — CI publishes a downloadable SpeakType.exe (2026-06-03)",
+      "text": "if-no-files-found: error turns a silently-missing exe into a red run (defence-in-depth alongside the existing verify step, which still logs the size).",
+      "source": "BRICKS.md"
+    },
+    {
+      "context": "Brick 18 — CI publishes a downloadable SpeakType.exe (2026-06-03)",
+      "text": "The exe is unsigned → SmartScreen \"More info → Run anyway\" still applies (code signing remains out of scope for v1).",
+      "source": "BRICKS.md"
+    },
+    {
+      "context": "Brick UI-6 — App logo (waveform mark) (2026-06-03)",
+      "text": "The .ico is the single brand source (exe + windows load it); only the tray is drawn programmatically, because it needs runtime per-state tinting (a static asset can't recolour). The tray glyph's bar proportions are hand-matched to the .ico.",
+      "source": "BRICKS.md"
+    },
+    {
+      "context": "Brick UI-6 — App logo (waveform mark) (2026-06-03)",
+      "text": "AppIcon.Brand is shared & never disposed (process-lifetime, like the UiTheme fonts) — safe because Form doesn't own/dispose an assigned Icon.",
+      "source": "BRICKS.md"
+    },
+    {
+      "context": "Brick UI-6 — App logo (waveform mark) (2026-06-03)",
+      "text": "Tooling: the .ico was generated on the Mac with Python/Pillow (no ImageMagick needed); regenerate via the same waveform proportions if the mark is revised.",
+      "source": "BRICKS.md"
+    },
+    {
+      "context": "Brick UI-5 — Flat tray menu (2026-06-03)",
+      "text": "Tray icon glyphs unchanged — the four state circles (SteelBlue/Red/Orange/DarkRed via MakeIcon) still convey Idle/Recording/Busy/Error; only the menu chrome changed. (A logo for the icon itself is the separate Brick UI-6.)",
+      "source": "BRICKS.md"
+    }
+  ],
+  "generatedAt": "2026-06-22"
+}

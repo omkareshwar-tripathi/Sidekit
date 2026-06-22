@@ -1,0 +1,171 @@
+{
+  "generatedAt": "2026-06-22",
+  "generatedTier": "committed-only",
+  "items": [
+    {
+      "id": "command:ship",
+      "name": "Command — /ship",
+      "tier": "committed",
+      "sourcePath": ".claude/commands/ship.md",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "doc:BRICKS",
+      "name": "BRICKS.md — session handoff log",
+      "tier": "committed",
+      "sourcePath": "BRICKS.md",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "doc:CLAUDE",
+      "name": "CLAUDE.md — working agreement",
+      "tier": "committed",
+      "sourcePath": "CLAUDE.md",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "hook:atlas-cloud-session",
+      "name": "Hook — atlas-cloud-session",
+      "tier": "committed",
+      "sourcePath": ".claude/hooks/atlas-cloud-session.sh",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "hook:atlas-sync",
+      "name": "Hook — atlas-sync",
+      "tier": "committed",
+      "sourcePath": ".claude/hooks/atlas-sync.sh",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "hook:check-bricks-updated",
+      "name": "Hook — check-bricks-updated",
+      "tier": "committed",
+      "sourcePath": ".claude/hooks/check-bricks-updated.sh",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "hook:run-simplify-on-stop",
+      "name": "Hook — run-simplify-on-stop",
+      "tier": "committed",
+      "sourcePath": ".claude/hooks/run-simplify-on-stop.sh",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "hook:session-start-bricks",
+      "name": "Hook — session-start-bricks",
+      "tier": "committed",
+      "sourcePath": ".claude/hooks/session-start-bricks.sh",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "hook:skill-reminder",
+      "name": "Hook — skill-reminder",
+      "tier": "committed",
+      "sourcePath": ".claude/hooks/skill-reminder.sh",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "skill:dotnet-best-practices",
+      "name": "Skill — dotnet-best-practices",
+      "tier": "committed",
+      "sourcePath": ".claude/skills/dotnet-best-practices",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "skill:dotnet-xunit",
+      "name": "Skill — dotnet-xunit",
+      "tier": "committed",
+      "sourcePath": ".claude/skills/dotnet-xunit",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "skill:find-skills",
+      "name": "Skill — find-skills",
+      "tier": "committed",
+      "sourcePath": ".claude/skills/find-skills",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "skill:graphify",
+      "name": "Skill — graphify",
+      "tier": "committed",
+      "sourcePath": ".claude/skills/graphify",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "skill:grill-me",
+      "name": "Skill — grill-me",
+      "tier": "committed",
+      "sourcePath": ".claude/skills/grill-me",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "skill:run-tests",
+      "name": "Skill — run-tests",
+      "tier": "committed",
+      "sourcePath": ".claude/skills/run-tests",
+      "portable": true,
+      "status": "applies-in-cloud",
+      "lastSeen": "2026-06-22",
+      "promoteHint": "",
+      "machineBound": false
+    }
+  ]
+}

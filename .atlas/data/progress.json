@@ -1,0 +1,155 @@
+{
+  "doing": [
+    {
+      "checked": false,
+      "title": "SCHEMA-CONSISTENCY — tighten the schema↔methods drift test (first brick of B).",
+      "detail": "SCHEMA-CONSISTENCY — tighten the schema↔methods drift test (first brick of B). `ActionSchemaTests` currently checks the 11 names/count/one param shape but does NOT verify each `ActionSchema` entry maps to a real `PlayerStore` method with m…",
+      "section": "Next up (Voice Agent)"
+    }
+  ],
+  "next": [
+    {
+      "checked": false,
+      "title": "AUDIOBOOK-MANUAL-UAT — user's manual Mac pass on the audiobook app.",
+      "detail": "AUDIOBOOK-MANUAL-UAT — user's manual Mac pass on the audiobook app. Build & run `agents/audiobook` (`swift run AudiobookApp`); confirm: window + library render, Play plays real audio, all 11 controls move state correctly (incl. the goToCha…",
+      "section": "Next up (Voice Agent)"
+    },
+    {
+      "checked": false,
+      "title": "Sub-project B — harness + decide loop (prompt-steered baseline).",
+      "detail": "Sub-project B — harness + decide loop (prompt-steered baseline). Brainstorm → spec → plan before any brick. Wire transcript → function pick → execute → verify against the `ActionSchema`, using an off-the-shelf small model; this produces th…",
+      "section": "Next up (Voice Agent)"
+    },
+    {
+      "checked": false,
+      "title": "SKILLS-FOR-SMALL-MODELS — lab eval: steering small local models with skills.",
+      "detail": "SKILLS-FOR-SMALL-MODELS — lab eval: steering small local models with skills. Research brick, lab-side: test how well Claude-style *skill files* (on-demand task instructions) control the behavior of small on-device models vs. baking instruc…",
+      "section": "Next iterations — post-launch direction (queued 2026-06-12, user-dictated)"
+    },
+    {
+      "checked": false,
+      "title": "NOTARIZE — Apple Developer ID + notarized DMG (user enrolling morning of 2026-06-12).",
+      "detail": "NOTARIZE — Apple Developer ID + notarized DMG (user enrolling morning of 2026-06-12). The shipped build is ad-hoc-signed: downloaders hit Gatekeeper (\"Apple could not verify…\") and on macOS 15+ must use System Settings → Privacy & Security…",
+      "section": "Shelf + Mirror — Sidekit launch features (queued 2026-06-09)"
+    },
+    {
+      "checked": false,
+      "title": "SHIP-M9 — REMAINDER: dictation + eyeball checks (user, ~3 min).",
+      "detail": "SHIP-M9 — REMAINDER: dictation + eyeball checks (user, ~3 min). Most of M9 was machine-walked 2026-06-12 by driving the real UI via Accessibility scripting + screenshots (results in the SHIP Done entry): welcome panel renders & gates corre…",
+      "section": "Sign-up + feedback — manual pass (queued 2026-06-12)"
+    },
+    {
+      "checked": false,
+      "title": "Clipboard contention + paste error handling (revealed by Brick 8 review).",
+      "detail": "Clipboard contention + paste error handling (revealed by Brick 8 review). WinForms `Clipboard` throws transient `ExternalException` when another process holds the clipboard open; today that propagates out of `ClipboardPasteService.Paste` (…",
+      "section": "Backlog (optional — needs a user decision, not in the v1 critical path)"
+    },
+    {
+      "checked": false,
+      "title": "Consolidate the duplicate capturing `ILogSink` test double (revealed by Brick 14d review).",
+      "detail": "Consolidate the duplicate capturing `ILogSink` test double (revealed by Brick 14d review). `FakeLogSink` (`Sidekit.Tests/Orchestration/Fakes.cs`, added in 14d) is byte-for-byte the private `FakeSink` nested in `Sidekit.Tests/Logging/AppLog…",
+      "section": "Backlog (optional — needs a user decision, not in the v1 critical path)"
+    },
+    {
+      "checked": false,
+      "title": "Shared test temp-dir helper (revealed by Brick 6b review).",
+      "detail": "Shared test temp-dir helper (revealed by Brick 6b review). The temp-dir scaffolding (`_tempDir` field + ctor + `Dispose`) is now duplicated across `JsonSettingsStoreTests`, `ModelStoreTests`, and `HttpModelDownloaderTests` (rule-of-three m…",
+      "section": "Backlog (optional — needs a user decision, not in the v1 critical path)"
+    },
+    {
+      "checked": false,
+      "title": "Reconcile `AppSettings.Autostart` with an externally-edited Run key (revealed by Brick 14e review).",
+      "detail": "Reconcile `AppSettings.Autostart` with an externally-edited Run key (revealed by Brick 14e review). The `ApplyAutostart` funnel keeps the two in-app entry points in sync, but if the user removes Sidekit from startup *externally* (Task Mana…",
+      "section": "Backlog (optional — needs a user decision, not in the v1 critical path)"
+    },
+    {
+      "checked": false,
+      "title": "Cleanup-pipeline real-world hardening (revealed by Brick 2 review).",
+      "detail": "Cleanup-pipeline real-world hardening (revealed by Brick 2 review). Decide whether to: (a) trim the always-filler list so it stops eating real tokens — `mm` (millimeter), `er` (ER), and possibly `ah` collide with genuine words/units; (b) m…",
+      "section": "Backlog (optional — needs a user decision, not in the v1 critical path)"
+    }
+  ],
+  "blocked": [
+    {
+      "checked": false,
+      "title": "SHELF-DROP-EDGES",
+      "detail": "SHELF-DROP-EDGES *(remainder is sandbox-gated)* — (a) done 2026-06-10: the vector/PDF-backed image drop (`pngData == nil`) now logs `image drop has no encodable bitmap representation — skipped` instead of vanishing silently (shipped with S…",
+      "section": "Shelf + Mirror — Sidekit launch features (queued 2026-06-09)"
+    },
+    {
+      "checked": false,
+      "title": "SHELF-LATER",
+      "detail": "SHELF-LATER *(post-v1, parked with reasons — from SHELF-POLISH deferrals)* — cancel-mid-copy for huge folders (needs a custom cancellable recursive copier; `FileManager.copyItem` can't abort), tile-direct multi-drag (unify tap+drag in one…",
+      "section": "Shelf + Mirror — Sidekit launch features (queued 2026-06-09)"
+    },
+    {
+      "checked": false,
+      "title": "MIRROR-UAT-DEFERRED",
+      "detail": "MIRROR-UAT-DEFERRED *(2 hardware-blocked checks from the 2026-06-11 Mirror UAT)* — re-verify when the hardware is available: (a) source picker switches feeds with >1 camera attached (user had only the built-in cam), (b) \"No camera found\" n…",
+      "section": "Shelf + Mirror — Sidekit launch features (queued 2026-06-09)"
+    },
+    {
+      "checked": false,
+      "title": "Real installer (Start Menu + Desktop shortcut + uninstall) — deferred by user (2026-06-03).",
+      "detail": "Real installer (Start Menu + Desktop shortcut + uninstall) — deferred by user (2026-06-03). Today Sidekit is a portable single exe: install = download `Sidekit.exe` from a CI artifact (Brick 18) and run it; first run adds a \"Start with Win…",
+      "section": "Backlog (optional — needs a user decision, not in the v1 critical path)"
+    },
+    {
+      "checked": false,
+      "title": "Deferred-dispatcher SUT-builder test helper (revealed by Brick 14e review).",
+      "detail": "Deferred-dispatcher SUT-builder test helper (revealed by Brick 14e review). Four orchestrator tests now hand-build an orchestrator + `DeferredDispatcher` + outcomes list with the same ~11-line block (the in-flight-cycle cases that the shar…",
+      "section": "Backlog (optional — needs a user decision, not in the v1 critical path)"
+    }
+  ],
+  "done": [
+    {
+      "checked": true,
+      "title": "ATLAS-WIRE — wired the two atlas hooks into `.claude/settings.json` (2026-06-22).",
+      "detail": "ATLAS-WIRE — wired the two atlas hooks into `.claude/settings.json` (2026-06-22).",
+      "section": "Done (Atlas)"
+    },
+    {
+      "checked": true,
+      "title": "ATLAS-9 — cloud bootstrap scripts (2026-06-22).",
+      "detail": "ATLAS-9 — cloud bootstrap scripts (2026-06-22). *(SessionStart wiring → ATLAS-WIRE.)*",
+      "section": "Done (Atlas)"
+    },
+    {
+      "checked": true,
+      "title": "ATLAS-7 — `atlas-sync.sh` Stop-refresh hook (2026-06-22).",
+      "detail": "ATLAS-7 — `atlas-sync.sh` Stop-refresh hook (2026-06-22). *(Stop wiring → ATLAS-WIRE.)*",
+      "section": "Done (Atlas)"
+    },
+    {
+      "checked": true,
+      "title": "ATLAS-8 — promotion scaffolder: `sync.js --promote=<id>` + `POST /api/promote/:id` (2026-06-22).",
+      "detail": "ATLAS-8 — promotion scaffolder: `sync.js --promote=<id>` + `POST /api/promote/:id` (2026-06-22).",
+      "section": "Done (Atlas)"
+    },
+    {
+      "checked": true,
+      "title": "ATLAS-6 — flashcards + SM-2 spaced-repetition review + persistence (2026-06-22).",
+      "detail": "ATLAS-6 — flashcards + SM-2 spaced-repetition review + persistence (2026-06-22).",
+      "section": "Done (Atlas)"
+    },
+    {
+      "checked": true,
+      "title": "ATLAS-5 — edit-in-place → pending.json proposals (2026-06-22).",
+      "detail": "ATLAS-5 — edit-in-place → pending.json proposals (2026-06-22).",
+      "section": "Done (Atlas)"
+    },
+    {
+      "checked": true,
+      "title": "ATLAS-4 — six-layer UI rendering seeded data (cool editorial palette) (2026-06-22).",
+      "detail": "ATLAS-4 — six-layer UI rendering seeded data (cool editorial palette) (2026-06-22).",
+      "section": "Done (Atlas)"
+    },
+    {
+      "checked": true,
+      "title": "ATLAS-3b — `claude-context` adapter + two-tier `environment.json` merge (2026-06-22).",
+      "detail": "ATLAS-3b — `claude-context` adapter + two-tier `environment.json` merge (2026-06-22).",
+      "section": "Done (Atlas)"
+    }
+  ],
+  "generatedAt": "2026-06-22"
+}

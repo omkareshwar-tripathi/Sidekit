@@ -1,0 +1,68 @@
+{
+  "northStar": "Sidekit is the always-on-top companion surface for your desktop — one place, always a click away, where you speak, stage, and check before you act, with every bit of intelligence running on your own device. And the whole surface is open to your AI agents.",
+  "pitch": "Sidekit sits at the top of your screen, always within reach. Click it and the surface opens: a mirror to check yourself before a call, a shelf to park files and folders for a few minutes (or a day) and grab them wherever you need, and your voice — hold a key, talk, and clean, correctly-written text appears wherever you're typing, processed entirely on your device. Over time the surface gains on-device drafting (speak an intent, get a written email) and a universal clipboard so what you copy on one device shows up on the others. And because it's a surface — not a black box — your AI agents can use it too: they hand files to you and take files from you through the very same shelf you do. One trusted surface, on every desktop you own.",
+  "legend": [
+    {
+      "emoji": "🔵",
+      "label": "Vision"
+    },
+    {
+      "emoji": "🟡",
+      "label": "Designing / proven-in-lab"
+    },
+    {
+      "emoji": "🟠",
+      "label": "Building"
+    },
+    {
+      "emoji": "🟢",
+      "label": "Shipped"
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "SpeakType — dictation",
+      "line": "Hold a key, speak, clean text appears — the surface's voice",
+      "platforms": "Mac (now) · Windows (next)",
+      "status": "🟠 Building"
+    },
+    {
+      "name": "Shelf",
+      "line": "Park files/folders temporarily; grab them anywhere; clears itself",
+      "platforms": "Mac (now) · Windows (next)",
+      "status": "🟠 Building"
+    },
+    {
+      "name": "Mirror",
+      "line": "One-click front-camera self-view before a call",
+      "platforms": "Mac (now) · Windows (next)",
+      "status": "🟠 Building"
+    },
+    {
+      "name": "Polish + Drafting",
+      "line": "On-device intelligence: clean/format what you said, then write new text",
+      "platforms": "Mac · Windows",
+      "status": "🟡 Polish proven · 🔵 Drafting vision"
+    },
+    {
+      "name": "Universal clipboard",
+      "line": "Copy on any device → available on the others; flows through the surface",
+      "platforms": "All four",
+      "status": "🔵 Vision"
+    },
+    {
+      "name": "Agent access",
+      "line": "The shelf + surface are open to local AI agents (mechanism TBD)",
+      "platforms": "Mac · Windows",
+      "status": "🔵 Vision"
+    }
+  ],
+  "openQuestions": [
+    "Agent interface: what is the mechanism by which agents reach the shelf/clipboard/dictation — a",
+    "One surface, two desktops: Mac (Swift) and Windows (C#) are separate forks today. As Sidekit",
+    "What syncs the devices? Universal clipboard (and a future cross-device shelf) need a transport:",
+    "Local LLM quality bar: is a desktop-runnable model good enough to draft a send-able email?",
+    "iOS keyboard memory limit: can Whisper run in the keyboard extension, or must it move to the"
+  ],
+  "generatedAt": "2026-06-22"
+}
