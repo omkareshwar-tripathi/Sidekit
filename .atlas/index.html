@@ -7,46 +7,55 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- Welcome-back ribbon -->
-  <header id="ribbon" class="ribbon"><div class="ribbon-inner" id="ribbon-inner"></div></header>
+  <!-- Page title + one quiet status line -->
+  <header class="page-head">
+    <div class="page-head-inner">
+      <h1 class="page-title">Project Atlas</h1>
+      <p class="status-line" id="status-line"></p>
+    </div>
+  </header>
 
-  <!-- Jump nav + search -->
+  <!-- Jump nav + search (sections in the locked order) -->
   <nav id="nav" class="nav">
     <ol class="nav-list">
-      <li><a href="#branches">Branches</a></li>
       <li><a href="#vision">Vision</a></li>
       <li><a href="#progress">Progress</a></li>
       <li><a href="#decisions">Decisions</a></li>
-      <li><a href="#environment">AI&nbsp;Context</a></li>
+      <li><a href="#ai-context">AI&nbsp;Context</a></li>
     </ol>
-    <input id="search" class="search" type="search" placeholder="Filter cards…" aria-label="Filter cards" />
+    <input id="search" class="search" type="search" placeholder="Filter…" aria-label="Filter dashboard" />
   </nav>
 
   <main id="atlas">
-    <section id="branches" class="layer" data-layer="branches">
-      <h2 class="layer-title">Branches</h2>
-      <div class="layer-body" id="branches-body"></div>
-    </section>
+    <!-- Branch filter bar — global context for the kanban below -->
+    <div id="branch-bar" class="branch-bar" role="region" aria-label="Branch filter"></div>
 
+    <!-- 1) Vision -->
     <section id="vision" class="layer" data-layer="vision">
       <h2 class="layer-title">Vision</h2>
+      <p class="layer-sub" id="vision-sub"></p>
       <div class="layer-body" id="vision-body"></div>
     </section>
 
+    <!-- 2) Progress — kanban, filtered by the selected branch -->
     <section id="progress" class="layer" data-layer="progress">
       <h2 class="layer-title">Progress</h2>
+      <p class="layer-sub" id="progress-sub"></p>
       <div class="layer-body" id="progress-body"></div>
     </section>
 
+    <!-- 3) Decisions -->
     <section id="decisions" class="layer" data-layer="decisions">
       <h2 class="layer-title">Decisions</h2>
+      <p class="layer-sub" id="decisions-sub"></p>
       <div class="layer-body" id="decisions-body"></div>
     </section>
 
-    <section id="environment" class="layer" data-layer="environment">
+    <!-- 4) AI Operating Context (no longer the hero position; moved to the bottom) -->
+    <section id="ai-context" class="layer hero" data-layer="ai-context">
       <h2 class="layer-title">AI Operating Context</h2>
-      <p class="layer-sub" id="environment-sub"></p>
-      <div class="layer-body" id="environment-body"></div>
+      <p class="layer-sub" id="ai-context-sub"></p>
+      <div class="layer-body" id="ai-context-body"></div>
     </section>
   </main>
 

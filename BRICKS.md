@@ -29,10 +29,16 @@ _New workstream (2026-06-22): a **zero-dependency** local dashboard that re-onbo
 
 ### Next up (Atlas)
 
-_No open Atlas bricks. v1 + the branch-aware layer (§H, ATLAS-B1…B3) shipped, then trimmed of three unused subsystems (ATLAS-SIMPLIFY). A light-theme + kanban-branch-filter **redesign is staged in `.atlas-redesign/`** but not yet promoted to the live `.atlas/` — when promoting it, port its 3 UI changes onto the simplified files (don't copy its `app.js` over)._
+_No open Atlas bricks. v1 + the branch-aware layer (§H), then trimmed (ATLAS-SIMPLIFY), and the light-theme + kanban-branch-filter **redesign promoted to the live `.atlas/`** (ATLAS-PROMOTE). The `.atlas-redesign/` staging folder is now redundant (a duplicate of the live UI) — a candidate for deletion._
 
 
 ### Done (Atlas)
+
+- [x] **ATLAS-PROMOTE — promote the light/kanban redesign to live `.atlas/` (2026-06-23).**
+  - **What:** The staged redesign went live: **light theme**, a thin **branch-selector bar**, **Progress as a kanban filtered by the selected branch**, AI-context moved to the bottom, Decisions as static cards (no flip). First **ported the ATLAS-SIMPLIFY cuts into the redesign** so it matches the trimmed backend — removed edit-in-place (`makeEditable`/`postPending`), Promote (`doPromote` + the envRow button), `showToast`/`toastTimer`, the now-unused `button()`, and their CSS (`.btn*`, `.editable`, `.toast`). Then copied the 3 UI files into `.atlas/`. Backend (`server.js`/`sync.js`/`git-branches.js`) unchanged — already simplified; no restart needed (static files served per-request).
+  - **Files:** `.atlas/index.html`, `.atlas/app.js`, `.atlas/styles.css` (now the redesign). Ported source lives in untracked `.atlas-redesign/`.
+  - **Verified:** live board at http://127.0.0.1:7842 (hard-reloaded) — light theme, order Branch-bar → Vision → Progress(kanban) → Decisions → AI-Context; **zero console errors**; branch filter toggles correctly (feat/audiobook-agent → 3 visible bricks, main → 9, All → 22 of 22); DOM has **0 Promote buttons, 0 contenteditable, 0 toast**; ported files parse + CSS braces 138/138; orphan grep clean.
+  - **Notes:** `.atlas-redesign/` is now a redundant duplicate of the live UI — candidate for deletion. Its `preview-full.html` (hand-inlined Claude Design preview) was NOT re-synced and is stale.
 
 - [x] **ATLAS-SIMPLIFY — cut three unused subsystems (ponytail review) (2026-06-23).**
   - **What:** A ponytail-review found three whole subsystems built but, by evidence, **never used** — 5 flashcards all `reps:0` (never reviewed); no `pending.json` ever written (edit-in-place); no `.mcp.json`/`global-memory.md` ever produced and no hook calls promote. Removed all three + a perf trim, in 5 verified bricks: **(1+2)** the flashcard/SM-2 engine (UI + `/api/review`+`/api/card` + `sm2.js` + `learning.json`); **(3)** edit-in-place proposals (`makeEditable`/`postPending` + `/api/pending` + `readBody`/`appendPending`); **(4)** the Promote scaffolder (~175 lines — `sync.js` promotion block + `markPromoted` + `/api/promote` + the Promote button/`doPromote`/`button()`/toast); **(5)** per-branch diffstat in `overview()` (kept for `detail()`). **Kept everything in use:** ribbon, Vision, Progress kanban, Decisions, and the two-tier AI-context model (still exercised by `atlas-cloud-session.sh --env-only`). Machine-local `promoteHint` lines stay as plain "↳" guidance text (no button).
@@ -46,13 +52,7 @@ _No open Atlas bricks. v1 + the branch-aware layer (§H, ATLAS-B1…B3) shipped,
   - **Verified:** `/api/branch/origin%2Fmain` → ahead 0 (it's the base); `/api/branch/feat%2Faudiobook-agent` → ahead 14, 14 commits, 44 files (slash URL-encoded works); bogus name → **404**; a valid commit **SHA** (not a branch) → **404** (rejects arbitrary refs — no injection). `node --check` clean.
   - **Notes:** Validation is a cheap single `for-each-ref` (not the full overview). Now any branch chip loads its detail live; §H is complete.
 
-- [x] **ATLAS-B2 — Branches UI + branch-aware ribbon (2026-06-23).**
-  - **What:** The visible branch layer (plan §H.5). A new **Branches** section (first among the layers — the re-onboarding centerpiece) + nav entry. `renderBranches` draws a **branch picker** (one chip per branch: name, ↑ahead ↓behind, +ins/−del, last-activity days; current highlighted) and a **detail panel** for the selected branch with three blocks: **What was done** (commit list, newest first), **What a merge into main adds / removes** (files grouped added/removed/modified with per-file ±, removed paths struck through), and **The story** (the matched BRICKS.md section's items). The **ribbon** is now branch-aware — appends `· N commits ahead of <base>`. Chips are clickable; the current branch uses the embedded detail (other branches load on demand once B3 lands).
-  - **Files:** `.atlas/index.html` (section + nav), `.atlas/app.js` (`renderBranches`/`branchChip`/`selectBranch`/`renderBranchDetail`; ribbon takes `branches`; `boot` wires it), `.atlas/styles.css` (picker, chips, commit list, file rows, story — cool/editorial, reuses `--green`/`--red`/`--amber`).
-  - **Verified:** `node --check` clean. DOM-shim render: boot completes no-throw; `branches-body` = 2 (picker + detail), `branch-detail` = 7 sections; ribbon = 4 nodes. `/api/data` carries branches (2 branches, 14-commit current detail). CSS braces 151/151. (Found + fixed a test gap: the shim's `loadData` lacked the `branches` layer.) Visual taste-check is the maintainer's.
-  - **Notes:** `selectBranch` fetches `/api/branch/:name` for non-current branches — that endpoint is **B3**; until then a non-current chip shows a graceful "Could not load" (current branch fully works). Reuses v1 `el()`/`plural()`/`emptyState()`/`data-text` search.
-
-_(Older Atlas Done entries — ATLAS-1, 2, 3, 3b, 4–9, WIRE, B1 — archived to BRICKS-ARCHIVE.md.)_
+_(Older Atlas Done entries — ATLAS-1, 2, 3, 3b, 4–9, WIRE, B1, B2 — archived to BRICKS-ARCHIVE.md.)_
 
 ## Mac (Swift) — on `main` (trunk)
 

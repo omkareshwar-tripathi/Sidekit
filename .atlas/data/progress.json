@@ -120,6 +120,13 @@
   "done": [
     {
       "checked": true,
+      "title": "ATLAS-SIMPLIFY — cut three unused subsystems (ponytail review) (2026-06-23).",
+      "detail": "ATLAS-SIMPLIFY — cut three unused subsystems (ponytail review) (2026-06-23).",
+      "section": "Done (Atlas)",
+      "branch": null
+    },
+    {
+      "checked": true,
       "title": "ATLAS-B3 — on-demand `GET /api/branch/:name` endpoint (2026-06-23).",
       "detail": "ATLAS-B3 — on-demand `GET /api/branch/:name` endpoint (2026-06-23).",
       "section": "Done (Atlas)",
@@ -129,13 +136,6 @@
       "checked": true,
       "title": "ATLAS-B2 — Branches UI + branch-aware ribbon (2026-06-23).",
       "detail": "ATLAS-B2 — Branches UI + branch-aware ribbon (2026-06-23).",
-      "section": "Done (Atlas)",
-      "branch": null
-    },
-    {
-      "checked": true,
-      "title": "ATLAS-B1 — `git-branches.js` module + `branches` adapter (2026-06-23).",
-      "detail": "ATLAS-B1 — `git-branches.js` module + `branches` adapter (2026-06-23).",
       "section": "Done (Atlas)",
       "branch": null
     },
