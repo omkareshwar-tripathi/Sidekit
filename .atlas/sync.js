@@ -479,9 +479,32 @@ const claudeContextAdapter = {
   },
 };
 
+// branches — per-branch view (commits since main, the merge add/remove diff, and
+// the matching BRICKS section). Overview for all branches + embedded detail for the
+// current one; other branches load on demand via server.js's /api/branch/:name.
+const gitBranches = require('./git-branches');
+const branchesAdapter = {
+  id: 'branches',
+  layer: 'branches',
+  detect() {
+    try {
+      git('rev-parse --is-inside-work-tree');
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  read() {
+    const ov = gitBranches.overview(REPO_ROOT);
+    if (!ov) return { base: '', current: '', branches: [], detail: null, generatedAt: today() };
+    ov.detail = ov.current ? gitBranches.detail(REPO_ROOT, ov.current) : null;
+    return ov;
+  },
+};
+
 // Ordered registry. Future adapters (other repos' sources) append here — the
 // driver below never changes.
-const ADAPTERS = [gitAdapter, bricksAdapter, visionAdapter, decisionsAdapter, claudeContextAdapter];
+const ADAPTERS = [gitAdapter, bricksAdapter, visionAdapter, decisionsAdapter, claudeContextAdapter, branchesAdapter];
 
 // ---------------------------------------------------------------------------
 // Promotion scaffolder (plan §F.2) — runs on the user's machine only.

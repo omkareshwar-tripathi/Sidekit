@@ -29,9 +29,28 @@ _New workstream (2026-06-22): a **zero-dependency** local dashboard that re-onbo
 
 ### Next up (Atlas)
 
-_All Atlas bricks complete. The board is fully functional; the Stop/SessionStart hooks are wired and additive. Remaining is the maintainer's visual taste-check in the browser (open http://127.0.0.1:7842) and the commit._
+_v1 complete (six layers, hooks wired). Now adding the **branch-aware** layer (plan §H): per-branch view of what was done + what a merge into main would add/remove + the matching BRICKS story._
+
 
 ### Done (Atlas)
+
+- [x] **ATLAS-B3 — on-demand `GET /api/branch/:name` endpoint (2026-06-23).**
+  - **What:** Completes "inspect any branch in-place" (plan §H.4). New `GET /api/branch/:name` returns the full `detail()` (commits + add/remove file diff + BRICKS story) for any branch without checking it out — the picker's `selectBranch` (from B2) fetches it when you click a non-current chip. The decoded name is **validated against the live branch list** (`gitBranches.branchNames`) before any git runs, so only real branches resolve.
+  - **Files:** `.atlas/git-branches.js` (`branchNames` + export), `.atlas/server.js` (`REPO_ROOT`, the route).
+  - **Verified:** `/api/branch/origin%2Fmain` → ahead 0 (it's the base); `/api/branch/feat%2Faudiobook-agent` → ahead 14, 14 commits, 44 files (slash URL-encoded works); bogus name → **404**; a valid commit **SHA** (not a branch) → **404** (rejects arbitrary refs — no injection). `node --check` clean.
+  - **Notes:** Validation is a cheap single `for-each-ref` (not the full overview). Now any branch chip loads its detail live; §H is complete.
+
+- [x] **ATLAS-B2 — Branches UI + branch-aware ribbon (2026-06-23).**
+  - **What:** The visible branch layer (plan §H.5). A new **Branches** section (first among the layers — the re-onboarding centerpiece) + nav entry. `renderBranches` draws a **branch picker** (one chip per branch: name, ↑ahead ↓behind, +ins/−del, last-activity days; current highlighted) and a **detail panel** for the selected branch with three blocks: **What was done** (commit list, newest first), **What a merge into main adds / removes** (files grouped added/removed/modified with per-file ±, removed paths struck through), and **The story** (the matched BRICKS.md section's items). The **ribbon** is now branch-aware — appends `· N commits ahead of <base>`. Chips are clickable; the current branch uses the embedded detail (other branches load on demand once B3 lands).
+  - **Files:** `.atlas/index.html` (section + nav), `.atlas/app.js` (`renderBranches`/`branchChip`/`selectBranch`/`renderBranchDetail`; ribbon takes `branches`; `boot` wires it), `.atlas/styles.css` (picker, chips, commit list, file rows, story — cool/editorial, reuses `--green`/`--red`/`--amber`).
+  - **Verified:** `node --check` clean. DOM-shim render: boot completes no-throw; `branches-body` = 2 (picker + detail), `branch-detail` = 7 sections; ribbon = 4 nodes. `/api/data` carries branches (2 branches, 14-commit current detail). CSS braces 151/151. (Found + fixed a test gap: the shim's `loadData` lacked the `branches` layer.) Visual taste-check is the maintainer's.
+  - **Notes:** `selectBranch` fetches `/api/branch/:name` for non-current branches — that endpoint is **B3**; until then a non-current chip shows a graceful "Could not load" (current branch fully works). Reuses v1 `el()`/`plural()`/`emptyState()`/`data-text` search.
+
+- [x] **ATLAS-B1 — `git-branches.js` module + `branches` adapter (2026-06-23).**
+  - **What:** The data behind the branch-aware view (plan §H). New pure `git-branches.js` computes, per branch: ahead/behind vs the auto-detected base (`main`/`origin/main`), the three-dot diff `base...branch` (what a merge would add/remove — files + ±lines), the commit list since divergence, and the matching `BRICKS.md` `## … — on \`<branch>\`` section. `overview()` does cheap counts for all branches (local + `origin/*`, deduped so a pushed branch shows once); `detail()` does the full commit+file breakdown for one ref. A new `branches` adapter wires it into the §G seam (current branch's detail embedded; others load on demand in B3) → `branches.json` (volatile, gitignored). Server `LAYERS` gains `branches`.
+  - **Files:** `.atlas/git-branches.js` (new), `.atlas/sync.js` (adapter + `ADAPTERS`), `.atlas/server.js` (`LAYERS`), `.gitignore`.
+  - **Verified:** numbers match raw git exactly — `feat/audiobook-agent` ↑14 ↓0, +4671/−1 across 44 files, 14 commits (vs `git rev-list --left-right --count origin/main...HEAD` = `0  14` and `git diff --shortstat` = 44 files/4671/1). **Idempotent** (`cmp -s` YES). **Graceful:** `overview`/`detail` on a non-git dir → `null`, no throw. `detail('origin/main')` → ahead 0 (it's the base).
+  - **Notes:** `--no-renames` so a rename reads honestly as remove-old + add-new. Caps: 100 commits / 200 files per branch. Base auto-detect prefers local `main`, then `origin/main`. `branches.json` is volatile (changes with every commit) — gitignored like `git.json`.
 
 - [x] **ATLAS-WIRE — wired the two atlas hooks into `.claude/settings.json` (2026-06-22).**
   - **What:** With the maintainer's explicit authorization (the self-modification guard had blocked the agent-planned edit), appended a **third Stop** entry (`atlas-sync.sh` — refresh the board each turn) and a **second SessionStart** entry (`atlas-cloud-session.sh` — cloud env-refresh) to `settings.json`, keeping every existing entry.

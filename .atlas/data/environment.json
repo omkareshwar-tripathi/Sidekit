@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-22",
+  "generatedAt": "2026-06-23",
   "generatedTier": "committed-only",
   "items": [
     {
@@ -9,7 +9,7 @@
       "sourcePath": ".claude/commands/ship.md",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -20,7 +20,7 @@
       "sourcePath": "BRICKS.md",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -31,7 +31,7 @@
       "sourcePath": "CLAUDE.md",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -42,7 +42,7 @@
       "sourcePath": ".claude/hooks/atlas-cloud-session.sh",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -53,7 +53,7 @@
       "sourcePath": ".claude/hooks/atlas-sync.sh",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -64,7 +64,7 @@
       "sourcePath": ".claude/hooks/check-bricks-updated.sh",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -75,7 +75,7 @@
       "sourcePath": ".claude/hooks/run-simplify-on-stop.sh",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -86,7 +86,7 @@
       "sourcePath": ".claude/hooks/session-start-bricks.sh",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -97,7 +97,7 @@
       "sourcePath": ".claude/hooks/skill-reminder.sh",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -108,7 +108,7 @@
       "sourcePath": ".claude/skills/dotnet-best-practices",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -119,7 +119,7 @@
       "sourcePath": ".claude/skills/dotnet-xunit",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -130,7 +130,7 @@
       "sourcePath": ".claude/skills/find-skills",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -141,7 +141,7 @@
       "sourcePath": ".claude/skills/graphify",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -152,7 +152,7 @@
       "sourcePath": ".claude/skills/grill-me",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     },
@@ -163,7 +163,7 @@
       "sourcePath": ".claude/skills/run-tests",
       "portable": true,
       "status": "applies-in-cloud",
-      "lastSeen": "2026-06-22",
+      "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
     }

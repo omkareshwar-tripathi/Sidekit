@@ -104,6 +104,24 @@
   "done": [
     {
       "checked": true,
+      "title": "ATLAS-B3 — on-demand `GET /api/branch/:name` endpoint (2026-06-23).",
+      "detail": "ATLAS-B3 — on-demand `GET /api/branch/:name` endpoint (2026-06-23).",
+      "section": "Done (Atlas)"
+    },
+    {
+      "checked": true,
+      "title": "ATLAS-B2 — Branches UI + branch-aware ribbon (2026-06-23).",
+      "detail": "ATLAS-B2 — Branches UI + branch-aware ribbon (2026-06-23).",
+      "section": "Done (Atlas)"
+    },
+    {
+      "checked": true,
+      "title": "ATLAS-B1 — `git-branches.js` module + `branches` adapter (2026-06-23).",
+      "detail": "ATLAS-B1 — `git-branches.js` module + `branches` adapter (2026-06-23).",
+      "section": "Done (Atlas)"
+    },
+    {
+      "checked": true,
       "title": "ATLAS-WIRE — wired the two atlas hooks into `.claude/settings.json` (2026-06-22).",
       "detail": "ATLAS-WIRE — wired the two atlas hooks into `.claude/settings.json` (2026-06-22).",
       "section": "Done (Atlas)"
@@ -131,25 +149,7 @@
       "title": "ATLAS-6 — flashcards + SM-2 spaced-repetition review + persistence (2026-06-22).",
       "detail": "ATLAS-6 — flashcards + SM-2 spaced-repetition review + persistence (2026-06-22).",
       "section": "Done (Atlas)"
-    },
-    {
-      "checked": true,
-      "title": "ATLAS-5 — edit-in-place → pending.json proposals (2026-06-22).",
-      "detail": "ATLAS-5 — edit-in-place → pending.json proposals (2026-06-22).",
-      "section": "Done (Atlas)"
-    },
-    {
-      "checked": true,
-      "title": "ATLAS-4 — six-layer UI rendering seeded data (cool editorial palette) (2026-06-22).",
-      "detail": "ATLAS-4 — six-layer UI rendering seeded data (cool editorial palette) (2026-06-22).",
-      "section": "Done (Atlas)"
-    },
-    {
-      "checked": true,
-      "title": "ATLAS-3b — `claude-context` adapter + two-tier `environment.json` merge (2026-06-22).",
-      "detail": "ATLAS-3b — `claude-context` adapter + two-tier `environment.json` merge (2026-06-22).",
-      "section": "Done (Atlas)"
     }
   ],
-  "generatedAt": "2026-06-22"
+  "generatedAt": "2026-06-23"
 }

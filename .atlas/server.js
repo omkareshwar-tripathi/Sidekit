@@ -16,7 +16,9 @@ const sm2 = require('./sm2');
 const HOST = '127.0.0.1';
 const PORT = 7842;
 const ROOT = __dirname; // the .atlas/ directory
+const REPO_ROOT = path.resolve(ROOT, '..');
 const DATA_DIR = path.join(ROOT, 'data');
+const gitBranches = require('./git-branches');
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -28,7 +30,7 @@ const CONTENT_TYPES = {
 
 // The data layers sync.js writes; GET /api/data returns their union.
 // A layer that hasn't been generated yet is reported as null (the UI degrades).
-const LAYERS = ['git', 'vision', 'progress', 'decisions', 'learning', 'environment', 'pending'];
+const LAYERS = ['git', 'vision', 'progress', 'decisions', 'learning', 'environment', 'pending', 'branches'];
 
 function readLayer(name) {
   try {
@@ -165,6 +167,22 @@ const server = http.createServer(async (req, res) => {
     const data = {};
     for (const layer of LAYERS) data[layer] = readLayer(layer);
     sendJson(res, 200, data);
+    return;
+  }
+
+  // On-demand detail for any branch (the picker loads non-current branches here).
+  if (req.method === 'GET' && route.startsWith('/api/branch/')) {
+    const name = decodeURIComponent(route.slice('/api/branch/'.length));
+    if (!gitBranches.branchNames(REPO_ROOT).includes(name)) {
+      sendJson(res, 404, { error: 'unknown branch' });
+      return;
+    }
+    const d = gitBranches.detail(REPO_ROOT, name);
+    if (!d) {
+      sendJson(res, 404, { error: 'no detail' });
+      return;
+    }
+    sendJson(res, 200, d);
     return;
   }
 

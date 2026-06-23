@@ -56,6 +56,7 @@ __pycache__/
 # purpose — it carries the view of machine-local AI config into the cloud.
 .atlas/data/git.json
 .atlas/data/pending.json
+.atlas/data/branches.json
 
 # Code map output (generated on demand by /graphify)
 graphify-out/

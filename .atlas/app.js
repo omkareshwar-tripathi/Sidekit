@@ -27,7 +27,7 @@ function plural(n, one, many) {
 }
 
 // ---- Welcome-back ribbon ----
-function renderRibbon(git, progress) {
+function renderRibbon(git, progress, branches) {
   const inner = $('#ribbon-inner');
   inner.replaceChildren();
   if (!git) {
@@ -38,15 +38,128 @@ function renderRibbon(git, progress) {
   const away = days <= 0 ? 'Picking up where you left off' : plural(days, 'day') + ' away';
   const doing = progress && progress.doing && progress.doing[0] ? progress.doing[0].title : git.lastCommitSubject;
 
+  // Branch-aware: how far the current branch is ahead of the base.
+  let branchBit = '';
+  if (branches && branches.branches) {
+    const cur = branches.branches.find((b) => b.isCurrent);
+    if (cur) branchBit = ' · ' + plural(cur.ahead, 'commit') + ' ahead of ' + branches.base;
+  }
+
   inner.append(
     el('p', { class: 'eyebrow' }, ['Welcome back']),
     el('h1', { html: '<b>' + escapeHtml(away) + '</b> — you were working on this branch.' }),
     el('p', { class: 'resume' }, ['Resume here → ', el('span', { class: 'pill' }, [doing])]),
     el('p', { class: 'meta' }, [
       el('code', null, [git.branch]),
-      ' · last commit ' + git.lastCommitDate + ' · ' + (git.cleanTree ? 'clean tree' : 'uncommitted changes'),
+      branchBit + ' · last commit ' + git.lastCommitDate + ' · ' + (git.cleanTree ? 'clean tree' : 'uncommitted changes'),
     ])
   );
+}
+
+// ---- Branches ----
+let branchData = null;
+
+function renderBranches(b) {
+  const body = $('#branches-body');
+  if (!body) return;
+  body.replaceChildren();
+  branchData = b;
+  if (!b || !b.branches || !b.branches.length) {
+    body.append(emptyState('Not a git repo, or no branches found.'));
+    return;
+  }
+  body.append(el('div', { class: 'branch-picker' }, b.branches.map((br) => branchChip(br))));
+  body.append(el('div', { id: 'branch-detail', class: 'branch-detail' }, []));
+  renderBranchDetail(b.detail);
+}
+
+function branchChip(br) {
+  const cls = 'bchip' + (br.isCurrent ? ' current active' : '') + (br.isRemote ? ' remote' : '');
+  const chip = el('button', { type: 'button', class: cls, 'data-text': (br.name + ' ' + br.bricksSection).toLowerCase() }, [
+    el('span', { class: 'bchip-name' }, [br.name]),
+    el('span', { class: 'bchip-meta' }, [
+      '↑' + br.ahead + ' ↓' + br.behind,
+      el('span', { class: 'bchip-stat add' }, ['+' + br.insertions]),
+      el('span', { class: 'bchip-stat del' }, ['−' + br.deletions]),
+      el('span', { class: 'bchip-age' }, [br.lastActivityDays + 'd']),
+    ]),
+  ]);
+  chip.addEventListener('click', () => selectBranch(br.name));
+  return chip;
+}
+
+async function selectBranch(name) {
+  document.querySelectorAll('.bchip').forEach((c) =>
+    c.classList.toggle('active', c.querySelector('.bchip-name').textContent === name)
+  );
+  if (branchData && branchData.detail && branchData.detail.name === name) {
+    renderBranchDetail(branchData.detail);
+    return;
+  }
+  const panel = $('#branch-detail');
+  panel.replaceChildren(el('p', { class: 'empty' }, ['Loading ' + name + '…']));
+  try {
+    const d = await fetch('/api/branch/' + encodeURIComponent(name)).then((r) => r.json());
+    if (d && d.name) renderBranchDetail(d);
+    else panel.replaceChildren(el('p', { class: 'empty' }, ['No detail for ' + name + '.']));
+  } catch {
+    panel.replaceChildren(el('p', { class: 'empty' }, ['Could not load ' + name + '.']));
+  }
+}
+
+function renderBranchDetail(d) {
+  const panel = $('#branch-detail');
+  if (!panel) return;
+  panel.replaceChildren();
+  if (!d) {
+    panel.append(emptyState('Select a branch.'));
+    return;
+  }
+  panel.append(
+    el('div', { class: 'bd-head' }, [
+      el('span', { class: 'bd-name' }, ['On ', el('code', null, [d.name])]),
+      el('span', { class: 'bd-stat' }, [
+        d.ahead + ' ahead of ' + d.base + ' · ' + plural(d.commits.length, 'commit') + ' · +' + d.insertions + '/−' + d.deletions + ' across ' + plural(d.filesChanged, 'file'),
+      ]),
+    ])
+  );
+
+  panel.append(el('div', { class: 'env-group-title' }, ['What was done — ' + plural(d.commits.length, 'commit')]));
+  panel.append(
+    d.commits.length
+      ? el('div', { class: 'commit-list' }, d.commits.map((c) =>
+          el('div', { class: 'commit', 'data-text': c.subject.toLowerCase() }, [
+            el('span', { class: 'c-sha' }, [c.sha]),
+            el('span', { class: 'c-subj' }, [c.subject]),
+            el('span', { class: 'c-date' }, [c.date]),
+          ])
+        ))
+      : emptyState('Nothing ahead of ' + d.base + '.')
+  );
+
+  panel.append(el('div', { class: 'env-group-title' }, ['What a merge into ' + d.base + ' adds / removes']));
+  panel.append(
+    d.files.length
+      ? el('div', { class: 'file-list' }, d.files.map((f) => {
+          const sc = f.status === 'A' ? 'add' : f.status === 'D' ? 'del' : 'mod';
+          const label = f.status === 'A' ? 'added' : f.status === 'D' ? 'removed' : 'modified';
+          return el('div', { class: 'frow ' + sc, 'data-text': f.path.toLowerCase() }, [
+            el('span', { class: 'f-status' }, [label]),
+            el('span', { class: 'f-path' }, [f.path]),
+            el('span', { class: 'f-stat' }, ['+' + f.insertions + ' −' + f.deletions]),
+          ]);
+        }))
+      : emptyState('No file changes vs ' + d.base + '.')
+  );
+
+  if (d.bricks && d.bricks.items && d.bricks.items.length) {
+    panel.append(el('div', { class: 'env-group-title' }, ['The story — ' + d.bricks.section]));
+    panel.append(
+      el('ul', { class: 'story' }, d.bricks.items.map((it) =>
+        el('li', { class: it.checked ? 'done' : 'open', 'data-text': it.title.toLowerCase() }, [(it.checked ? '✓ ' : '○ ') + it.title])
+      ))
+    );
+  }
 }
 
 // ---- Vision ----
@@ -462,7 +575,8 @@ async function boot() {
     $('#ribbon-inner').append(el('h1', null, ['Could not reach the atlas server.']));
     return;
   }
-  renderRibbon(data.git, data.progress);
+  renderRibbon(data.git, data.progress, data.branches);
+  renderBranches(data.branches);
   renderVision(data.vision);
   renderProgress(data.progress);
   renderDecisions(data.decisions);
