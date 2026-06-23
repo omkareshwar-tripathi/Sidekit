@@ -122,33 +122,21 @@
     },
     {
       "checked": true,
-      "title": "ATLAS-WIRE — wired the two atlas hooks into `.claude/settings.json` (2026-06-22).",
-      "detail": "ATLAS-WIRE — wired the two atlas hooks into `.claude/settings.json` (2026-06-22).",
-      "section": "Done (Atlas)"
+      "title": "HOMEBREW-DIST — Homebrew tap + install docs for the un-notarized DMG (2026-06-22).",
+      "detail": "HOMEBREW-DIST — Homebrew tap + install docs for the un-notarized DMG (2026-06-22). User couldn't distribute the DMG — on macOS 26 (Tahoe) Gatekeeper hard-rejects the self-signed (`Sidekit Local Signing`), un-notarized app once it carries t…",
+      "section": "Done (Mac)"
     },
     {
       "checked": true,
-      "title": "ATLAS-9 — cloud bootstrap scripts (2026-06-22).",
-      "detail": "ATLAS-9 — cloud bootstrap scripts (2026-06-22). *(SessionStart wiring → ATLAS-WIRE.)*",
-      "section": "Done (Atlas)"
+      "title": "INTEL-UI-FIXES — hover trigger, close button, growing panel (2026-06-12, user M11 feedback round 1).",
+      "detail": "INTEL-UI-FIXES — hover trigger, close button, growing panel (2026-06-12, user M11 feedback round 1). Three small bricks from the user's first walk of Intelligence v1, all shipped same-day. (1) INTEL-UI-HOVER `860ec42` — the invisible hover…",
+      "section": "Done (Mac)"
     },
     {
       "checked": true,
-      "title": "ATLAS-7 — `atlas-sync.sh` Stop-refresh hook (2026-06-22).",
-      "detail": "ATLAS-7 — `atlas-sync.sh` Stop-refresh hook (2026-06-22). *(Stop wiring → ATLAS-WIRE.)*",
-      "section": "Done (Atlas)"
-    },
-    {
-      "checked": true,
-      "title": "ATLAS-8 — promotion scaffolder: `sync.js --promote=<id>` + `POST /api/promote/:id` (2026-06-22).",
-      "detail": "ATLAS-8 — promotion scaffolder: `sync.js --promote=<id>` + `POST /api/promote/:id` (2026-06-22).",
-      "section": "Done (Atlas)"
-    },
-    {
-      "checked": true,
-      "title": "ATLAS-6 — flashcards + SM-2 spaced-repetition review + persistence (2026-06-22).",
-      "detail": "ATLAS-6 — flashcards + SM-2 spaced-repetition review + persistence (2026-06-22).",
-      "section": "Done (Atlas)"
+      "title": "INTELLIGENCE-V1 — pill hover menu, scratchpad panel, RAM-guest session, Settings Intelligence row (2026-06-12).",
+      "detail": "INTELLIGENCE-V1 — pill hover menu, scratchpad panel, RAM-guest session, Settings Intelligence row (2026-06-12). Final task of the Sidekit Intelligence v1 plan. What ships: (1) Pill hover menu — 3-button menu (Polish / Scratchpad / Dictate)…",
+      "section": "Done (Mac)"
     }
   ],
   "generatedAt": "2026-06-23"
