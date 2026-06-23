@@ -40,7 +40,7 @@ leading and Windows following it to parity.
 | `vision/` | Where the product is going and why — north star, roadmap, per-capability intent, website brief. | [`vision/README.md`](vision/README.md) |
 | `docs/` | Design specs (`superpowers/specs/`) and implementation plans (`superpowers/plans/`) for things actually being built, plus backend setup. | `docs/superpowers/specs/` |
 | `.claude/` | The AI-assisted dev setup — project skills, hooks, `settings.json`, and `scripts/` (e.g. `cloud-setup.sh`, the one-time remote-container bootstrap). | `.claude/settings.json` |
-| `.atlas/` | **Project Atlas** — a local, zero-dependency re-onboarding dashboard that reflects `vision/`, `BRICKS.md`, the specs' decisions, and the AI setup into one view (with flashcards for learning). Run `node .atlas/server.js`. | [`.atlas/README.md`](.atlas/README.md) |
+| `.atlas/` | **Project Atlas** — a local, zero-dependency re-onboarding dashboard that reflects `vision/`, `BRICKS.md`, the specs' decisions, and the AI setup into one view. Run `node .atlas/server.js`. | [`.atlas/README.md`](.atlas/README.md) |
 
 **`agents/`** holds the new voice-agent framework work: standalone SwiftPM packages that prove
 the listen→decide→act→verify loop end-to-end. The first agent is a functional audiobook player;
@@ -60,7 +60,6 @@ Windows prototype; a macOS CI can be added when needed.)
 - [`TESTING.md`](TESTING.md) — the original **Windows** v1 manual test plan (parked). The shipped macOS app's tests are in [`mac/TESTING.md`](mac/TESTING.md).
 - [`CLAUDE.md`](CLAUDE.md) — the working agreement for development on this repo (our engineering rules).
 - `LICENSE` — MIT.
-- `.mcp.json` / `.claude/global-memory.md` — **atlas portability artifacts**, present only after you "Promote" machine-local AI config from the dashboard's AI-Operating-Context layer (they carry your global MCP servers and global memory into the cloud, which can't see `~/.claude`). Generated and managed by `.atlas/sync.js --promote`; absent until first promoted.
 
 > **Not in the repo:** `lab/` (multi-gigabyte local model-evaluation scratch) and `bip-posts/`
 > (build-in-public drafts) are gitignored — they live only on the maintainer's machine.

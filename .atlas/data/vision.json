@@ -55,6 +55,12 @@
       "line": "The shelf + surface are open to local AI agents (mechanism TBD)",
       "platforms": "Mac · Windows",
       "status": "🔵 Vision"
+    },
+    {
+      "name": "Open agentic intelligence",
+      "line": "Fine-tune small on-device models to beat frontier models at narrow tasks, wrapped in an agentic harness — and released open-source",
+      "platforms": "Mac · Windows",
+      "status": "🟡 proven-in-lab · 🔵 open-source vision"
     }
   ],
   "openQuestions": [

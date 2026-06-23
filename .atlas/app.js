@@ -79,8 +79,6 @@ function branchChip(br) {
     el('span', { class: 'bchip-name' }, [br.name]),
     el('span', { class: 'bchip-meta' }, [
       '↑' + br.ahead + ' ↓' + br.behind,
-      el('span', { class: 'bchip-stat add' }, ['+' + br.insertions]),
-      el('span', { class: 'bchip-stat del' }, ['−' + br.deletions]),
       el('span', { class: 'bchip-age' }, [br.lastActivityDays + 'd']),
     ]),
   ]);
@@ -168,8 +166,8 @@ function renderVision(v) {
   body.replaceChildren();
   if (!v) return body.append(emptyState('No vision/README.md found.'));
 
-  if (v.northStar) body.append(makeEditable(el('p', { class: 'north' }, [v.northStar]), v.northStar, 'vision', 'northStar'));
-  if (v.pitch) body.append(makeEditable(el('p', { class: 'pitch' }, [v.pitch]), v.pitch, 'vision', 'pitch'));
+  if (v.northStar) body.append(el('p', { class: 'north' }, [v.northStar]));
+  if (v.pitch) body.append(el('p', { class: 'pitch' }, [v.pitch]));
 
   if (v.legend && v.legend.length) {
     body.append(el('ul', { class: 'legend' }, v.legend.map((l) => el('li', null, [l.emoji + ' ' + l.label]))));
@@ -196,8 +194,8 @@ function renderVision(v) {
     body.append(
       el('div', { class: 'qs-wrap' }, [
         el('div', { class: 'env-group-title' }, ['Open strategic questions']),
-        el('ul', { class: 'qs' }, v.openQuestions.map((q, i) =>
-          makeEditable(el('li', { 'data-text': q }, [q]), q, 'vision', 'openQuestion[' + i + ']')
+        el('ul', { class: 'qs' }, v.openQuestions.map((q) =>
+          el('li', { 'data-text': q }, [q])
         )),
       ])
     );
@@ -265,153 +263,14 @@ function renderDecisions(d) {
     body.append(
       el('div', { class: 'notes' }, [
         el('h3', null, ['Decision notes from the build log']),
-        ...d.notes.map((n) => {
-          const span = el('span', null, [n.text]);
-          makeEditable(span, n.text, 'decisions', 'note:' + n.context);
-          return el('p', { class: 'note', 'data-text': (n.context + ' ' + n.text).toLowerCase() }, [
+        ...d.notes.map((n) =>
+          el('p', { class: 'note', 'data-text': (n.context + ' ' + n.text).toLowerCase() }, [
             el('b', null, [n.context + ' — ']),
-            span,
-          ]);
-        }),
+            el('span', null, [n.text]),
+          ])
+        ),
       ])
     );
-  }
-}
-
-// ---- Learning: flashcards + in-dashboard SM-2 review ----
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-function button(label, onclick, cls) {
-  const b = el('button', { type: 'button', class: 'btn ' + (cls || '') }, [label]);
-  b.addEventListener('click', onclick);
-  return b;
-}
-
-let learnCards = [];
-let review = { queue: [], i: 0, showBack: false, active: false };
-
-function renderLearning(l) {
-  learnCards = (l && l.cards) || [];
-  const body = $('#learning-body');
-  body.replaceChildren();
-
-  const due = learnCards.filter((c) => !c.due || c.due <= todayStr());
-  body.append(
-    el('div', { class: 'learn-head' }, [
-      el('span', { class: 'due-count' }, [learnCards.length ? plural(due.length, 'card') + ' due today' : 'No cards yet']),
-      due.length ? button('Review now ▶', () => startReview(due), 'accent') : null,
-    ]),
-    el('div', { id: 'review-panel', class: 'review-panel' }, [])
-  );
-
-  if (learnCards.length) {
-    body.append(
-      el('div', { class: 'env-group-title' }, ['All cards']),
-      el('div', { class: 'grid cols-3' }, learnCards.map(cardTile))
-    );
-  }
-  body.append(addCardForm());
-  if (review.active) renderReviewPanel();
-}
-
-function cardTile(c) {
-  const mastery = c.reps >= 3 ? 'strong' : c.reps >= 1 ? 'learning' : 'new';
-  return el('div', { class: 'card tile', 'data-text': (c.front + ' ' + c.back).toLowerCase() }, [
-    el('div', { class: 'tile-front' }, [c.front]),
-    el('div', { class: 'tile-meta' }, [
-      el('span', { class: 'badge ' + mastery }, [mastery]),
-      el('span', { class: 'tile-due' }, ['due ' + (c.due || todayStr()) + ' · ' + plural(c.reps || 0, 'rep')]),
-    ]),
-  ]);
-}
-
-function startReview(due) {
-  review = { queue: due.slice(), i: 0, showBack: false, active: true };
-  renderReviewPanel();
-  $('#review-panel').scrollIntoView({ block: 'nearest' });
-}
-
-function renderReviewPanel() {
-  const panel = $('#review-panel');
-  if (!panel) return;
-  panel.replaceChildren();
-  if (!review.active) return;
-
-  if (review.i >= review.queue.length) {
-    panel.append(el('div', { class: 'review-done' }, ['Review complete ✦ — ' + plural(review.queue.length, 'card') + ' reviewed']));
-    review.active = false;
-    return;
-  }
-  const c = review.queue[review.i];
-  const face = el('div', { class: 'review-card' }, [
-    el('div', { class: 'review-progress' }, [review.i + 1 + ' / ' + review.queue.length]),
-    el('div', { class: 'rc-front' }, [c.front]),
-  ]);
-  if (!review.showBack) {
-    face.append(button('Show answer', () => { review.showBack = true; renderReviewPanel(); }, 'wide'));
-  } else {
-    face.append(
-      el('div', { class: 'rc-back' }, [c.back]),
-      el('div', { class: 'grade-row' }, [
-        button('Again', () => grade(c, 'again'), 'g-again'),
-        button('Hard', () => grade(c, 'hard'), 'g-hard'),
-        button('Good', () => grade(c, 'good'), 'g-good'),
-        button('Easy', () => grade(c, 'easy'), 'g-easy'),
-      ])
-    );
-  }
-  panel.append(face);
-}
-
-async function grade(c, g) {
-  try {
-    const j = await fetch('/api/review', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: c.id, grade: g }),
-    }).then((r) => r.json());
-    if (j && j.ok) {
-      const idx = learnCards.findIndex((x) => x.id === c.id);
-      if (idx >= 0) learnCards[idx] = j.card;
-    }
-  } catch {
-    /* keep advancing even if the write failed */
-  }
-  review.i += 1;
-  review.showBack = false;
-  renderReviewPanel();
-}
-
-function addCardForm() {
-  const front = el('input', { class: 'fld', type: 'text', placeholder: 'Front (the prompt)' });
-  const back = el('input', { class: 'fld', type: 'text', placeholder: 'Back (the answer)' });
-  const add = button('Add card', async () => {
-    if (!front.value.trim() || !back.value.trim()) return;
-    const j = await fetch('/api/card', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ front: front.value.trim(), back: back.value.trim() }),
-    }).then((r) => r.json()).catch(() => null);
-    if (j && j.ok) {
-      front.value = '';
-      back.value = '';
-      showToast('Card added');
-      reloadLearning();
-    }
-  }, 'accent');
-  return el('div', { class: 'add-card' }, [
-    el('div', { class: 'env-group-title' }, ['Add a card']),
-    el('div', { class: 'add-row' }, [front, back, add]),
-  ]);
-}
-
-async function reloadLearning() {
-  try {
-    const data = await fetch('/api/data').then((r) => r.json());
-    renderLearning(data.learning);
-  } catch {
-    /* leave current view */
   }
 }
 
@@ -466,81 +325,10 @@ function envRow(it, committedOnly) {
   ];
   if (it.promoteHint && it.status !== 'promoted') kids.push(el('div', { class: 'env-hint' }, ['↳ ' + it.promoteHint]));
 
-  // A Promote action where it makes sense: not for machine-bound/promoted/committed
-  // items, and only enabled when machine-local is live (cloud can't see ~/.claude).
-  const promotable = it.promoteHint && !it.machineBound && it.status !== 'promoted' && it.tier === 'machine-local';
-  let action = null;
-  if (promotable) {
-    if (committedOnly) {
-      action = el('button', { type: 'button', class: 'btn promote', disabled: 'true', title: 'Run the atlas locally — the cloud cannot see ~/.claude' }, ['Promote']);
-    } else {
-      action = button('Promote', () => doPromote(it.id), 'promote');
-    }
-  }
-
   return el('div', { class: 'env-item', 'data-text': (it.name + ' ' + statusText).toLowerCase() }, [
     el('div', { class: 'env-verdict' }, [VERDICT[it.status] || '•']),
     el('div', { class: 'env-main' }, kids),
-    action,
   ]);
-}
-
-async function doPromote(id) {
-  const j = await fetch('/api/promote/' + encodeURIComponent(id), { method: 'POST' })
-    .then((r) => r.json())
-    .catch(() => null);
-  if (j) showToast(j.message);
-  // Refresh the environment layer so a freshly-promoted item flips to ✅.
-  try {
-    const data = await fetch('/api/data').then((r) => r.json());
-    renderEnvironment(data.environment);
-  } catch {
-    /* leave current view */
-  }
-}
-
-// ---- edit-in-place: edits become proposals, never touch canonical docs ----
-async function postPending(payload) {
-  try {
-    const r = await fetch('/api/pending', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return await r.json();
-  } catch {
-    return null;
-  }
-}
-
-function makeEditable(node, originalString, layer, field) {
-  node.setAttribute('contenteditable', 'true');
-  node.setAttribute('spellcheck', 'false');
-  node.classList.add('editable');
-  let original = originalString;
-  node.addEventListener('blur', async () => {
-    const text = (node.textContent || '').trim();
-    if (!text || text === (original || '').trim()) return;
-    const j = await postPending({ layer, field, original, text });
-    if (j && j.ok) {
-      original = text;
-      showToast(plural(j.count, 'proposal') + ' pending — Claude folds these into the docs');
-    }
-  });
-  return node;
-}
-
-let toastTimer = null;
-function showToast(msg) {
-  let t = $('#toast');
-  if (!t) {
-    t = el('div', { id: 'toast', class: 'toast' }, []);
-    document.body.append(t);
-  }
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
 }
 
 // ---- shared ----
@@ -580,7 +368,6 @@ async function boot() {
   renderVision(data.vision);
   renderProgress(data.progress);
   renderDecisions(data.decisions);
-  renderLearning(data.learning);
   renderEnvironment(data.environment);
   setupSearch();
   $('#foot').textContent =

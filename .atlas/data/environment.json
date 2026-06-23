@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-06-23",
-  "generatedTier": "committed-only",
+  "generatedTier": "machine-local",
   "items": [
     {
       "id": "command:ship",
@@ -102,6 +102,39 @@
       "machineBound": false
     },
     {
+      "id": "info:node",
+      "name": "Node v24.10.0 (local runtime)",
+      "tier": "machine-local",
+      "sourcePath": "(local)",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "mcp:gitnexus",
+      "name": "Global MCP — gitnexus",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude.json",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .mcp.json (project scope, ${ENV} secrets)",
+      "machineBound": false
+    },
+    {
+      "id": "mem:global",
+      "name": "Global memory — ~/.claude/CLAUDE.md",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/CLAUDE.md",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/global-memory.md, @import from CLAUDE.md",
+      "machineBound": false
+    },
+    {
       "id": "skill:dotnet-best-practices",
       "name": "Skill — dotnet-best-practices",
       "tier": "committed",
@@ -132,6 +165,391 @@
       "status": "applies-in-cloud",
       "lastSeen": "2026-06-23",
       "promoteHint": "",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:app-ui-design",
+      "name": "Global skill — app-ui-design",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/app-ui-design",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/app-ui-design/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:build-in-public",
+      "name": "Global skill — build-in-public",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/build-in-public",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/build-in-public/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:bullmq-specialist",
+      "name": "Global skill — bullmq-specialist",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/bullmq-specialist",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/bullmq-specialist/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:clone-website",
+      "name": "Global skill — clone-website",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/clone-website",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/clone-website/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:deploy-to-vercel",
+      "name": "Global skill — deploy-to-vercel",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/deploy-to-vercel",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/deploy-to-vercel/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:dotnet-best-practices",
+      "name": "Global skill — dotnet-best-practices",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/dotnet-best-practices",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/dotnet-best-practices/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:dotnet-xunit",
+      "name": "Global skill — dotnet-xunit",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/dotnet-xunit",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/dotnet-xunit/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:emil-design-eng",
+      "name": "Global skill — emil-design-eng",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/emil-design-eng",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/emil-design-eng/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:extract-design-system",
+      "name": "Global skill — extract-design-system",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/extract-design-system",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/extract-design-system/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:find-skills",
+      "name": "Global skill — find-skills",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/find-skills",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/find-skills/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:flutter-design",
+      "name": "Global skill — flutter-design",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/flutter-design",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/flutter-design/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:flutter-frontend-design",
+      "name": "Global skill — flutter-frontend-design",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/flutter-frontend-design",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/flutter-frontend-design/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:framer-motion-animator",
+      "name": "Global skill — framer-motion-animator",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/framer-motion-animator",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/framer-motion-animator/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:frontend-design",
+      "name": "Global skill — frontend-design",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/frontend-design",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/frontend-design/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:graphify",
+      "name": "Global skill — graphify",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/graphify",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/graphify/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:grill-me",
+      "name": "Global skill — grill-me",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/grill-me",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/grill-me/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:ios-glass-ui-designer",
+      "name": "Global skill — ios-glass-ui-designer",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/ios-glass-ui-designer",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/ios-glass-ui-designer/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:meta-tags-optimizer",
+      "name": "Global skill — meta-tags-optimizer",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/meta-tags-optimizer",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/meta-tags-optimizer/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:mobile-app",
+      "name": "Global skill — mobile-app",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/mobile-app",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/mobile-app/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:mobile-app-design-mastery",
+      "name": "Global skill — mobile-app-design-mastery",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/mobile-app-design-mastery",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/mobile-app-design-mastery/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:mobile-app-ui-design",
+      "name": "Global skill — mobile-app-ui-design",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/mobile-app-ui-design",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/mobile-app-ui-design/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:nextjs-app-router-patterns",
+      "name": "Global skill — nextjs-app-router-patterns",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/nextjs-app-router-patterns",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/nextjs-app-router-patterns/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:nextjs-supabase-auth",
+      "name": "Global skill — nextjs-supabase-auth",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/nextjs-supabase-auth",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/nextjs-supabase-auth/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:playwright-e2e-testing",
+      "name": "Global skill — playwright-e2e-testing",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/playwright-e2e-testing",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/playwright-e2e-testing/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:portfolio-case-study-writer",
+      "name": "Global skill — portfolio-case-study-writer",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/portfolio-case-study-writer",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/portfolio-case-study-writer/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:react-dev",
+      "name": "Global skill — react-dev",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/react-dev",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/react-dev/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:render-deploy",
+      "name": "Global skill — render-deploy",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/render-deploy",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/render-deploy/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:run-tests",
+      "name": "Global skill — run-tests",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/run-tests",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/run-tests/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:tailwind-design-system",
+      "name": "Global skill — tailwind-design-system",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/tailwind-design-system",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/tailwind-design-system/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:teach",
+      "name": "Global skill — teach",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/teach",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/teach/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:ui-design-system",
+      "name": "Global skill — ui-design-system",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/ui-design-system",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/ui-design-system/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:ui-ux-designer",
+      "name": "Global skill — ui-ux-designer",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/ui-ux-designer",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/ui-ux-designer/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:ui-ux-pro-max",
+      "name": "Global skill — ui-ux-pro-max",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/ui-ux-pro-max",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/ui-ux-pro-max/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:user-acceptance",
+      "name": "Global skill — user-acceptance",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/user-acceptance",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/user-acceptance/",
+      "machineBound": false
+    },
+    {
+      "id": "skill:global:vercel-react-best-practices",
+      "name": "Global skill — vercel-react-best-practices",
+      "tier": "machine-local",
+      "sourcePath": "~/.claude/skills/vercel-react-best-practices",
+      "portable": false,
+      "status": "local-only",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "Promote → .claude/skills/vercel-react-best-practices/",
       "machineBound": false
     },
     {
@@ -166,6 +584,17 @@
       "lastSeen": "2026-06-23",
       "promoteHint": "",
       "machineBound": false
+    },
+    {
+      "id": "tool:gitnexus",
+      "name": "GitNexus — local git query backend",
+      "tier": "machine-local",
+      "sourcePath": "(global hook / binary)",
+      "portable": false,
+      "status": "local-only-machine-bound",
+      "lastSeen": "2026-06-23",
+      "promoteHint": "",
+      "machineBound": true
     }
   ]
 }

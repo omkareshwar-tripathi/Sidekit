@@ -4,6 +4,12 @@ Append-only archive of completed bricks, moved out of `BRICKS.md` to keep the ac
 
 ---
 
+- [x] **ATLAS-B1 — `git-branches.js` module + `branches` adapter (2026-06-23).**
+  - **What:** The data behind the branch-aware view (plan §H). New pure `git-branches.js` computes, per branch: ahead/behind vs the auto-detected base (`main`/`origin/main`), the three-dot diff `base...branch` (what a merge would add/remove — files + ±lines), the commit list since divergence, and the matching `BRICKS.md` `## … — on \`<branch>\`` section. `overview()` does cheap counts for all branches (local + `origin/*`, deduped so a pushed branch shows once); `detail()` does the full commit+file breakdown for one ref. A new `branches` adapter wires it into the §G seam (current branch's detail embedded; others load on demand in B3) → `branches.json` (volatile, gitignored). Server `LAYERS` gains `branches`.
+  - **Files:** `.atlas/git-branches.js` (new), `.atlas/sync.js` (adapter + `ADAPTERS`), `.atlas/server.js` (`LAYERS`), `.gitignore`.
+  - **Verified:** numbers match raw git exactly — `feat/audiobook-agent` ↑14 ↓0, +4671/−1 across 44 files, 14 commits (vs `git rev-list --left-right --count origin/main...HEAD` = `0  14` and `git diff --shortstat` = 44 files/4671/1). **Idempotent** (`cmp -s` YES). **Graceful:** `overview`/`detail` on a non-git dir → `null`, no throw. `detail('origin/main')` → ahead 0 (it's the base).
+  - **Notes:** `--no-renames` so a rename reads honestly as remove-old + add-new. Caps: 100 commits / 200 files per branch. Base auto-detect prefers local `main`, then `origin/main`. `branches.json` is volatile (changes with every commit) — gitignored like `git.json`. **Note (post-B1):** per-branch diffstat in `overview()` was later removed in ATLAS-SIMPLIFY (kept only in `detail()`).
+
 - [x] **ATLAS-WIRE — wired the two atlas hooks into `.claude/settings.json` (2026-06-22).**
   - **What:** With the maintainer's explicit authorization (the self-modification guard had blocked the agent-planned edit), appended a **third Stop** entry (`atlas-sync.sh` — refresh the board each turn) and a **second SessionStart** entry (`atlas-cloud-session.sh` — cloud env-refresh) to `settings.json`, keeping every existing entry.
   - **Files:** `.claude/settings.json`.

@@ -13,7 +13,6 @@ It is a *reflection* of the repo's existing sources of truth, not a new silo:
 | Vision | [`vision/README.md`](../vision/README.md) |
 | Progress (kanban) | [`BRICKS.md`](../BRICKS.md) checkboxes + current branch |
 | Decisions | `docs/superpowers/specs/*.md` decision tables + BRICKS notes |
-| Learning | atlas-owned flashcards + spaced-repetition state |
 | AI Operating Context | `.claude/` (committed) + `~/.claude/` (machine-local) |
 
 ## Run it
@@ -38,9 +37,8 @@ board reconciles against real git state and never drifts.
 `.atlas/` travels with the repo. Its derived data lives in `.atlas/data/`:
 
 - **Committed** (so the board is populated on a fresh clone): `vision.json`,
-  `progress.json`, `decisions.json`, `learning.json`, `environment.json`.
-- **Volatile** (gitignored — regenerated on every sync): `git.json`,
-  `pending.json`.
+  `progress.json`, `decisions.json`, `environment.json`.
+- **Volatile** (gitignored — regenerated on every sync): `git.json`.
 
 `environment.json` is deliberately committed: it is the snapshot that carries a
 *view* of your machine-local AI config (global `~/.claude/` memories, skills,

@@ -51,6 +51,7 @@ Everything here is part of the **always-on-top surface** and is **on-device** an
 | [**Polish + Drafting**](scratchpad-and-polish.md) | On-device intelligence: clean/format what you said, then *write* new text | Mac · Windows | 🟡 Polish proven · 🔵 Drafting vision |
 | [**Universal clipboard**](pillars/4-universal-clipboard.md) | Copy on any device → available on the others; flows through the surface | All four | 🔵 Vision |
 | **Agent access** | The shelf + surface are open to local AI agents (mechanism TBD) | Mac · Windows | 🔵 Vision |
+| **Open agentic intelligence** | Fine-tune small on-device models to beat frontier models at narrow tasks, wrapped in an agentic harness — and released open-source | Mac · Windows | 🟡 proven-in-lab · 🔵 open-source vision |
 
 **Status legend:** 🔵 Vision · 🟡 Designing / proven-in-lab · 🟠 Building · 🟢 Shipped
 
@@ -117,6 +118,10 @@ that make sense to share.
    shelf you can see is the shelf an agent uses.
 4. **Brick-led delivery.** Each capability earns its own spec → plan → bricks (the `CLAUDE.md` loop).
    This folder feeds that discipline; it never replaces it.
+5. **Small, specialized, and open.** The on-device intelligence is built by *supervised fine-tuning of
+   small models* (LoRA/QLoRA on Apple MLX) to **beat frontier models at narrow tasks** — wrapped in an
+   agentic harness and released **open-source**. The bet, stated honestly: a tuned small model you *own*
+   can beat a big one you *rent*, and giving the recipe away is the strength, not the leak.
 
 ## Open strategic questions (unresolved — don't silently decide)
 

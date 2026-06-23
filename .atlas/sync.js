@@ -140,11 +140,17 @@ const bricksAdapter = {
   read() {
     const lines = fs.readFileSync(repoPath('BRICKS.md'), 'utf8').split('\n');
     let section = '';
+    let h2Branch = null; // the nearest h2's `on `<branch>`` marker (h3/h4 don't change it)
     const items = [];
     for (const line of lines) {
-      const h = line.match(/^#{2,4}\s+(.*)$/);
-      if (h) {
-        section = h[1].replace(/[*_`]/g, '').trim();
+      const hm = line.match(/^(#{2,6})\s+(.*)$/);
+      if (hm) {
+        section = hm[2].replace(/[*_`]/g, '').trim();
+        if (hm[1].length === 2) {
+          // Only an h2 carries the branch marker (same regex as git-branches.js:109).
+          const on = hm[2].match(/on\s+`([^`]+)`/);
+          h2Branch = on ? on[1] : null;
+        }
         continue;
       }
       const m = line.match(/^\s*-\s*\[([ xX])\]\s+(.*)$/);
@@ -156,6 +162,7 @@ const bricksAdapter = {
         title: bold ? bold[1].trim() : truncate(body, 80),
         detail: truncate(body.replace(/\*\*/g, ''), 240),
         section,
+        branch: h2Branch,
       });
     }
 
@@ -428,20 +435,6 @@ function readPriorEnvironment() {
   }
 }
 
-// If a promotion artifact now exists committed, flip its machine-local source to "promoted".
-function markPromoted(byId) {
-  const mem = byId.get('mem:global');
-  if (mem && fs.existsSync(repoPath('.claude/global-memory.md'))) mem.status = 'promoted';
-  const mcpExists = fs.existsSync(repoPath('.mcp.json'));
-  for (const it of byId.values()) {
-    if (it.id.startsWith('mcp:') && mcpExists) it.status = 'promoted';
-    if (it.id.startsWith('skill:global:')) {
-      const name = it.id.slice('skill:global:'.length);
-      if (fs.existsSync(repoPath('.claude/skills/' + name))) it.status = 'promoted';
-    }
-  }
-}
-
 // The merge: rebuild committed fresh; rebuild OR preserve machine-local; union by id.
 function mergeEnvironment() {
   const prior = readPriorEnvironment();
@@ -461,7 +454,6 @@ function mergeEnvironment() {
       byId.set(it.id, carried); // preserve verbatim; lastSeen stays as last recorded
     }
   }
-  markPromoted(byId);
 
   const items = [...byId.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   return { generatedAt: today(), generatedTier, items };
@@ -507,113 +499,6 @@ const branchesAdapter = {
 const ADAPTERS = [gitAdapter, bricksAdapter, visionAdapter, decisionsAdapter, claudeContextAdapter, branchesAdapter];
 
 // ---------------------------------------------------------------------------
-// Promotion scaffolder (plan §F.2) — runs on the user's machine only.
-// Turns a machine-local item into a committed artifact that applies in the cloud.
-// Safety: Atlas-authored regions are fenced with sentinels and only those are
-// rewritten; a whole-file target that isn't atlas-authored is left untouched
-// (we back up before regenerating); operations are idempotent.
-// ---------------------------------------------------------------------------
-
-function backup(file) {
-  if (fs.existsSync(file)) fs.copyFileSync(file, file + '.bak');
-}
-function reEscape(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-// Replace the content between markdown sentinels for `id`, or append the block.
-// Human prose outside the sentinels is never touched.
-function upsertSentinelRegion(file, id, inner) {
-  const begin = '<!-- atlas:begin ' + id + ' -->';
-  const end = '<!-- atlas:end ' + id + ' -->';
-  const block = begin + '\n' + inner + '\n' + end;
-  let text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-  if (text.includes(begin) && text.includes(end)) {
-    text = text.replace(new RegExp(reEscape(begin) + '[\\s\\S]*?' + reEscape(end)), block);
-  } else {
-    text = text.replace(/\s*$/, '') + '\n\n' + block + '\n';
-  }
-  backup(file);
-  fs.writeFileSync(file, text);
-}
-
-function promoteMemory() {
-  const src = path.join(os.homedir(), '.claude/CLAUDE.md');
-  if (!fs.existsSync(src)) return { ok: false, message: 'No ~/.claude/CLAUDE.md to promote.' };
-  const target = repoPath('.claude/global-memory.md');
-  backup(target);
-  const header = '<!-- Atlas-owned: generated from ~/.claude/CLAUDE.md. Edit the source there, then re-run promote. -->\n\n';
-  fs.writeFileSync(target, header + fs.readFileSync(src, 'utf8'));
-  upsertSentinelRegion(repoPath('CLAUDE.md'), 'global-memory', '@.claude/global-memory.md');
-  return { ok: true, message: 'Promoted global memory → .claude/global-memory.md (+ sentinel @import in CLAUDE.md).' };
-}
-
-function promoteSkill(name) {
-  const src = path.join(os.homedir(), '.claude/skills', name);
-  if (!fs.existsSync(src)) return { ok: false, message: 'No ~/.claude/skills/' + name + ' to promote.' };
-  const target = repoPath('.claude/skills', name);
-  if (fs.existsSync(target)) return { ok: true, message: '.claude/skills/' + name + ' already committed — skipped (committed wins).' };
-  fs.cpSync(src, target, { recursive: true });
-  return { ok: true, message: 'Promoted skill → .claude/skills/' + name + '/.' };
-}
-
-function sanitizeMcp(cfg, name, requiredEnv) {
-  const out = { ...cfg };
-  if (out.env && typeof out.env === 'object') {
-    const env = {};
-    for (const k of Object.keys(out.env)) {
-      const v = '${' + (name + '_' + k).toUpperCase().replace(/[^A-Z0-9]/g, '_') + '}';
-      env[k] = v;
-      requiredEnv.add(v.slice(2, -1));
-    }
-    out.env = env;
-  }
-  return out;
-}
-
-function promoteMcp() {
-  const file = repoPath('.mcp.json');
-  if (fs.existsSync(file)) {
-    let existing;
-    try {
-      existing = JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch {
-      existing = null;
-    }
-    if (!existing || existing._atlas !== true) {
-      return { ok: false, message: '.mcp.json exists and is hand-edited (no atlas marker) — aborting, nothing clobbered.' };
-    }
-  }
-  let servers = {};
-  try {
-    servers = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude.json'), 'utf8')).mcpServers || {};
-  } catch {
-    /* none */
-  }
-  if (!Object.keys(servers).length) return { ok: false, message: 'No global MCP servers in ~/.claude.json to promote.' };
-
-  const requiredEnv = new Set();
-  const mcpServers = {};
-  for (const [name, cfg] of Object.entries(servers)) mcpServers[name] = sanitizeMcp(cfg, name, requiredEnv);
-  backup(file);
-  const out = {
-    _atlas: true,
-    _comment: 'Generated by Project Atlas from ~/.claude.json. Set these env vars in the cloud: ' + ([...requiredEnv].join(', ') || '(none)'),
-    mcpServers,
-  };
-  fs.writeFileSync(file, JSON.stringify(out, null, 2) + '\n');
-  return { ok: true, message: 'Promoted ' + Object.keys(mcpServers).length + ' MCP server(s) → .mcp.json. Required env: ' + ([...requiredEnv].join(', ') || '(none)') };
-}
-
-function promote(id) {
-  if (inCloud()) return { ok: false, message: 'Promotion runs on your machine — the cloud cannot see ~/.claude.' };
-  if (id === 'mem:global') return promoteMemory();
-  if (id.startsWith('skill:global:')) return promoteSkill(id.slice('skill:global:'.length));
-  if (id.startsWith('mcp:')) return promoteMcp();
-  return { ok: false, message: 'Nothing promotable for id: ' + id };
-}
-
-// ---------------------------------------------------------------------------
 // Driver
 // ---------------------------------------------------------------------------
 
@@ -648,11 +533,4 @@ function run() {
   }
 }
 
-const promoteArg = process.argv.find((a) => a.startsWith('--promote='));
-if (promoteArg) {
-  const result = promote(promoteArg.slice('--promote='.length));
-  console.log(result.message);
-  process.exit(result.ok ? 0 : 1);
-} else {
-  run();
-}
+run();

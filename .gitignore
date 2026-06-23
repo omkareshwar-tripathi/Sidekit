@@ -55,7 +55,6 @@ __pycache__/
 # only these two are machine-/moment-specific. environment.json stays committed on
 # purpose — it carries the view of machine-local AI config into the cloud.
 .atlas/data/git.json
-.atlas/data/pending.json
 .atlas/data/branches.json
 
 # Code map output (generated on demand by /graphify)

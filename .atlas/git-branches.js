@@ -154,7 +154,6 @@ function overview(repoRoot) {
     // A pushed branch shows once (local wins); only remote-only branches add a row.
     if (r.isRemote && localNames.has(r.name.replace(/^origin\//, ''))) continue;
     const { ahead, behind } = aheadBehind(git, base, r.name);
-    const stat = diffStat(git, base, r.name);
     branches.push({
       name: r.name,
       isCurrent: r.name === current,
@@ -164,9 +163,6 @@ function overview(repoRoot) {
       author: r.author,
       ahead,
       behind,
-      filesChanged: stat.filesChanged,
-      insertions: stat.insertions,
-      deletions: stat.deletions,
       lastActivityDays: daysSince(r.date),
       bricksSection: (matchBricksSection(repoRoot, r.name.replace(/^origin\//, '')) || {}).section || '',
     });

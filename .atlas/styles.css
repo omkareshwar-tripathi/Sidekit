@@ -143,8 +143,6 @@ body {
 .bchip-name { font-weight: 600; font-size: 13.5px; }
 .bchip.remote .bchip-name { color: var(--muted); }
 .bchip-meta { display: flex; gap: 8px; align-items: center; font-size: 11.5px; color: var(--faint); }
-.bchip-stat.add { color: var(--green); }
-.bchip-stat.del { color: var(--red); }
 
 .branch-detail { margin-top: 4px; }
 .bd-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
@@ -233,53 +231,8 @@ body {
 .note { border-left: 2px solid var(--line); padding: 2px 0 2px 14px; margin: 10px 0; color: var(--muted); font-size: 13.5px; }
 .note b { color: var(--ink); font-weight: 600; }
 
-/* ---- Learning ---- */
+/* ---- Empty state ---- */
 .empty { color: var(--faint); font-style: italic; }
-.btn {
-  font: 600 13.5px var(--sans);
-  color: var(--ink);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 8px 14px;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, transform 0.05s;
-}
-.btn:hover { border-color: var(--cyan); }
-.btn:active { transform: translateY(1px); }
-.btn.accent { color: #07221f; background: var(--cyan); border-color: var(--cyan); }
-.btn.wide { width: 100%; margin-top: 14px; }
-.learn-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
-.due-count { font: 500 15px var(--serif); color: var(--ink); }
-.review-panel:empty { display: none; }
-.review-card {
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 26px 24px;
-  margin: 6px 0 8px;
-  box-shadow: var(--shadow);
-}
-.review-progress { color: var(--faint); font-size: 12px; margin-bottom: 14px; }
-.rc-front { font: 400 21px/1.4 var(--serif); }
-.rc-back { color: var(--muted); margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
-.grade-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 18px; }
-.grade-row .g-again { border-color: rgba(244, 130, 138, 0.5); }
-.grade-row .g-hard { border-color: rgba(251, 191, 115, 0.45); }
-.grade-row .g-good { border-color: rgba(95, 211, 155, 0.45); }
-.grade-row .g-easy { border-color: rgba(94, 224, 214, 0.5); }
-.review-done { color: var(--green); font: 500 16px var(--serif); padding: 14px 0; }
-.tile .tile-front { font-weight: 600; font-size: 14.5px; }
-.tile .tile-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 8px; }
-.badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); text-transform: uppercase; letter-spacing: 0.04em; }
-.badge.new { color: var(--faint); }
-.badge.learning { color: var(--amber); border-color: rgba(251, 191, 115, 0.4); }
-.badge.strong { color: var(--green); border-color: rgba(95, 211, 155, 0.4); }
-.tile-due { color: var(--faint); font-size: 11.5px; }
-.add-card { margin-top: 22px; }
-.add-row { display: flex; gap: 10px; flex-wrap: wrap; }
-.fld { flex: 1; min-width: 180px; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 14px var(--sans); outline: none; }
-.fld:focus { border-color: var(--cyan); }
 
 /* ---- Environment / portability ---- */
 .env-item { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; }
@@ -294,32 +247,5 @@ body {
 .env-status.promoted { color: var(--cyan); }
 .env-hint { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
 .env-group-title { font: 600 12px/1 var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); margin: 18px 0 10px; }
-.env-item .btn.promote { align-self: center; padding: 6px 12px; font-size: 12.5px; white-space: nowrap; }
-.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
-.btn[disabled]:hover { border-color: var(--line); }
-
-/* ---- edit-in-place ---- */
-.editable { outline: none; border-radius: 6px; padding: 2px 4px; margin: 0 -4px; transition: box-shadow 0.15s, background 0.15s; }
-.editable:hover { box-shadow: inset 0 0 0 1px var(--line); }
-.editable:focus { box-shadow: inset 0 0 0 1px var(--cyan); background: rgba(94, 224, 214, 0.06); }
-
-.toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%) translateY(8px);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  color: var(--ink);
-  padding: 11px 18px;
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  font-size: 13.5px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s, transform 0.25s;
-  z-index: 20;
-}
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 .foot { max-width: 1080px; margin: 0 auto; padding: 28px 24px 48px; color: var(--faint); font-size: 12.5px; border-top: 1px solid var(--line); }
