@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # UserPromptSubmit hook: list available skills (project + user) and remind
-# Claude to check whether one applies before acting. CLAUDE.md §5 references
-# this hook as the source of the up-to-date skill list.
+# Claude to check whether one applies before acting.
 set -euo pipefail
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-USER_SKILLS_DIR="$HOME/.claude/skills"
+USER_SKILLS_DIR="${HOME:-/nonexistent}/.claude/skills"
 PROJECT_SKILLS_DIR="$PROJECT_DIR/.claude/skills"
 
 list_skills_in() {
@@ -16,7 +15,7 @@ list_skills_in() {
     rel="${f#"$root"/}"
     name="${rel%/SKILL.md}"
     desc=$(awk '
-      /^description:[[:space:]]*[|>]/ { in_block=1; next }
+      /^description:[[:space:]]*\|/ { in_block=1; next }
       in_block && /^[[:space:]]+/ { sub(/^[[:space:]]+/,""); print; exit }
       /^description:[[:space:]]*/ { sub(/^description:[[:space:]]*/, ""); print; exit }
     ' "$f" 2>/dev/null || true)
@@ -41,13 +40,13 @@ if [ -z "$project_list" ] && [ -z "$user_list" ]; then
   exit 0
 fi
 
-ctx="Before any operation (Write/Edit/Bash/Agent/etc.), scan the skill list below. If any folder-based skill applies to the task, read its SKILL.md before acting. These are in ADDITION to any skills already listed in the system prompt. Per CLAUDE.md §5, name the applicable skill on each plan/brick step's 'Skill:' line."
+ctx="Before any operation (Write/Edit/Bash/Agent/etc.), scan the skill list below. If any folder-based skill applies to the task, read its SKILL.md before acting. These are in ADDITION to any skills already listed in the system prompt."
 [ -n "$project_list" ] && ctx+=$'\n\nProject skills ('"$PROJECT_SKILLS_DIR"$'):\n'"$project_list"
 [ -n "$user_list" ] && ctx+=$'\n\nUser skills ('"$USER_SKILLS_DIR"$'):\n'"$user_list"
 
 if command -v jq >/dev/null 2>&1; then
   jq -nc --arg c "$ctx" '{hookSpecificOutput:{hookEventName:"UserPromptSubmit",additionalContext:$c}}'
 else
-  # Fallback: plain text is also accepted by the harness for UserPromptSubmit.
+  # Fallback: emit additionalContext as plain text (also accepted by the harness for UserPromptSubmit)
   printf '%s\n' "$ctx"
 fi
