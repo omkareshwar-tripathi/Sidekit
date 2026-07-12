@@ -16,24 +16,6 @@
             "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/atlas-cloud-session.sh"
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start-status.sh"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/skill-reminder.sh"
-          }
-        ]
       }
     ],
     "Stop": [
@@ -50,14 +32,6 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/atlas-sync.sh"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/check-status-updated.sh"
           }
         ]
       }
